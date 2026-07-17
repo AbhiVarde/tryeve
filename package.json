@@ -11,6 +11,7 @@
     "@ai-sdk/react": "^4.0.32",
     "@base-ui/react": "^1.6.0",
     "@streamdown/code": "^1.1.1",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.6.1",
     "@vercel/sandbox": "^2.6.1",
     "ai": "^7.0.29",
