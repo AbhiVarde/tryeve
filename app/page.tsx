@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { CheckIcon, type CheckIconHandle } from "@/components/ui/check";
-import { CopyIcon, type CopyIconHandle } from "@/components/ui/copy";
 import {
   DownloadIcon,
   type DownloadIconHandle,
 } from "@/components/ui/download";
 import { ChevronLeft, X } from "lucide-react";
 import { toast } from "sonner";
+import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
@@ -101,14 +102,12 @@ export default function Home() {
     index: number;
   } | null>(null);
   const [testStatus, setTestStatus] = useState<Record<string, TestState>>({});
-  const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
   const lastFileKey = useRef<string | null>(null);
 
   const downloadIconRef = useRef<DownloadIconHandle>(null);
-  const copyIconRef = useRef<CopyIconHandle>(null);
   const checkIconRefs = useRef<Map<string, CheckIconHandle>>(new Map());
 
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
@@ -132,11 +131,7 @@ export default function Home() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  useEffect(() => {
-    setCopied(false);
-  }, [selectedFile]);
-
-  async function onSubmit(e: React.FormEvent) {
+ async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
@@ -190,14 +185,6 @@ export default function Home() {
       setBusy(false);
       setPhase(null);
     }
-  }
-
-  async function handleCopy() {
-    if (!panelFile) return;
-    await navigator.clipboard.writeText(panelFile.content);
-    setCopied(true);
-    toast.success("copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
   }
 
   const remaining = MAX_INPUT_LENGTH - input.length;
@@ -386,19 +373,6 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={handleCopy}
-                  onMouseEnter={() => copyIconRef.current?.startAnimation()}
-                  onMouseLeave={() => copyIconRef.current?.stopAnimation()}
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label="copy file"
-                >
-                  {copied ? (
-                    <CheckIcon size={16} />
-                  ) : (
-                    <CopyIcon ref={copyIconRef} size={16} />
-                  )}
-                </button>
-                <button
                   onClick={() => setSelectedFile(null)}
                   className="text-muted-foreground hover:text-foreground"
                   aria-label="close"
@@ -407,9 +381,11 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            <pre className="flex-1 overflow-auto px-6 py-4 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
-              {panelFile.content}
-            </pre>
+            <div className="flex-1 overflow-auto px-6 py-4">
+              <Streamdown plugins={{ code }} className="text-xs">
+                {`\`\`\`${panelFile.filename.endsWith(".md") ? "markdown" : "ts"}\n${panelFile.content}\n\`\`\``}
+              </Streamdown>
+            </div>
           </div>
         )}
       </div>
