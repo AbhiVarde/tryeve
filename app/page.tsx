@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
@@ -17,17 +15,9 @@ import { toast } from "sonner";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
+type Message = { id: string; role: "user" | "assistant"; text: string };
 
 const MAX_INPUT_LENGTH = 500;
-
-function getText(message: UIMessage): string {
-  return message.parts
-    .filter(
-      (part): part is { type: "text"; text: string } => part.type === "text",
-    )
-    .map((part) => part.text)
-    .join("");
-}
 
 function parseFiles(raw: string): FileBlock[] {
   const regex = /```[a-zA-Z]*\n([\s\S]*?)```/g;
@@ -104,6 +94,8 @@ function TopBar({ hideOnMobile }: { hideOnMobile: boolean }) {
 
 export default function Home() {
   const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [busy, setBusy] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{
     messageId: string;
     index: number;
@@ -119,48 +111,12 @@ export default function Home() {
   const copyIconRef = useRef<CopyIconHandle>(null);
   const checkIconRefs = useRef<Map<string, CheckIconHandle>>(new Map());
 
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/generate" }),
-    onFinish: async (event) => {
-      const finished =
-        "message" in event ? event.message : (event as unknown as UIMessage);
-      const text = getText(finished);
+  const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
 
-      if (!text.trim()) return;
-
-      setTestStatus((prev) => ({ ...prev, [finished.id]: "testing" }));
-
-      try {
-        const res = await fetch("/api/test-agent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code: text }),
-        });
-        const result = await res.json();
-
-        setTestStatus((prev) => ({
-          ...prev,
-          [finished.id]: result.passed ? "passed" : "failed",
-        }));
-
-        toast[result.passed ? "success" : "error"](
-          result.passed
-            ? "sandbox test passed"
-            : "agent failed the sandbox test",
-        );
-      } catch {
-        setTestStatus((prev) => ({ ...prev, [finished.id]: "failed" }));
-        toast.error("sandbox test failed to run");
-      }
-    },
-    onError: () => toast.error("something went wrong, try again"),
-  });
-
-  const busy = status === "submitted" || status === "streaming";
   const activeMessage = selectedFile
     ? messages.find((m) => m.id === selectedFile.messageId)
     : null;
-  const activeFiles = activeMessage ? parseFiles(getText(activeMessage)) : [];
+  const activeFiles = activeMessage ? parseFiles(activeMessage.text) : [];
   const activeFile = selectedFile ? activeFiles[selectedFile.index] : null;
 
   const fileKey = selectedFile
@@ -180,7 +136,7 @@ export default function Home() {
     setCopied(false);
   }, [selectedFile]);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
@@ -191,9 +147,49 @@ export default function Home() {
       toast.error(`keep it under ${MAX_INPUT_LENGTH} characters`);
       return;
     }
+
     setSelectedFile(null);
-    sendMessage({ text: trimmed });
     setInput("");
+
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      text: trimmed,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setBusy(true);
+    setPhase("generating");
+    setTimeout(() => setPhase("testing"), 16000);
+
+    const assistantId = crypto.randomUUID();
+
+    try {
+      const res = await fetch("/api/build-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      const result = await res.json();
+
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", text: result.code ?? "" },
+      ]);
+
+      setTestStatus((prev) => ({
+        ...prev,
+        [assistantId]: result.passed ? "passed" : "failed",
+      }));
+
+      toast[result.passed ? "success" : "error"](
+        result.passed ? "sandbox test passed" : "agent failed the sandbox test",
+      );
+    } catch {
+      toast.error("something went wrong, try again");
+    } finally {
+      setBusy(false);
+      setPhase(null);
+    }
   }
 
   async function handleCopy() {
@@ -204,39 +200,39 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-const remaining = MAX_INPUT_LENGTH - input.length;
-const nearLimit = remaining <= 40;
+  const remaining = MAX_INPUT_LENGTH - input.length;
+  const nearLimit = remaining <= 40;
 
-const inputBar = (
-  <form onSubmit={onSubmit} className="w-full space-y-2">
-    <div className="relative">
-      <Textarea
-        placeholder="an agent that summarizes github issues..."
-        value={input}
-        maxLength={MAX_INPUT_LENGTH}
-        onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
-        className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1"
-      />
-      <span
-        className={`pointer-events-none absolute right-3 bottom-2.5 font-mono text-[11px] tabular-nums transition-colors ${
-          nearLimit ? "text-red-400" : "text-muted-foreground/60"
-        }`}
+  const inputBar = (
+    <form onSubmit={onSubmit} className="w-full space-y-2">
+      <div className="relative">
+        <Textarea
+          placeholder="an agent that summarizes github issues..."
+          value={input}
+          maxLength={MAX_INPUT_LENGTH}
+          onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
+          className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1"
+        />
+        <span
+          className={`pointer-events-none absolute right-3 bottom-2.5 font-mono text-[11px] tabular-nums transition-colors ${
+            nearLimit ? "text-red-400" : "text-muted-foreground/60"
+          }`}
+        >
+          {input.length}/{MAX_INPUT_LENGTH}
+        </span>
+      </div>
+      <Button
+        type="submit"
+        disabled={busy || input.trim().length === 0}
+        className="w-full"
       >
-        {input.length}/{MAX_INPUT_LENGTH}
-      </span>
-    </div>
-    <Button
-      type="submit"
-      disabled={busy || input.trim().length === 0}
-      className="w-full"
-    >
-      {busy && <Spinner className="size-4" />}
-      <span className="animate-in fade-in duration-300">
-        {busy ? "generating agent" : "generate agent"}
-      </span>
-    </Button>
-  </form>
-);
+        {busy && <Spinner className="size-4" />}
+        <span className="animate-in fade-in duration-300">
+          {busy ? "generating agent" : "generate agent"}
+        </span>
+      </Button>
+    </form>
+  );
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden">
@@ -274,18 +270,14 @@ const inputBar = (
                     return (
                       <div key={message.id} className="flex justify-end">
                         <div className="max-w-[85%] rounded-md bg-primary/10 px-3.5 py-2.5 font-mono text-sm">
-                          {getText(message)}
+                          {message.text}
                         </div>
                       </div>
                     );
                   }
 
-                  const text = getText(message);
-                  const files = parseFiles(text);
+                  const files = parseFiles(message.text);
                   const state = testStatus[message.id];
-                  const isLast =
-                    message.id === messages[messages.length - 1].id;
-                  const generating = isLast && status === "streaming";
                   const finishedTesting =
                     state === "passed" || state === "failed";
 
@@ -293,11 +285,7 @@ const inputBar = (
                     <div key={message.id} className="flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                          {generating
-                            ? "generating your agent..."
-                            : state === "testing"
-                              ? "running sandbox test..."
-                              : `${files.length} file${files.length !== 1 ? "s" : ""} generated`}
+                          {`${files.length} file${files.length !== 1 ? "s" : ""} generated`}
                         </p>
                         {finishedTesting && (
                           <button
@@ -336,18 +324,14 @@ const inputBar = (
                               className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-black/30 px-2.5 py-1 font-mono text-xs transition-colors hover:bg-accent/50"
                             >
                               {file.filename}
-                              {generating || state === "testing" ? (
-                                <Spinner className="size-3 text-muted-foreground" />
-                              ) : (
-                                <CheckIcon
-                                  ref={(el) => {
-                                    if (el) checkIconRefs.current.set(key, el);
-                                    else checkIconRefs.current.delete(key);
-                                  }}
-                                  size={16}
-                                  className="text-muted-foreground"
-                                />
-                              )}
+                              <CheckIcon
+                                ref={(el) => {
+                                  if (el) checkIconRefs.current.set(key, el);
+                                  else checkIconRefs.current.delete(key);
+                                }}
+                                size={16}
+                                className="text-muted-foreground"
+                              />
                             </button>
                           );
                         })}
@@ -355,6 +339,13 @@ const inputBar = (
                     </div>
                   );
                 })}
+                {busy && (
+                  <p className="text-sm text-muted-foreground">
+                    {phase === "generating"
+                      ? "generating your agent..."
+                      : "running sandbox test..."}
+                  </p>
+                )}
               </div>
             </div>
 

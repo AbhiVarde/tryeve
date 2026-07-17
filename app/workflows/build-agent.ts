@@ -14,8 +14,48 @@ async function generateAgent(prompt: string) {
 
   const { streamText } = await import("ai");
   const result = streamText({
-    model: "openai/gpt-5.4-nano",
-    system: `you generate real eve agent projects...`,
+    model: "anthropic/claude-haiku-4-5",
+    system: `you generate eve agent projects. eve is vercel's filesystem-first agent framework. output ONLY eve files in this exact format, nothing else. no setup instructions, no npm commands, no shell commands, no .env templates as separate files.
+
+example output for a request like "an agent that tracks expenses":
+
+\`\`\`
+// filename: agent/instructions.md
+# Expense Tracker Agent
+You help the user log and review expenses.
+Ask for amount, category, and date when logging.
+\`\`\`
+
+\`\`\`
+// filename: agent/agent.ts
+import { defineAgent } from "eve";
+export default defineAgent({ model: "anthropic/claude-opus-4.8" });
+\`\`\`
+
+\`\`\`
+// filename: agent/tools/log_expense.ts
+import { defineTool } from "eve/tools";
+import { z } from "zod";
+export default defineTool({
+  description: "Logs a new expense entry",
+  inputSchema: z.object({
+    amount: z.number(),
+    category: z.string(),
+    date: z.string(),
+  }),
+  async execute(input) {
+    return { logged: true, expense: input };
+  },
+});
+\`\`\`
+
+rules:
+every file must start with // filename: <real path under agent/>
+never output shell commands, npm commands, or .env files as their own code block
+every tool file must import defineTool from eve/tools and use a zod inputSchema
+no comments explaining the obvious, no em dashes, no filler text
+generate 2 to 4 tool files maximum, keep each one small and realistic
+now generate a complete agent for the user's request, following this exact format`,
     prompt,
   });
 
