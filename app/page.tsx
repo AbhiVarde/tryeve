@@ -9,14 +9,31 @@ import {
   DownloadIcon,
   type DownloadIconHandle,
 } from "@/components/ui/download";
-import { ChevronLeft, X } from "lucide-react";
+import { LinkIcon, type LinkIconHandle } from "@/components/ui/link";
+import {
+  ChevronLeftIcon,
+  type ChevronLeftIconHandle,
+} from "@/components/ui/chevron-left";
+import { XIcon, type XIconHandle } from "@/components/ui/x";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  Task,
+  TaskContent,
+  TaskItem,
+  TaskTrigger,
+} from "@/components/ai-elements/task";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
-type Message = { id: string; role: "user" | "assistant"; text: string };
+type Message = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  shareId?: string;
+};
 
 const MAX_INPUT_LENGTH = 500;
 
@@ -77,10 +94,18 @@ function VercelMark() {
   );
 }
 
-function TopBar({ hideOnMobile }: { hideOnMobile: boolean }) {
+function TopBar({
+  hideOnMobile,
+  onReset,
+}: {
+  hideOnMobile: boolean;
+  onReset: () => void;
+}) {
   return (
-    <div
-      className={`fixed top-0 left-0 z-30 items-center gap-2 px-6 py-4 ${
+    <button
+      onClick={onReset}
+      aria-label="start over"
+      className={`fixed top-0 left-0 z-30 items-center gap-2 px-6 py-4 opacity-90 transition-opacity hover:opacity-100 ${
         hideOnMobile ? "hidden md:flex" : "flex"
       }`}
     >
@@ -89,7 +114,7 @@ function TopBar({ hideOnMobile }: { hideOnMobile: boolean }) {
       <span className="font-mono text-sm font-medium tracking-tight">
         tryeve
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -107,8 +132,12 @@ export default function Home() {
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
   const lastFileKey = useRef<string | null>(null);
 
-  const downloadIconRef = useRef<DownloadIconHandle>(null);
+  // per-message refs so multiple generated agents in the thread don't share animation state
+  const downloadIconRefs = useRef<Map<string, DownloadIconHandle>>(new Map());
+  const linkIconRefs = useRef<Map<string, LinkIconHandle>>(new Map());
   const checkIconRefs = useRef<Map<string, CheckIconHandle>>(new Map());
+  const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
+  const xIconRef = useRef<XIconHandle>(null);
 
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
 
@@ -131,7 +160,16 @@ export default function Home() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
- async function onSubmit(e: React.FormEvent) {
+  function resetSession() {
+    if (busy) return;
+    setMessages([]);
+    setSelectedFile(null);
+    setPanelFile(null);
+    setTestStatus({});
+    setInput("");
+  }
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
@@ -168,17 +206,18 @@ export default function Home() {
 
       setMessages((prev) => [
         ...prev,
-        { id: assistantId, role: "assistant", text: result.code ?? "" },
+        {
+          id: assistantId,
+          role: "assistant",
+          text: result.code ?? "",
+          shareId: result.id,
+        },
       ]);
 
       setTestStatus((prev) => ({
         ...prev,
         [assistantId]: result.passed ? "passed" : "failed",
       }));
-
-      toast[result.passed ? "success" : "error"](
-        result.passed ? "sandbox test passed" : "agent failed the sandbox test",
-      );
     } catch {
       toast.error("something went wrong, try again");
     } finally {
@@ -223,7 +262,7 @@ export default function Home() {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden">
-      <TopBar hideOnMobile={!!selectedFile} />
+      <TopBar hideOnMobile={!!selectedFile} onReset={resetSession} />
 
       <div
         className={`flex h-full flex-col transition-[width] duration-300 ease-in-out ${
@@ -270,26 +309,89 @@ export default function Home() {
 
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
                           {`${files.length} file${files.length !== 1 ? "s" : ""} generated`}
+                          {finishedTesting && (
+                            <span
+                              className={
+                                state === "passed"
+                                  ? "text-emerald-500"
+                                  : "text-red-400"
+                              }
+                            >
+                              ·{" "}
+                              {state === "passed"
+                                ? "tests passed"
+                                : "tests failed"}
+                            </span>
+                          )}
                         </p>
+
                         {finishedTesting && (
-                          <button
-                            onClick={() => downloadZip(files)}
-                            onMouseEnter={() =>
-                              downloadIconRef.current?.startAnimation()
-                            }
-                            onMouseLeave={() =>
-                              downloadIconRef.current?.stopAnimation()
-                            }
-                            className="flex items-center gap-1.5 font-mono text-sm text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-                          >
-                            <DownloadIcon ref={downloadIconRef} size={16} />
-                            download zip
-                          </button>
+                          <div className="flex items-center gap-4 sm:gap-3.5">
+                            <button
+                              onClick={() => downloadZip(files)}
+                              onMouseEnter={() =>
+                                downloadIconRefs.current
+                                  .get(message.id)
+                                  ?.startAnimation()
+                              }
+                              onMouseLeave={() =>
+                                downloadIconRefs.current
+                                  .get(message.id)
+                                  ?.stopAnimation()
+                              }
+                              className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                            >
+                              <DownloadIcon
+                                ref={(el) => {
+                                  if (el)
+                                    downloadIconRefs.current.set(
+                                      message.id,
+                                      el,
+                                    );
+                                  else
+                                    downloadIconRefs.current.delete(message.id);
+                                }}
+                                size={14}
+                              />
+                              download
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  `${window.location.origin}/agent/${message.shareId}`,
+                                );
+                                toast.success("link copied");
+                              }}
+                              onMouseEnter={() =>
+                                linkIconRefs.current
+                                  .get(message.id)
+                                  ?.startAnimation()
+                              }
+                              onMouseLeave={() =>
+                                linkIconRefs.current
+                                  .get(message.id)
+                                  ?.stopAnimation()
+                              }
+                              className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                            >
+                              <LinkIcon
+                                ref={(el) => {
+                                  if (el)
+                                    linkIconRefs.current.set(message.id, el);
+                                  else linkIconRefs.current.delete(message.id);
+                                }}
+                                size={14}
+                              />
+                              share
+                            </button>
+                          </div>
                         )}
                       </div>
+
                       <div className="flex flex-wrap gap-2">
                         {files.map((file, idx) => {
                           const key = `${message.id}-${idx}`;
@@ -327,11 +429,48 @@ export default function Home() {
                   );
                 })}
                 {busy && (
-                  <p className="text-sm text-muted-foreground">
-                    {phase === "generating"
-                      ? "generating your agent..."
-                      : "running sandbox test..."}
-                  </p>
+                  <Task defaultOpen className="font-mono text-sm">
+                    <TaskTrigger title="building your agent" />
+                    <TaskContent>
+                      <TaskItem>
+                        <span className="flex items-center gap-2">
+                          {phase === "generating" ? (
+                            <Spinner className="size-3" />
+                          ) : (
+                            <CheckIcon
+                              size={12}
+                              className="text-muted-foreground"
+                            />
+                          )}
+                          {phase === "generating" ? (
+                            <Shimmer duration={1.5}>
+                              generating agent files
+                            </Shimmer>
+                          ) : (
+                            "generating agent files"
+                          )}
+                        </span>
+                      </TaskItem>
+                      <TaskItem>
+                        <span className="flex items-center gap-2">
+                          {phase === "testing" ? (
+                            <Spinner className="size-3" />
+                          ) : (
+                            <div className="size-2 rounded-full border border-muted-foreground/30" />
+                          )}
+                          {phase === "testing" ? (
+                            <Shimmer duration={1.5}>
+                              running sandbox test
+                            </Shimmer>
+                          ) : (
+                            <span className="text-muted-foreground/50">
+                              running sandbox test
+                            </span>
+                          )}
+                        </span>
+                      </TaskItem>
+                    </TaskContent>
+                  </Task>
                 )}
               </div>
             </div>
@@ -362,10 +501,16 @@ export default function Home() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSelectedFile(null)}
+                  onMouseEnter={() =>
+                    chevronLeftIconRef.current?.startAnimation()
+                  }
+                  onMouseLeave={() =>
+                    chevronLeftIconRef.current?.stopAnimation()
+                  }
                   className="text-muted-foreground hover:text-foreground md:hidden"
                   aria-label="back"
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeftIcon ref={chevronLeftIconRef} size={16} />
                 </button>
                 <span className="truncate font-mono text-sm font-medium">
                   {panelFile.filename}
@@ -374,10 +519,12 @@ export default function Home() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSelectedFile(null)}
+                  onMouseEnter={() => xIconRef.current?.startAnimation()}
+                  onMouseLeave={() => xIconRef.current?.stopAnimation()}
                   className="text-muted-foreground hover:text-foreground"
                   aria-label="close"
                 >
-                  <X size={16} />
+                  <XIcon ref={xIconRef} size={16} />
                 </button>
               </div>
             </div>
