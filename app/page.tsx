@@ -124,6 +124,46 @@ async function downloadZip(files: FileBlock[]) {
     zip.file(file.filename, file.content);
   });
 
+  zip.file(
+    "package.json",
+    JSON.stringify(
+      {
+        name: "my-eve-agent",
+        private: true,
+        type: "module",
+        scripts: { dev: "eve dev" },
+        dependencies: { eve: "latest" },
+      },
+      null,
+      2,
+    ),
+  );
+
+  zip.file(
+    "README.md",
+    `# your eve agent
+
+built with tryeve.
+
+## run it
+
+npm install
+npm run dev
+
+eve reads everything under agent/ automatically. no registration, no extra config.
+
+## structure
+
+agent/instructions.md defines what your agent does
+agent/agent.ts sets the model, only present if your agent needs a specific one
+agent/tools/ contains typed tools the agent can call, the filename is the tool name
+
+## docs
+
+https://eve.dev/docs/introduction
+`,
+  );
+
   const blob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
