@@ -1,5 +1,6 @@
 import { head } from "@vercel/blob";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { AgentViewer } from "./viewer";
 
 type FileBlock = { filename: string; content: string };
@@ -29,6 +30,33 @@ function parseFiles(raw: string): FileBlock[] {
   return blocks;
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+
+  try {
+    const blob = await head(`agents/${id}.json`, {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    const res = await fetch(blob.url);
+    const data: { prompt: string } = await res.json();
+
+    return {
+      title: data.prompt,
+      description: `an eve agent built with tryeve: ${data.prompt}`,
+      openGraph: {
+        title: data.prompt,
+        description: `an eve agent built with tryeve: ${data.prompt}`,
+      },
+    };
+  } catch {
+    return { title: "shared agent" };
+  }
+}
+
 export default async function AgentPage({
   params,
 }: {
@@ -52,4 +80,3 @@ export default async function AgentPage({
 
   return <AgentViewer prompt={data.prompt} files={files} />;
 }
-

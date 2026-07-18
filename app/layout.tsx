@@ -17,8 +17,42 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "tryeve",
-  description: "build and test a real eve agent, right in the browser",
+  metadataBase: new URL("https://tryeve.abhivarde.in"),
+  title: {
+    default: "tryeve, describe an agent, get a working one",
+    template: "%s · tryeve",
+  },
+  description:
+    "a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description. no install, no terminal.",
+  keywords: ["eve", "ai agent builder", "vercel sandbox", "agent generator"],
+  authors: [{ name: "abhi varde", url: "https://abhivarde.in" }],
+  openGraph: {
+    title: "tryeve, describe an agent, get a working one",
+    description:
+      "a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description. no install, no terminal.",
+    url: "https://tryeve.abhivarde.in",
+    siteName: "tryeve",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "tryeve, describe an agent, get a working one",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "tryeve, describe an agent, get a working one",
+    description:
+      "a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description. no install, no terminal.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
