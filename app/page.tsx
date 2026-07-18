@@ -66,20 +66,34 @@ type ChatSession = AgentSession & { agentMessageId: string };
 
 const MAX_INPUT_LENGTH = 500;
 
-const FEATURES: string[] = [
-  "describe an agent in plain english",
-  "generates real, working eve files",
-  "every agent is tested against a live eve runtime before you see it",
-  "generation and testing run as one durable step, survives crashes",
-  "inspect every file with syntax highlighting",
-  "export the full agent as a zip",
-  "share a live link to any agent you build",
-  "connect to your agent right after it's built, no install needed",
-  "chat with it live, with markdown-formatted replies",
-  "auto-scrolling chat with a jump-to-latest button",
-  "reload the page anytime, your agent and chat pick up right where you left off",
-  "idle or closed sandboxes shut down automatically, nothing left running",
-  "dark, minimal, vercel-inspired interface",
+const FEATURE_GROUPS: { label: string; items: string[] }[] = [
+  {
+    label: "build & test",
+    items: [
+      "describe an agent in plain english",
+      "generates real, working eve files",
+      "every agent is tested against a live eve runtime before you see it",
+      "generation and testing run as one durable step, survives crashes",
+    ],
+  },
+  {
+    label: "chat & share",
+    items: [
+      "inspect every file with syntax highlighting",
+      "export the full agent as a zip",
+      "share a live link to any agent you build",
+      "connect to your agent right after it's built, no install needed",
+      "chat with it live, with markdown-formatted replies",
+      "auto-scrolling chat with a jump-to-latest button",
+    ],
+  },
+  {
+    label: "reliability",
+    items: [
+      "reload the page anytime, your agent and chat pick up right where you left off",
+      "idle or closed sandboxes shut down automatically, nothing left running",
+    ],
+  },
 ];
 
 const VERCEL_PRODUCTS: { name: string; description: string }[] = [
@@ -932,16 +946,25 @@ function HomeInner() {
                       <p className="mb-4 font-mono text-xs tracking-wide text-muted-foreground">
                         features
                       </p>
-                      <ul className="flex flex-col gap-2.5">
-                        {FEATURES.map((feature) => (
-                          <li
-                            key={feature}
-                            className="font-mono text-xs leading-relaxed text-foreground/80"
-                          >
-                            ↳ {feature}
-                          </li>
+                      <div className="flex flex-col gap-5">
+                        {FEATURE_GROUPS.map((group) => (
+                          <div key={group.label}>
+                            <p className="mb-2 font-mono text-[11px] text-muted-foreground/70">
+                              {group.label}
+                            </p>
+                            <ul className="flex flex-col gap-2.5">
+                              {group.items.map((feature) => (
+                                <li
+                                  key={feature}
+                                  className="font-mono text-xs leading-relaxed text-foreground/80"
+                                >
+                                  ↳ {feature}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
 
                     <div>
