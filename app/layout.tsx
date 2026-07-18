@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from "@vercel/analytics/next";
 import { BackgroundGlow } from "@/components/background-glow";
 import "./globals.css";
@@ -34,9 +35,11 @@ export default function RootLayout({
         className="min-h-full flex flex-col bg-background text-foreground"
         style={{ fontFamily: "var(--font-geist-sans)" }}
       >
-        <BackgroundGlow />
-        {children}
-        <Toaster />
+        <TooltipProvider>
+          <BackgroundGlow />
+          {children}
+          <Toaster />
+        </TooltipProvider>
         <Analytics />
       </body>
     </html>

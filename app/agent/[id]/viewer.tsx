@@ -30,14 +30,14 @@ export function AgentViewer({
     <div className="relative min-h-screen w-full overflow-hidden">
       <TopBar />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col gap-6 px-6 pt-24 pb-16">
+      <div className="relative z-10 mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 pt-24 pb-16">
         <div>
           <p className="mb-2 font-mono text-xs text-muted-foreground">
             shared agent
           </p>
-          <p className="rounded-md bg-primary/10 px-3.5 py-2.5 font-mono text-sm">
+          <div className="w-full bg-black! px-3 py-1.5 font-mono text-sm text-white rounded-lg! shadow-sm">
             {prompt}
-          </p>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -77,10 +77,14 @@ export function AgentViewer({
           href="/"
           onMouseEnter={() => arrowIconRef.current?.startAnimation()}
           onMouseLeave={() => arrowIconRef.current?.stopAnimation()}
-          className="mx-auto mt-4 flex items-center gap-1.5 rounded-md border border-border/60 px-4 py-2 font-mono text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+          className="group mx-auto mt-4 flex cursor-pointer items-center gap-1.5 font-mono text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           build your own agent
-          <ArrowRightIcon ref={arrowIconRef} size={14} />
+          <ArrowRightIcon
+            ref={arrowIconRef}
+            size={14}
+            className="transition-transform duration-300 group-hover:translate-x-1"
+          />
         </Link>
       </div>
     </div>

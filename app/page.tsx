@@ -23,6 +23,11 @@ import {
   CircleHelpIcon,
   type CircleHelpIconHandle,
 } from "@/components/ui/circle-help";
+import {
+  BotMessageSquareIcon,
+  type BotMessageSquareHandle,
+} from "@/components/ui/bot-message-square";
+import { LogoutIcon, type LogoutIconHandle } from "@/components/ui/logout";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
@@ -33,9 +38,19 @@ import {
   TaskItem,
   TaskTrigger,
 } from "@/components/ai-elements/task";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
 import { TopBar } from "@/components/topbar";
 import { PanelGlow } from "@/components/panel-glow";
 import { VercelMark } from "@/components/vercel-mark";
+import {
+  useAgentChat,
+  AgentConversation,
+  type AgentSession,
+} from "@/components/agent-chat-panel";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
@@ -43,8 +58,10 @@ type Message = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  kind: "generate" | "chat";
   shareId?: string;
 };
+type ChatSession = AgentSession & { agentMessageId: string };
 
 const MAX_INPUT_LENGTH = 500;
 
@@ -56,12 +73,14 @@ const FEATURES: string[] = [
   "inspect every file with syntax highlighting",
   "export the full agent as a zip",
   "share a live link to any agent you build",
+  "connect to your agent right after it's built, no install needed",
+  "chat with it live, with markdown-formatted replies",
+  "auto-scrolling chat with a jump-to-latest button",
   "dark, minimal, vercel-inspired interface",
 ];
 
 const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   { name: "next.js", description: "the app itself" },
-  { name: "shadcn/ui", description: "every ui component" },
   {
     name: "ai gateway",
     description: "routes the generation request to a model",
@@ -69,7 +88,7 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   { name: "ai sdk", description: "streams the model's response" },
   {
     name: "sandbox",
-    description: "tests every generated file before showing it",
+    description: "tests every agent, then runs it live so you can talk to it",
   },
   {
     name: "workflow sdk",
@@ -81,9 +100,10 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   },
   {
     name: "ai elements",
-    description: "the task progress ui and shimmer loading text",
+    description: "the chat interface, task progress ui, shimmer loading text",
   },
   { name: "streamdown", description: "renders code and markdown cleanly" },
+  { name: "shadcn/ui", description: "every ui component" },
   { name: "vercel", description: "hosts and deploys the app" },
   {
     name: "analytics",
@@ -183,7 +203,6 @@ export default function Home() {
   } | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [testStatus, setTestStatus] = useState<Record<string, TestState>>({});
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
   const lastFileKey = useRef<string | null>(null);
@@ -191,14 +210,76 @@ export default function Home() {
   const downloadIconRefs = useRef<Map<string, DownloadIconHandle>>(new Map());
   const linkIconRefs = useRef<Map<string, LinkIconHandle>>(new Map());
   const checkIconRefs = useRef<Map<string, CheckIconHandle>>(new Map());
+  const botIconRefs = useRef<Map<string, BotMessageSquareHandle>>(new Map());
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const xIconRef = useRef<XIconHandle>(null);
   const circleHelpIconRef = useRef<CircleHelpIconHandle>(null);
+  const logoutIconRef = useRef<LogoutIconHandle>(null);
 
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
 
+  const [chatSession, setChatSession] = useState<ChatSession | null>(null);
+  const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
+
+  const {
+    messages: agentMessages,
+    sendMessage,
+    status,
+  } = useAgentChat(chatSession, (patch) =>
+    setChatSession((prev) => (prev ? { ...prev, ...patch } : prev)),
+  );
+
   const panelOpen = !!selectedFile || showInfo;
+
+  const chatSessionRef = useRef<ChatSession | null>(null);
+  useEffect(() => {
+    chatSessionRef.current = chatSession;
+  }, [chatSession]);
+
+  useEffect(() => {
+    function stopActiveSandbox() {
+      const session = chatSessionRef.current;
+      if (!session) return;
+      navigator.sendBeacon(
+        "/api/stop-agent",
+        new Blob([JSON.stringify({ sandboxName: session.sandboxName })], {
+          type: "application/json",
+        }),
+      );
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") stopActiveSandbox();
+    }
+
+    window.addEventListener("beforeunload", stopActiveSandbox);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", stopActiveSandbox);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!chatSession) return;
+
+    const timer = setTimeout(
+      () => {
+        fetch("/api/stop-agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sandboxName: chatSession.sandboxName }),
+        });
+        setChatSession(null);
+        toast.info("agent disconnected after 5 minutes of inactivity");
+      },
+      5 * 60 * 1000,
+    );
+
+    return () => clearTimeout(timer);
+  }, [chatSession, agentMessages.length]);
 
   const activeMessage = selectedFile
     ? messages.find((m) => m.id === selectedFile.messageId)
@@ -215,16 +296,13 @@ export default function Home() {
     if (activeFile) setPanelFile(activeFile);
   }
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages]);
-
   function resetSession() {
     if (busy) return;
     setMessages([]);
     setSelectedFile(null);
     setPanelFile(null);
     setShowInfo(false);
+    setChatSession(null);
     setTestStatus({});
     setInput("");
   }
@@ -244,26 +322,82 @@ export default function Home() {
     setShowInfo(false);
   }
 
+  function endChat() {
+    if (chatSession) {
+      fetch("/api/stop-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sandboxName: chatSession.sandboxName }),
+      });
+    }
+    setChatSession(null);
+  }
+
+  async function startChat(message: Message) {
+    setChatLoadingId(message.id);
+
+    try {
+      const res = await fetch("/api/run-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: message.text }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        toast.error(
+          data.error ??
+            "unable to reach your agent. check the connection and try again.",
+        );
+        return;
+      }
+
+      setChatSession({
+        agentMessageId: message.id,
+        url: data.url,
+        sandboxName: data.sandboxName,
+        sessionId: null,
+        continuationToken: null,
+        turnCount: 0,
+      });
+    } catch {
+      toast.error("failed to connect to your agent. please try again.");
+    } finally {
+      setChatLoadingId(null);
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
-      toast.error("describe your agent first");
+      toast.error(
+        chatSession
+          ? "enter a message before sending"
+          : "enter a prompt to build your agent",
+      );
       return;
     }
     if (trimmed.length > MAX_INPUT_LENGTH) {
-      toast.error(`keep it under ${MAX_INPUT_LENGTH} characters`);
+      toast.error(`keep your prompt under ${MAX_INPUT_LENGTH} characters`);
+      return;
+    }
+
+    setInput("");
+
+    if (chatSession) {
+      sendMessage({ text: trimmed });
       return;
     }
 
     setSelectedFile(null);
     setShowInfo(false);
-    setInput("");
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
       text: trimmed,
+      kind: "generate",
     };
     setMessages((prev) => [...prev, userMessage]);
     setBusy(true);
@@ -286,6 +420,7 @@ export default function Home() {
           id: assistantId,
           role: "assistant",
           text: result.code ?? "",
+          kind: "generate",
           shareId: result.id,
         },
       ]);
@@ -295,7 +430,9 @@ export default function Home() {
         [assistantId]: result.passed ? "passed" : "failed",
       }));
     } catch {
-      toast.error("something went wrong, try again");
+      toast.error(
+        "something went wrong building your agent. please try again.",
+      );
     } finally {
       setBusy(false);
       setPhase(null);
@@ -304,12 +441,35 @@ export default function Home() {
 
   const remaining = MAX_INPUT_LENGTH - input.length;
   const nearLimit = remaining <= 40;
+  const submitting = chatSession ? status === "streaming" : busy;
 
   const inputBar = (
     <form onSubmit={onSubmit} className="w-full space-y-2">
+      {chatSession && (
+        <div className="flex items-center justify-between rounded-md bg-primary/5 px-3 py-2 font-mono text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-emerald-500" />
+            agent connected
+          </span>
+          <button
+            type="button"
+            onClick={endChat}
+            onMouseEnter={() => logoutIconRef.current?.startAnimation()}
+            onMouseLeave={() => logoutIconRef.current?.stopAnimation()}
+            className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <LogoutIcon ref={logoutIconRef} size={13} />
+            disconnect
+          </button>
+        </div>
+      )}
       <div className="relative">
         <Textarea
-          placeholder="an agent that summarizes github issues..."
+          placeholder={
+            chatSession
+              ? "message your agent..."
+              : "an agent that summarizes github issues..."
+          }
           value={input}
           maxLength={MAX_INPUT_LENGTH}
           onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
@@ -325,12 +485,18 @@ export default function Home() {
       </div>
       <Button
         type="submit"
-        disabled={busy || input.trim().length === 0}
-        className="w-full"
+        disabled={submitting || input.trim().length === 0}
+        className="w-full cursor-pointer"
       >
-        {busy && <Spinner className="size-4" />}
+        {submitting && <Spinner className="size-4" />}
         <span className="animate-in fade-in duration-300">
-          {busy ? "generating agent" : "generate agent"}
+          {chatSession
+            ? status === "streaming"
+              ? "sending"
+              : "send"
+            : busy
+              ? "generating agent"
+              : "generate agent"}
         </span>
       </Button>
     </form>
@@ -347,7 +513,7 @@ export default function Home() {
             onMouseEnter={() => circleHelpIconRef.current?.startAnimation()}
             onMouseLeave={() => circleHelpIconRef.current?.stopAnimation()}
             aria-label="about tryeve"
-            className="text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground cursor-pointer"
+            className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
           >
             <CircleHelpIcon ref={circleHelpIconRef} size={16} />
           </button>
@@ -365,8 +531,9 @@ export default function Home() {
               <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                 describe an agent. get a working one.
               </h1>
-              <p className="mt-3 max-w-sm text-sm text-muted-foreground">
-                no install, no terminal. built and tested right here.
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                no install, no terminal. built, tested, and ready to talk to,
+                right here.
               </p>
 
               <div className="mt-10 w-full">{inputBar}</div>
@@ -374,16 +541,13 @@ export default function Home() {
           </div>
         ) : (
           <>
-            <div
-              ref={scrollRef}
-              className="flex-1 overflow-auto px-6 pt-16 pb-8"
-            >
-              <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+            <Conversation className="flex-1 pt-12">
+              <ConversationContent className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6">
                 {messages.map((message) => {
                   if (message.role === "user") {
                     return (
                       <div key={message.id} className="flex justify-end">
-                        <div className="max-w-[85%] rounded-md bg-primary/10 px-3.5 py-2.5 font-mono text-sm">
+                        <div className="max-w-[85%] bg-black! px-3 py-1.5 font-mono text-sm text-white rounded-lg! shadow-sm">
                           {message.text}
                         </div>
                       </div>
@@ -394,6 +558,7 @@ export default function Home() {
                   const state = testStatus[message.id];
                   const finishedTesting =
                     state === "passed" || state === "failed";
+                  const isThisChat = chatSession?.agentMessageId === message.id;
 
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
@@ -430,7 +595,7 @@ export default function Home() {
                                   .get(message.id)
                                   ?.stopAnimation()
                               }
-                              className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                             >
                               <DownloadIcon
                                 ref={(el) => {
@@ -446,13 +611,12 @@ export default function Home() {
                               />
                               download
                             </button>
-
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(
                                   `${window.location.origin}/agent/${message.shareId}`,
                                 );
-                                toast.success("link copied");
+                                toast.success("link copied to your clipboard");
                               }}
                               onMouseEnter={() =>
                                 linkIconRefs.current
@@ -464,7 +628,7 @@ export default function Home() {
                                   .get(message.id)
                                   ?.stopAnimation()
                               }
-                              className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                             >
                               <LinkIcon
                                 ref={(el) => {
@@ -475,6 +639,46 @@ export default function Home() {
                                 size={14}
                               />
                               share
+                            </button>
+                            <button
+                              onClick={() => startChat(message)}
+                              disabled={
+                                chatLoadingId === message.id || isThisChat
+                              }
+                              onMouseEnter={() =>
+                                botIconRefs.current
+                                  .get(message.id)
+                                  ?.startAnimation()
+                              }
+                              onMouseLeave={() =>
+                                botIconRefs.current
+                                  .get(message.id)
+                                  ?.stopAnimation()
+                              }
+                              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                            >
+                              {chatLoadingId === message.id ? (
+                                <Spinner className="size-3.5" />
+                              ) : isThisChat ? (
+                                <CheckIcon
+                                  size={14}
+                                  className="text-emerald-500"
+                                />
+                              ) : (
+                                <BotMessageSquareIcon
+                                  ref={(el) => {
+                                    if (el)
+                                      botIconRefs.current.set(message.id, el);
+                                    else botIconRefs.current.delete(message.id);
+                                  }}
+                                  size={14}
+                                />
+                              )}
+                              {chatLoadingId === message.id
+                                ? "connecting"
+                                : isThisChat
+                                  ? "connected"
+                                  : "connect"}
                             </button>
                           </div>
                         )}
@@ -493,7 +697,7 @@ export default function Home() {
                               onMouseLeave={() =>
                                 checkIconRefs.current.get(key)?.stopAnimation()
                               }
-                              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-black/30 px-2.5 py-1 font-mono text-xs transition-colors hover:bg-accent/50"
+                              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/40 bg-background px-2.5 py-1 font-mono text-xs transition-colors hover:bg-accent hover:text-accent-foreground"
                             >
                               {file.filename}
                               <CheckIcon
@@ -502,7 +706,7 @@ export default function Home() {
                                   else checkIconRefs.current.delete(key);
                                 }}
                                 size={16}
-                                className="text-muted-foreground"
+                                className="text-muted-foreground/70"
                               />
                             </button>
                           );
@@ -511,6 +715,7 @@ export default function Home() {
                     </div>
                   );
                 })}
+                <AgentConversation messages={agentMessages} status={status} />
                 {busy && (
                   <Task defaultOpen className="font-mono text-sm">
                     <TaskTrigger title="building your agent" />
@@ -555,11 +760,12 @@ export default function Home() {
                     </TaskContent>
                   </Task>
                 )}
-              </div>
-            </div>
+              </ConversationContent>
+              <ConversationScrollButton />
+            </Conversation>
 
-            <div className="border-t border-border/60 px-6 py-4">
-              <div className="mx-auto w-full max-w-xl">{inputBar}</div>
+            <div className="bg-transparent! mx-auto w-full max-w-2xl p-4">
+              {inputBar}
             </div>
           </>
         )}
@@ -578,7 +784,7 @@ export default function Home() {
             onMouseEnter={() => chevronRightIconRef.current?.startAnimation()}
             onMouseLeave={() => chevronRightIconRef.current?.stopAnimation()}
             aria-label="collapse panel"
-            className="cursor-pointer absolute top-1/2 -left-3 z-40 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground md:flex"
+            className="absolute top-1/2 -left-3 z-40 hidden h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground md:flex"
           >
             <ChevronRightIcon ref={chevronRightIconRef} size={12} />
           </button>
@@ -631,9 +837,9 @@ export default function Home() {
                     <div>
                       <p className="font-mono text-sm font-medium">tryeve</p>
                       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                        ↳ a free, browser-based tool that builds and tests a
-                        real eve agent from a plain description, no install, no
-                        terminal.
+                        ↳ a free, browser-based tool that builds, tests, and
+                        runs a real eve agent from a plain description, no
+                        install, no terminal.
                       </p>
                     </div>
 
@@ -658,7 +864,10 @@ export default function Home() {
                         <p className="font-mono text-xs tracking-wide text-muted-foreground">
                           built with
                         </p>
-                        <VercelMark className="translate-y-px opacity-70" />
+                        <VercelMark
+                          size={10}
+                          className="translate-y-px opacity-70"
+                        />
                         <p className="font-mono text-xs tracking-wide text-muted-foreground">
                           products
                         </p>

@@ -70,6 +70,19 @@ export async function POST(req: Request) {
   const sandbox = await Sandbox.create({ runtime: "node24", timeout: 45_000 });
 
   try {
+    const testFiles = files.map((file) => {
+      const runnable = file.content
+        .replace(/from ["']eve\/tools["']/g, 'from "./eve-tools.js"')
+        .replace(/from ["']eve["']/g, 'from "./eve.js"')
+        .replace(/from ["']zod["']/g, 'from "./zod.js"');
+
+      return {
+        path: `check-${file.filename.split("/").pop()}`,
+        content: Buffer.from(runnable),
+        filename: file.filename,
+      };
+    });
+
     await sandbox.writeFiles([
       {
         path: "package.json",
@@ -78,27 +91,21 @@ export async function POST(req: Request) {
       { path: "eve.js", content: Buffer.from(EVE_STUB) },
       { path: "eve-tools.js", content: Buffer.from(EVE_TOOLS_STUB) },
       { path: "zod.js", content: Buffer.from(ZOD_STUB) },
+      ...testFiles.map(({ path, content }) => ({ path, content })),
     ]);
 
-    const errors: string[] = [];
+    const results = await Promise.all(
+      testFiles.map(async ({ path, filename }) => {
+        const result = await sandbox.runCommand("node", [path]);
+        if (result.exitCode !== 0) {
+          const err = await result.stderr();
+          return `${filename}: ${err.trim().split("\n")[0]}`;
+        }
+        return null;
+      }),
+    );
 
-    for (const file of files) {
-      const runnable = file.content
-        .replace(/from ["']eve\/tools["']/g, 'from "./eve-tools.js"')
-        .replace(/from ["']eve["']/g, 'from "./eve.js"')
-        .replace(/from ["']zod["']/g, 'from "./zod.js"');
-
-      const testPath = `check-${file.filename.split("/").pop()}`;
-      await sandbox.writeFiles([
-        { path: testPath, content: Buffer.from(runnable) },
-      ]);
-
-      const result = await sandbox.runCommand("node", [testPath]);
-      if (result.exitCode !== 0) {
-        const err = await result.stderr();
-        errors.push(`${file.filename}: ${err.trim().split("\n")[0]}`);
-      }
-    }
+    const errors = results.filter((e): e is string => e !== null);
 
     if (errors.length > 0) {
       return Response.json({ passed: false, error: errors.join("\n") });
