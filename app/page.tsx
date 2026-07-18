@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
@@ -194,9 +195,12 @@ https://eve.dev/docs/introduction
 }
 
 export default function Home() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [selectedFile, setSelectedFile] = useState<{
     messageId: string;
     index: number;
@@ -296,6 +300,46 @@ export default function Home() {
     if (activeFile) setPanelFile(activeFile);
   }
 
+  useEffect(() => {
+    const shareId = searchParams.get("a");
+    if (!shareId) {
+      setRestoring(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(`/agent/${shareId}/raw`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { prompt: string; code: string } | null) => {
+        if (cancelled || !data) return;
+        const assistantId = crypto.randomUUID();
+        setMessages([
+          {
+            id: crypto.randomUUID(),
+            role: "user",
+            text: data.prompt,
+            kind: "generate",
+          },
+          {
+            id: assistantId,
+            role: "assistant",
+            text: data.code,
+            kind: "generate",
+            shareId,
+          },
+        ]);
+        setTestStatus((prev) => ({ ...prev, [assistantId]: "passed" }));
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
   function resetSession() {
     if (busy) return;
     setMessages([]);
@@ -305,6 +349,7 @@ export default function Home() {
     setChatSession(null);
     setTestStatus({});
     setInput("");
+    router.replace("/");
   }
 
   function openFile(messageId: string, index: number) {
@@ -429,6 +474,8 @@ export default function Home() {
         ...prev,
         [assistantId]: result.passed ? "passed" : "failed",
       }));
+
+      if (result.id) router.replace(`/?a=${result.id}`);
     } catch {
       toast.error(
         "something went wrong building your agent. please try again.",
@@ -525,7 +572,11 @@ export default function Home() {
           panelOpen ? "w-full md:w-1/2" : "w-full"
         }`}
       >
-        {messages.length === 0 ? (
+        {restoring ? (
+          <div className="flex flex-1 items-center justify-center">
+            <Spinner className="size-5 text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-16 sm:px-6">
             <div className="relative z-10 flex w-full max-w-xl flex-col items-center text-center">
               <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
