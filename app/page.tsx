@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -203,7 +203,7 @@ https://eve.dev/docs/introduction
   URL.revokeObjectURL(url);
 }
 
-export default function Home() {
+function HomeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [input, setInput] = useState("");
@@ -1003,5 +1003,13 @@ export default function Home() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeInner />
+    </Suspense>
   );
 }
