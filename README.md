@@ -52,7 +52,7 @@ steps 2 through 4 run as one durable workflow step, so a crash mid generation do
 | [ai elements](https://ai-sdk.dev/elements) | chat interface, task progress ui, loading states |
 | [streamdown](https://streamdown.ai) | renders code and markdown cleanly |
 | [shadcn/ui](https://ui.shadcn.com) | every ui component |
-| ▲ [vercel](https://vercel.com) | hosts and deploys the app |
+| [vercel](https://vercel.com) | hosts and deploys the app |
 | [analytics](https://vercel.com/docs/analytics) | tracks real usage without slowing anything down |
 
 ## getting started
