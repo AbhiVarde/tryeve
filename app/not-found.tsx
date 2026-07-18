@@ -8,7 +8,6 @@ import {
   type ArrowRightIconHandle,
 } from "@/components/ui/arrow-right";
 import { TopBar } from "@/components/topbar";
-import { BackgroundGlow } from "@/components/background-glow";
 
 export default function NotFound() {
   const arrowRef = useRef<ArrowRightIconHandle>(null);
@@ -18,8 +17,6 @@ export default function NotFound() {
       <TopBar />
 
       <section className="relative mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-6 text-center">
-        <BackgroundGlow />
-
         <p className="relative z-10 font-mono text-sm text-muted-foreground">
           404
         </p>

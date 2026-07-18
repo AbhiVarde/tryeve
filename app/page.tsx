@@ -34,7 +34,6 @@ import {
   TaskTrigger,
 } from "@/components/ai-elements/task";
 import { TopBar } from "@/components/topbar";
-import { BackgroundGlow } from "@/components/background-glow";
 import { PanelGlow } from "@/components/panel-glow";
 import { VercelMark } from "@/components/vercel-mark";
 
@@ -322,8 +321,6 @@ export default function Home() {
       >
         {messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-16 sm:px-6">
-            <BackgroundGlow />
-
             <div className="relative z-10 flex w-full max-w-xl flex-col items-center text-center">
               <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                 describe an agent. get a working one.

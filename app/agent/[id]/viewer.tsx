@@ -13,7 +13,6 @@ import {
   type ArrowRightIconHandle,
 } from "@/components/ui/arrow-right";
 import { TopBar } from "@/components/topbar";
-import { BackgroundGlow } from "@/components/background-glow";
 
 type FileBlock = { filename: string; content: string };
 
@@ -30,7 +29,6 @@ export function AgentViewer({
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
       <TopBar />
-      <BackgroundGlow />
 
       <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col gap-6 px-6 pt-24 pb-16">
         <div>
