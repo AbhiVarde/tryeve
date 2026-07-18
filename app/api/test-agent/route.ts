@@ -1,4 +1,5 @@
 import { Sandbox } from "@vercel/sandbox";
+import { nanoid } from "nanoid";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,35 +31,58 @@ function parseFiles(raw: string): FileBlock[] {
   return blocks;
 }
 
-const EVE_STUB = `export function defineAgent(config) { return config; }`;
+const OPEN_CHANNEL_AUTH = `import { eveChannel } from "eve/channels/eve";
+import { none } from "eve/channels/auth";
 
-const EVE_TOOLS_STUB = `export function defineTool(config) {
-  if (!config.description) throw new Error("tool missing description");
-  if (!config.inputSchema) throw new Error("tool missing inputSchema");
-  if (typeof config.execute !== "function") throw new Error("tool missing execute");
-  return config;
-}`;
-
-const ZOD_STUB = `
-function chainable() {
-  return new Proxy(function () {}, {
-    get() { return () => chainable(); },
-    apply() { return chainable(); },
-  });
-}
-export const z = new Proxy({}, {
-  get() { return (..._args) => chainable(); },
-});
+export default eveChannel({ auth: [none()] });
 `;
+
+async function waitForServer(url: string, timeoutMs: number) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(url, { method: "GET" });
+      if (res.status < 500) return true;
+    } catch {
+      // server not accepting connections yet, keep polling
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  return false;
+}
+
+function getSandboxEnv() {
+  const env: Record<string, string> = {};
+
+  if (process.env.AI_GATEWAY_API_KEY) {
+    env.AI_GATEWAY_API_KEY = process.env.AI_GATEWAY_API_KEY;
+  }
+  if (process.env.VERCEL_OIDC_TOKEN) {
+    env.VERCEL_OIDC_TOKEN = process.env.VERCEL_OIDC_TOKEN;
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  }
+  if (process.env.OPENAI_API_KEY) {
+    env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  }
+
+  return env;
+}
 
 export async function POST(req: Request) {
   const { code } = await req.json();
 
   if (!code || typeof code !== "string") {
-    return new Response("code is required", { status: 400 });
+    return Response.json(
+      { passed: false, error: "code is required" },
+      { status: 400 },
+    );
   }
 
-  const files = parseFiles(code).filter((f) => f.filename.endsWith(".ts"));
+  const files = parseFiles(code);
 
   if (files.length === 0) {
     return Response.json({
@@ -67,53 +91,107 @@ export async function POST(req: Request) {
     });
   }
 
-  const sandbox = await Sandbox.create({ runtime: "node24", timeout: 45_000 });
+  const sandboxEnv = getSandboxEnv();
+
+  if (Object.keys(sandboxEnv).length === 0) {
+    return Response.json({
+      passed: false,
+      error:
+        "no model credentials found in the environment (AI_GATEWAY_API_KEY, VERCEL_OIDC_TOKEN, ANTHROPIC_API_KEY, or OPENAI_API_KEY)",
+    });
+  }
+
+  const sandbox = await Sandbox.create({
+    name: `eve-agent-test-${nanoid(8)}`,
+    runtime: "node24",
+    timeout: 90_000,
+    ports: [3000],
+    env: sandboxEnv,
+  });
 
   try {
-    const testFiles = files.map((file) => {
-      const runnable = file.content
-        .replace(/from ["']eve\/tools["']/g, 'from "./eve-tools.js"')
-        .replace(/from ["']eve["']/g, 'from "./eve.js"')
-        .replace(/from ["']zod["']/g, 'from "./zod.js"');
-
-      return {
-        path: `check-${file.filename.split("/").pop()}`,
-        content: Buffer.from(runnable),
-        filename: file.filename,
-      };
-    });
-
-    await sandbox.writeFiles([
-      {
-        path: "package.json",
-        content: Buffer.from(JSON.stringify({ type: "module" })),
-      },
-      { path: "eve.js", content: Buffer.from(EVE_STUB) },
-      { path: "eve-tools.js", content: Buffer.from(EVE_TOOLS_STUB) },
-      { path: "zod.js", content: Buffer.from(ZOD_STUB) },
-      ...testFiles.map(({ path, content }) => ({ path, content })),
+    await Promise.all([
+      sandbox.fs.mkdir("agent/tools", { recursive: true }),
+      sandbox.fs.mkdir("agent/channels", { recursive: true }),
     ]);
 
-    const results = await Promise.all(
-      testFiles.map(async ({ path, filename }) => {
-        const result = await sandbox.runCommand("node", [path]);
-        if (result.exitCode !== 0) {
-          const err = await result.stderr();
-          return `${filename}: ${err.trim().split("\n")[0]}`;
-        }
-        return null;
-      }),
-    );
+    await sandbox.writeFiles([
+      ...files.map((f) => ({
+        path: f.filename,
+        content: Buffer.from(f.content),
+      })),
+      {
+        path: "package.json",
+        content: Buffer.from(
+          JSON.stringify({
+            name: "eve-agent-test",
+            private: true,
+            type: "module",
+            dependencies: { eve: "latest" },
+          }),
+        ),
+      },
+      {
+        path: "agent/channels/eve.ts",
+        content: Buffer.from(OPEN_CHANNEL_AUTH),
+      },
+    ]);
 
-    const errors = results.filter((e): e is string => e !== null);
+    const install = await sandbox.runCommand({
+      cmd: "npm",
+      args: ["install", "--no-audit", "--no-fund"],
+    });
 
-    if (errors.length > 0) {
-      return Response.json({ passed: false, error: errors.join("\n") });
+    if (install.exitCode !== 0) {
+      const err = await install.stderr();
+      return Response.json({
+        passed: false,
+        error: `install failed: ${err.trim().split("\n")[0]}`,
+      });
+    }
+
+    await sandbox.runCommand({
+      cmd: "npx",
+      args: ["eve", "dev", "--no-ui", "--port", "3000"],
+      detached: true,
+    });
+
+    const url = sandbox.domain(3000);
+    const ready = await waitForServer(url, 45_000);
+
+    if (!ready) {
+      return Response.json({
+        passed: false,
+        error:
+          "agent didn't start in time, check your instructions and tool syntax",
+      });
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(`${url}/eve/v1/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "hello, are you working?" }),
+      });
+    } catch {
+      return Response.json({
+        passed: false,
+        error: "agent started but didn't respond to a test message",
+      });
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return Response.json({
+        passed: false,
+        error: errText || "agent rejected the test message",
+      });
     }
 
     return Response.json({
       passed: true,
-      output: `${files.length} file(s) validated`,
+      output: `${files.length} file(s) validated, agent responded to a live test message`,
     });
   } finally {
     await sandbox.stop();
