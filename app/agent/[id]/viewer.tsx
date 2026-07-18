@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Link from "next/link";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import {
@@ -11,23 +12,10 @@ import {
   ArrowRightIcon,
   type ArrowRightIconHandle,
 } from "@/components/ui/arrow-right";
+import { TopBar } from "@/components/topbar";
+import { BackgroundGlow } from "@/components/background-glow";
 
 type FileBlock = { filename: string; content: string };
-
-function VercelMark() {
-  return (
-    <svg
-      viewBox="0 0 76 65"
-      width={14}
-      height={14}
-      fill="currentColor"
-      aria-hidden="true"
-      className="text-foreground"
-    >
-      <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-    </svg>
-  );
-}
 
 export function AgentViewer({
   prompt,
@@ -40,19 +28,11 @@ export function AgentViewer({
   const arrowIconRef = useRef<ArrowRightIconHandle>(null);
 
   return (
-    <div className="relative min-h-screen w-full">
-      <a
-        href="/"
-        className="fixed top-0 left-0 z-10 flex items-center gap-2 px-6 py-4 opacity-90 transition-opacity hover:opacity-100"
-      >
-        <VercelMark />
-        <span className="text-sm font-medium text-muted-foreground">/</span>
-        <span className="font-mono text-sm font-medium tracking-tight">
-          tryeve
-        </span>
-      </a>
+    <div className="relative min-h-screen w-full overflow-hidden">
+      <TopBar />
+      <BackgroundGlow />
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 pt-24 pb-16">
+      <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col gap-6 px-6 pt-24 pb-16">
         <div>
           <p className="mb-2 font-mono text-xs text-muted-foreground">
             shared agent
@@ -95,7 +75,7 @@ export function AgentViewer({
           ))}
         </div>
 
-        <a
+        <Link
           href="/"
           onMouseEnter={() => arrowIconRef.current?.startAnimation()}
           onMouseLeave={() => arrowIconRef.current?.stopAnimation()}
@@ -103,7 +83,7 @@ export function AgentViewer({
         >
           build your own agent
           <ArrowRightIcon ref={arrowIconRef} size={14} />
-        </a>
+        </Link>
       </div>
     </div>
   );

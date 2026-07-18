@@ -14,7 +14,15 @@ import {
   ChevronLeftIcon,
   type ChevronLeftIconHandle,
 } from "@/components/ui/chevron-left";
+import {
+  ChevronRightIcon,
+  type ChevronRightIconHandle,
+} from "@/components/ui/chevron-right";
 import { XIcon, type XIconHandle } from "@/components/ui/x";
+import {
+  CircleHelpIcon,
+  type CircleHelpIconHandle,
+} from "@/components/ui/circle-help";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
@@ -25,6 +33,10 @@ import {
   TaskItem,
   TaskTrigger,
 } from "@/components/ai-elements/task";
+import { TopBar } from "@/components/topbar";
+import { BackgroundGlow } from "@/components/background-glow";
+import { PanelGlow } from "@/components/panel-glow";
+import { VercelMark } from "@/components/vercel-mark";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
@@ -36,6 +48,49 @@ type Message = {
 };
 
 const MAX_INPUT_LENGTH = 500;
+
+const FEATURES: string[] = [
+  "describe an agent in plain english",
+  "generates real, working eve files",
+  "every agent is sandbox-tested before you see it",
+  "generation and testing run as one durable step, survives crashes",
+  "inspect every file with syntax highlighting",
+  "export the full agent as a zip",
+  "share a live link to any agent you build",
+  "dark, minimal, vercel-inspired interface",
+];
+
+const VERCEL_PRODUCTS: { name: string; description: string }[] = [
+  { name: "next.js", description: "the app itself" },
+  { name: "shadcn/ui", description: "every ui component" },
+  {
+    name: "ai gateway",
+    description: "routes the generation request to a model",
+  },
+  { name: "ai sdk", description: "streams the model's response" },
+  {
+    name: "sandbox",
+    description: "tests every generated file before showing it",
+  },
+  {
+    name: "workflow sdk",
+    description: "runs generate and test as one durable step, survives crashes",
+  },
+  {
+    name: "blob",
+    description: "stores each generated agent so shared links stay live",
+  },
+  {
+    name: "ai elements",
+    description: "the task progress ui and shimmer loading text",
+  },
+  { name: "streamdown", description: "renders code and markdown cleanly" },
+  { name: "vercel", description: "hosts and deploys the app" },
+  {
+    name: "analytics",
+    description: "tracks real usage without slowing anything down",
+  },
+];
 
 function parseFiles(raw: string): FileBlock[] {
   const regex = /```[a-zA-Z]*\n([\s\S]*?)```/g;
@@ -79,45 +134,6 @@ async function downloadZip(files: FileBlock[]) {
   URL.revokeObjectURL(url);
 }
 
-function VercelMark() {
-  return (
-    <svg
-      viewBox="0 0 76 65"
-      width={14}
-      height={14}
-      fill="currentColor"
-      aria-hidden="true"
-      className="text-foreground"
-    >
-      <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-    </svg>
-  );
-}
-
-function TopBar({
-  hideOnMobile,
-  onReset,
-}: {
-  hideOnMobile: boolean;
-  onReset: () => void;
-}) {
-  return (
-    <button
-      onClick={onReset}
-      aria-label="start over"
-      className={`fixed top-0 left-0 z-30 items-center gap-2 px-6 py-4 opacity-90 transition-opacity hover:opacity-100 ${
-        hideOnMobile ? "hidden md:flex" : "flex"
-      }`}
-    >
-      <VercelMark />
-      <span className="text-sm font-medium text-muted-foreground">/</span>
-      <span className="font-mono text-sm font-medium tracking-tight">
-        tryeve
-      </span>
-    </button>
-  );
-}
-
 export default function Home() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -126,20 +142,24 @@ export default function Home() {
     messageId: string;
     index: number;
   } | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
   const [testStatus, setTestStatus] = useState<Record<string, TestState>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
   const lastFileKey = useRef<string | null>(null);
 
-  // per-message refs so multiple generated agents in the thread don't share animation state
   const downloadIconRefs = useRef<Map<string, DownloadIconHandle>>(new Map());
   const linkIconRefs = useRef<Map<string, LinkIconHandle>>(new Map());
   const checkIconRefs = useRef<Map<string, CheckIconHandle>>(new Map());
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
+  const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const xIconRef = useRef<XIconHandle>(null);
+  const circleHelpIconRef = useRef<CircleHelpIconHandle>(null);
 
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
+
+  const panelOpen = !!selectedFile || showInfo;
 
   const activeMessage = selectedFile
     ? messages.find((m) => m.id === selectedFile.messageId)
@@ -165,8 +185,24 @@ export default function Home() {
     setMessages([]);
     setSelectedFile(null);
     setPanelFile(null);
+    setShowInfo(false);
     setTestStatus({});
     setInput("");
+  }
+
+  function openFile(messageId: string, index: number) {
+    setShowInfo(false);
+    setSelectedFile({ messageId, index });
+  }
+
+  function openInfo() {
+    setSelectedFile(null);
+    setShowInfo((prev) => !prev);
+  }
+
+  function closePanel() {
+    setSelectedFile(null);
+    setShowInfo(false);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -182,6 +218,7 @@ export default function Home() {
     }
 
     setSelectedFile(null);
+    setShowInfo(false);
     setInput("");
 
     const userMessage: Message = {
@@ -262,16 +299,30 @@ export default function Home() {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden">
-      <TopBar hideOnMobile={!!selectedFile} onReset={resetSession} />
+      <TopBar
+        hideOnMobile={panelOpen}
+        onLogoClick={resetSession}
+        rightSlot={
+          <button
+            onClick={openInfo}
+            onMouseEnter={() => circleHelpIconRef.current?.startAnimation()}
+            onMouseLeave={() => circleHelpIconRef.current?.stopAnimation()}
+            aria-label="about tryeve"
+            className="text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground cursor-pointer"
+          >
+            <CircleHelpIcon ref={circleHelpIconRef} size={16} />
+          </button>
+        }
+      />
 
       <div
         className={`flex h-full flex-col transition-[width] duration-300 ease-in-out ${
-          selectedFile ? "w-full md:w-1/2" : "w-full"
+          panelOpen ? "w-full md:w-1/2" : "w-full"
         }`}
       >
         {messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-16 sm:px-6">
-            <div className="pointer-events-none absolute top-0 left-1/2 h-125 w-175 -translate-x-1/2 -translate-y-1/3 rounded-full bg-primary/10 blur-3xl" />
+            <BackgroundGlow />
 
             <div className="relative z-10 flex w-full max-w-xl flex-col items-center text-center">
               <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
@@ -398,12 +449,7 @@ export default function Home() {
                           return (
                             <button
                               key={file.filename}
-                              onClick={() =>
-                                setSelectedFile({
-                                  messageId: message.id,
-                                  index: idx,
-                                })
-                              }
+                              onClick={() => openFile(message.id, idx)}
                               onMouseEnter={() =>
                                 checkIconRefs.current.get(key)?.startAnimation()
                               }
@@ -484,57 +530,146 @@ export default function Home() {
 
       <div
         className={`fixed inset-0 z-20 flex h-full flex-col bg-background transition-transform duration-300 ease-in-out will-change-transform ${
-          selectedFile ? "translate-x-0" : "translate-x-full"
-        } md:static md:inset-auto md:z-auto md:translate-x-0 md:overflow-hidden md:border-l md:border-border/60 md:transition-[width] md:duration-300 md:ease-in-out ${
-          selectedFile ? "md:w-1/2" : "md:w-0"
+          panelOpen ? "translate-x-0" : "translate-x-full"
+        } md:relative md:inset-auto md:z-auto md:translate-x-0 md:transition-[width] md:duration-300 md:ease-in-out md:border-l md:border-border/60 ${
+          panelOpen ? "md:w-1/2" : "md:w-0"
         }`}
       >
-        {panelFile && (
-          <div
-            className={`flex h-full min-w-0 flex-col transition-opacity duration-200 ease-in-out ${
-              selectedFile
-                ? "opacity-100 delay-100"
-                : "opacity-0 md:opacity-100"
-            }`}
+        {panelOpen && (
+          <button
+            onClick={closePanel}
+            onMouseEnter={() => chevronRightIconRef.current?.startAnimation()}
+            onMouseLeave={() => chevronRightIconRef.current?.stopAnimation()}
+            aria-label="collapse panel"
+            className="cursor-pointer absolute top-1/2 -left-3 z-40 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground md:flex"
           >
-            <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setSelectedFile(null)}
-                  onMouseEnter={() =>
-                    chevronLeftIconRef.current?.startAnimation()
-                  }
-                  onMouseLeave={() =>
-                    chevronLeftIconRef.current?.stopAnimation()
-                  }
-                  className="text-muted-foreground hover:text-foreground md:hidden"
-                  aria-label="back"
-                >
-                  <ChevronLeftIcon ref={chevronLeftIconRef} size={16} />
-                </button>
-                <span className="truncate font-mono text-sm font-medium">
-                  {panelFile.filename}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setSelectedFile(null)}
-                  onMouseEnter={() => xIconRef.current?.startAnimation()}
-                  onMouseLeave={() => xIconRef.current?.stopAnimation()}
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label="close"
-                >
-                  <XIcon ref={xIconRef} size={16} />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto px-6 py-4">
-              <Streamdown plugins={{ code }} className="text-xs">
-                {`\`\`\`${panelFile.filename.endsWith(".md") ? "markdown" : "ts"}\n${panelFile.content}\n\`\`\``}
-              </Streamdown>
-            </div>
-          </div>
+            <ChevronRightIcon ref={chevronRightIconRef} size={12} />
+          </button>
         )}
+
+        <div className="h-full w-full overflow-hidden">
+          {(panelFile && selectedFile) || showInfo ? (
+            <div
+              className={`relative flex h-full min-w-0 flex-col transition-opacity duration-200 ease-in-out ${
+                panelOpen ? "opacity-100 delay-100" : "opacity-0 md:opacity-100"
+              }`}
+            >
+              <PanelGlow />
+
+              <div className="relative z-10 flex items-center justify-between border-b border-border/60 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={closePanel}
+                    onMouseEnter={() =>
+                      chevronLeftIconRef.current?.startAnimation()
+                    }
+                    onMouseLeave={() =>
+                      chevronLeftIconRef.current?.stopAnimation()
+                    }
+                    className="cursor-pointer text-muted-foreground hover:text-foreground md:hidden"
+                    aria-label="back"
+                  >
+                    <ChevronLeftIcon ref={chevronLeftIconRef} size={16} />
+                  </button>
+                  <span className="truncate font-mono text-sm font-medium">
+                    {showInfo ? "tryeve/about.md" : panelFile?.filename}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={closePanel}
+                    onMouseEnter={() => xIconRef.current?.startAnimation()}
+                    onMouseLeave={() => xIconRef.current?.stopAnimation()}
+                    className="cursor-pointer text-muted-foreground hover:text-foreground"
+                    aria-label="close"
+                  >
+                    <XIcon ref={xIconRef} size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {showInfo ? (
+                <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
+                  <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
+                    <div>
+                      <p className="font-mono text-sm font-medium">tryeve</p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                        ↳ a free, browser-based tool that builds and tests a
+                        real eve agent from a plain description, no install, no
+                        terminal.
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="mb-4 font-mono text-xs tracking-wide text-muted-foreground">
+                        features
+                      </p>
+                      <ul className="flex flex-col gap-2.5">
+                        {FEATURES.map((feature) => (
+                          <li
+                            key={feature}
+                            className="font-mono text-xs leading-relaxed text-foreground/80"
+                          >
+                            ↳ {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <div className="mb-3 flex items-center gap-1.5">
+                        <p className="font-mono text-xs tracking-wide text-muted-foreground">
+                          built with
+                        </p>
+                        <VercelMark className="translate-y-px opacity-70" />
+                        <p className="font-mono text-xs tracking-wide text-muted-foreground">
+                          products
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2.5">
+                        {VERCEL_PRODUCTS.map((p) => (
+                          <p
+                            key={p.name}
+                            className="font-mono text-xs leading-relaxed text-foreground/80"
+                          >
+                            ↳{" "}
+                            <span className="font-medium text-foreground/90">
+                              {p.name}
+                            </span>
+                            <span className="text-muted-foreground">
+                              : {p.description}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <div className="h-px bg-linear-to-r from-transparent via-border to-transparent" />
+                      <p className="mt-4 text-xs text-muted-foreground">
+                        icons animated by{" "}
+                        <a
+                          href="https://lucide-animated.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline decoration-border underline-offset-2 transition-colors hover:text-foreground"
+                        >
+                          lucide-animated
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative z-10 flex-1 overflow-auto px-6 py-4">
+                  <Streamdown plugins={{ code }} className="text-xs">
+                    {`\`\`\`${panelFile?.filename.endsWith(".md") ? "markdown" : "ts"}\n${panelFile?.content}\n\`\`\``}
+                  </Streamdown>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
