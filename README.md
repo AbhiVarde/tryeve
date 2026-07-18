@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ▲ tryeve
 
-## Getting Started
+describe an agent. get a working one.
 
-First, run the development server:
+a free, browser based tool that builds, tests, and runs a real [eve](https://eve.dev) agent from a plain english description. no install, no terminal.
+
+[live demo](https://tryeve.abhivarde.in) · built with ▲ [vercel](https://vercel.com)
+
+## what it does
+
+you type a description. tryeve generates real eve files, boots them in an isolated sandbox against the actual eve runtime, and only shows you the result once it has confirmed the agent responds. if it passes, you can chat with it live, download it as a working project, or share a link that lets anyone else talk to it too.
+
+reload the page anytime. your agent, your chat, your files, all still there.
+
+## features
+
+- describe an agent in plain english
+- generates real, working eve files
+- every agent is tested against a live eve runtime before you see it
+- generation and testing run as one durable step, survives crashes
+- inspect every file with syntax highlighting
+- export the full agent as a zip
+- share a live link to any agent you build
+- connect to your agent right after it's built, no install needed
+- chat with it live, with markdown formatted replies
+- reload the page anytime, your agent and chat pick up right where you left off
+- idle or closed sandboxes shut down automatically, nothing left running
+- dark, minimal interface
+
+## how it works
+
+1. you describe an agent
+2. the ai gateway routes the request to a model, which writes real eve files
+3. a vercel sandbox installs eve for real and boots it, no stubs
+4. tryeve sends a live test message and confirms the agent actually responds
+5. if it passes, the files are shown and the agent stays reachable to chat with
+6. everything is stored in blob, so a share link or a page reload brings it all back
+
+steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request.
+
+## built with
+
+| product | role |
+|---|---|
+| [next.js](https://nextjs.org) | the app itself |
+| [ai gateway](https://vercel.com/docs/ai-gateway) | routes the generation request to a model |
+| [ai sdk](https://sdk.vercel.ai) | streams the model's response |
+| [sandbox](https://vercel.com/docs/sandbox) | tests every agent against a real eve runtime, then runs it live so you can talk to it |
+| [workflow sdk](https://vercel.com/docs/workflow) | runs generate and test as one durable step |
+| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent and its chat session, so reloads and share links stay in sync |
+| [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation and connect requests |
+| [ai elements](https://ai-sdk.dev/elements) | chat interface, task progress ui, loading states |
+| [streamdown](https://streamdown.ai) | renders code and markdown cleanly |
+| [shadcn/ui](https://ui.shadcn.com) | every ui component |
+| ▲ [vercel](https://vercel.com) | hosts and deploys the app |
+| [analytics](https://vercel.com/docs/analytics) | tracks real usage without slowing anything down |
+
+## getting started
+
+clone the repo and install dependencies:
+
+```bash
+git clone https://github.com/AbhiVarde/tryeve.git
+cd tryeve
+npm install
+```
+
+link the project to vercel and pull environment variables:
+
+```bash
+vercel link
+vercel env pull
+```
+
+run the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+open [localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+tryeve needs at least one model credential and a blob token. set these in your vercel project or in `.env.local`:
 
-## Learn More
+```bash
+BLOB_READ_WRITE_TOKEN=
 
-To learn more about Next.js, take a look at the following resources:
+# at least one of the following
+AI_GATEWAY_API_KEY=
+VERCEL_OIDC_TOKEN=
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`VERCEL_OIDC_TOKEN` is generated automatically when the project is linked and deployed on vercel. for local development, `vercel env pull` handles this for you.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## project structure
 
-## Deploy on Vercel
+```
+app/
+  api/
+    build-agent/     generates and tests an agent as one durable workflow step
+    test-agent/      boots the agent in a sandbox and confirms it responds
+    run-agent/       boots a live sandbox for chat
+    stop-agent/      stops a sandbox on disconnect, idle, or tab close
+    agent-chat/      streams chat responses from the live sandbox
+  agent/[id]/        shared, read only view of a generated agent
+  page.tsx           the main app
+components/
+  agent-chat-panel.tsx   chat state and streaming ui
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## limits
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+sandboxes run on the [hobby plan](https://vercel.com/docs/plans/hobby) by default. this means:
+
+- 5 free sandbox cpu hours per month
+- sandbox sessions can run up to 45 minutes before an automatic timeout
+- generation and connect requests are rate limited per ip
+
+these are generous enough for regular use, but heavy or repeated testing during development will use up hobby quota faster than the old stub based tests did.
+
+## deploy your own
+
+[![deploy with vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/AbhiVarde/tryeve)
+
+## license
+
+mit
