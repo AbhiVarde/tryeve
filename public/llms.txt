@@ -1,0 +1,21 @@
+# tryeve
+
+> a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description. no install, no terminal.
+
+tryeve takes a plain english description, generates real eve agent files with an ai model, boots them in an isolated vercel sandbox against the actual eve runtime, and sends a live test message to confirm the agent responds before showing any result. once an agent passes, it can be chatted with directly in the browser, downloaded as a working project, or shared as a live link that others can also chat with. state persists across reloads, and idle or closed sandboxes shut down automatically.
+
+## docs
+
+- [readme](https://github.com/AbhiVarde/tryeve/blob/main/README.md): setup, environment variables, project structure, and how the generate-test-chat flow works
+- [eve documentation](https://eve.dev/docs/introduction): the agent framework tryeve generates code for
+
+## examples
+
+- [live app](https://tryeve.vercel.app): describe an agent and try it in the browser
+
+## optional
+
+- [vercel sandbox](https://vercel.com/docs/sandbox): isolated compute used to install and boot each generated agent
+- [vercel ai gateway](https://vercel.com/docs/ai-gateway): routes the generation request to a model
+- [vercel workflow sdk](https://vercel.com/docs/workflow): runs generation and testing as one durable step
+- [vercel blob](https://vercel.com/docs/storage/vercel-blob): stores each generated agent and its chat session
