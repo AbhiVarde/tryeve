@@ -11,7 +11,7 @@ tryeve takes a plain english description, generates real eve agent files with an
 
 ## examples
 
-- [live app](https://tryeve.vercel.app): describe an agent and try it in the browser
+- [live app](https://tryeve.abhivarde.in): describe an agent and try it in the browser
 
 ## optional
 
