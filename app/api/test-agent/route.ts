@@ -39,6 +39,18 @@ const EVE_TOOLS_STUB = `export function defineTool(config) {
   return config;
 }`;
 
+const ZOD_STUB = `
+function chainable() {
+  return new Proxy(function () {}, {
+    get() { return () => chainable(); },
+    apply() { return chainable(); },
+  });
+}
+export const z = new Proxy({}, {
+  get() { return (..._args) => chainable(); },
+});
+`;
+
 export async function POST(req: Request) {
   const { code } = await req.json();
 
@@ -61,34 +73,20 @@ export async function POST(req: Request) {
     await sandbox.writeFiles([
       {
         path: "package.json",
-        content: Buffer.from(
-          JSON.stringify({ type: "module", dependencies: { zod: "^3.23.8" } }),
-        ),
+        content: Buffer.from(JSON.stringify({ type: "module" })),
       },
       { path: "eve.js", content: Buffer.from(EVE_STUB) },
       { path: "eve-tools.js", content: Buffer.from(EVE_TOOLS_STUB) },
+      { path: "zod.js", content: Buffer.from(ZOD_STUB) },
     ]);
-
-    const install = await sandbox.runCommand("npm", [
-      "install",
-      "--no-audit",
-      "--no-fund",
-    ]);
-
-    if (install.exitCode !== 0) {
-      const err = await install.stderr();
-      return Response.json({
-        passed: false,
-        error: `dependency install failed: ${err}`,
-      });
-    }
 
     const errors: string[] = [];
 
     for (const file of files) {
       const runnable = file.content
         .replace(/from ["']eve\/tools["']/g, 'from "./eve-tools.js"')
-        .replace(/from ["']eve["']/g, 'from "./eve.js"');
+        .replace(/from ["']eve["']/g, 'from "./eve.js"')
+        .replace(/from ["']zod["']/g, 'from "./zod.js"');
 
       const testPath = `check-${file.filename.split("/").pop()}`;
       await sandbox.writeFiles([
