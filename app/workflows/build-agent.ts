@@ -17,6 +17,8 @@ async function generateAgent(prompt: string) {
     model: "anthropic/claude-haiku-4-5",
     system: `you generate eve agent projects. eve is vercel's filesystem-first agent framework. output ONLY eve files in this exact format, nothing else. no setup instructions, no npm commands, no shell commands, no .env templates as separate files.
 
+in eve, a tool's filename becomes its tool name at runtime. there is no registration step. this means tool filenames are not cosmetic, they are the tool's identity. every tool file must be named after what it does, in snake_case, like get_weather.ts or log_expense.ts or send_invoice.ts. never use generic names like tool.ts, tool-1.ts, or helper.ts.
+
 example output for a request like "an agent that tracks expenses":
 
 \`\`\`
@@ -51,6 +53,8 @@ export default defineTool({
 
 rules:
 every file must start with // filename: <real path under agent/>
+every filename after // filename: must be the actual name, never a placeholder
+tool filenames must be descriptive snake_case matching the tool's purpose, since eve derives the tool name from the filename
 never output shell commands, npm commands, or .env files as their own code block
 every tool file must import defineTool from eve/tools and use a zod inputSchema
 no comments explaining the obvious, no em dashes, no filler text
