@@ -1,4 +1,5 @@
 import { Sandbox } from "@vercel/sandbox";
+import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
 
 export const runtime = "nodejs";
@@ -73,7 +74,7 @@ function getSandboxEnv() {
 }
 
 export async function POST(req: Request) {
-  const { code } = await req.json();
+  const { code, shareId } = await req.json();
 
   if (!code || typeof code !== "string") {
     return Response.json(
@@ -155,6 +156,22 @@ export async function POST(req: Request) {
       ok: false,
       error: "agent sandbox didn't start in time",
     });
+  }
+
+  if (shareId && typeof shareId === "string") {
+    try {
+      await put(
+        `agents/${shareId}-session.json`,
+        JSON.stringify({ sandboxName, url }),
+        {
+          access: "public",
+          addRandomSuffix: false,
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+        },
+      );
+    } catch {
+      // session persistence is best-effort, chat still works without it
+    }
   }
 
   return Response.json({ ok: true, sandboxName, url });

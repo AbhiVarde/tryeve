@@ -311,7 +311,7 @@ export default function Home() {
 
     fetch(`/agent/${shareId}/raw`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { prompt: string; code: string } | null) => {
+      .then(async (data: { prompt: string; code: string } | null) => {
         if (cancelled || !data) return;
         const assistantId = crypto.randomUUID();
         setMessages([
@@ -330,6 +330,25 @@ export default function Home() {
           },
         ]);
         setTestStatus((prev) => ({ ...prev, [assistantId]: "passed" }));
+
+        try {
+          const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
+          if (!sessionRes.ok) return;
+          const session: { sandboxName: string; url: string } =
+            await sessionRes.json();
+          const pingRes = await fetch(session.url, { method: "GET" });
+          if (cancelled || !pingRes.ok) return;
+          setChatSession({
+            agentMessageId: assistantId,
+            url: session.url,
+            sandboxName: session.sandboxName,
+            sessionId: null,
+            continuationToken: null,
+            turnCount: 0,
+          });
+        } catch {
+          // sandbox no longer reachable, stay disconnected
+        }
       })
       .finally(() => {
         if (!cancelled) setRestoring(false);
@@ -369,10 +388,16 @@ export default function Home() {
 
   function endChat() {
     if (chatSession) {
+      const agentMessage = messages.find(
+        (m) => m.id === chatSession.agentMessageId,
+      );
       fetch("/api/stop-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sandboxName: chatSession.sandboxName }),
+        body: JSON.stringify({
+          sandboxName: chatSession.sandboxName,
+          shareId: agentMessage?.shareId,
+        }),
       });
     }
     setChatSession(null);
@@ -385,7 +410,7 @@ export default function Home() {
       const res = await fetch("/api/run-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: message.text }),
+        body: JSON.stringify({ code: message.text, shareId: message.shareId }),
       });
       const data = await res.json();
 
