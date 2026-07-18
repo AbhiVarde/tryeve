@@ -69,7 +69,7 @@ const MAX_INPUT_LENGTH = 500;
 const FEATURES: string[] = [
   "describe an agent in plain english",
   "generates real, working eve files",
-  "every agent is sandbox-tested before you see it",
+  "every agent is tested against a live eve runtime before you see it",
   "generation and testing run as one durable step, survives crashes",
   "inspect every file with syntax highlighting",
   "export the full agent as a zip",
@@ -77,6 +77,8 @@ const FEATURES: string[] = [
   "connect to your agent right after it's built, no install needed",
   "chat with it live, with markdown-formatted replies",
   "auto-scrolling chat with a jump-to-latest button",
+  "reload the page anytime, your agent and chat pick up right where you left off",
+  "idle or closed sandboxes shut down automatically, nothing left running",
   "dark, minimal, vercel-inspired interface",
 ];
 
@@ -89,7 +91,8 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   { name: "ai sdk", description: "streams the model's response" },
   {
     name: "sandbox",
-    description: "tests every agent, then runs it live so you can talk to it",
+    description:
+      "tests every agent against a real eve runtime, then runs it live so you can talk to it",
   },
   {
     name: "workflow sdk",
@@ -97,7 +100,13 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   },
   {
     name: "blob",
-    description: "stores each generated agent so shared links stay live",
+    description:
+      "stores each generated agent and its live chat session, so shared links and reloads stay in sync",
+  },
+  {
+    name: "firewall",
+    description:
+      "rate limits generation and connect requests to keep usage fair",
   },
   {
     name: "ai elements",
