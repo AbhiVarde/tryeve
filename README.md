@@ -38,7 +38,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 
 steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request.
 
-## built with
+## built with ▲
 
 | product | role |
 |---|---|
@@ -54,6 +54,8 @@ steps 2 through 4 run as one durable workflow step, so a crash mid generation do
 | [shadcn/ui](https://ui.shadcn.com) | every ui component |
 | [vercel](https://vercel.com) | hosts and deploys the app |
 | [analytics](https://vercel.com/docs/analytics) | tracks real usage without slowing anything down |
+
+icons animated by [lucide-animated](https://lucide-animated.com).
 
 ## getting started
 
