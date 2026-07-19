@@ -2,6 +2,7 @@ import { start } from "workflow/api";
 import { put, head } from "@vercel/blob";
 import { nanoid } from "nanoid";
 import { checkRateLimit } from "@vercel/firewall";
+import { cookies } from "next/headers";
 import { buildAgentWorkflow } from "@/app/workflows/build-agent";
 
 export async function POST(req: Request) {
@@ -12,6 +13,18 @@ export async function POST(req: Request) {
       { error: "too many requests, try again in a minute" },
       { status: 429 },
     );
+  }
+
+  const cookieStore = await cookies();
+  let visitorId = cookieStore.get("tryeve_vid")?.value;
+  if (!visitorId) {
+    visitorId = nanoid(16);
+    cookieStore.set("tryeve_vid", visitorId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
   }
 
   const { prompt } = await req.json();
@@ -31,7 +44,7 @@ export async function POST(req: Request) {
   );
 
   try {
-    const existing = await head("agents/index.json", {
+    const existing = await head(`agents/history/${visitorId}.json`, {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     }).catch(() => null);
 
@@ -40,15 +53,18 @@ export async function POST(req: Request) {
 
     history.unshift({ id, prompt, createdAt: new Date().toISOString() });
 
-    await put("agents/index.json", JSON.stringify(history.slice(0, 200)), {
-      access: "public",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
+    await put(
+      `agents/history/${visitorId}.json`,
+      JSON.stringify(history.slice(0, 200)),
+      {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      },
+    );
   } catch (err) {
     console.error("history index write failed:", err);
-    // best-effort, generation still succeeds without it
   }
 
   return Response.json({ ...result, id });
