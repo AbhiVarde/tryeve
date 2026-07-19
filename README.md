@@ -36,9 +36,10 @@ reload the page anytime. your agent, your chat, your files, all still there.
 3. a vercel sandbox installs eve for real and boots it, no stubs
 4. tryeve sends a live test message and confirms the agent actually responds
 5. if it passes, the files are shown and the agent stays reachable to chat with
-6. everything is stored in blob, so a share link or a page reload brings it all back
+6. the agent is stored in blob, so a share link or a page reload brings it all back
+7. it's also added to your own history, tracked by a private cookie, not visible to anyone else
 
-steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request.
+steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
 
 ## built with ▲
 
