@@ -25,6 +25,8 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - chat with it live, with markdown formatted replies
 - reload the page anytime, your agent and chat pick up right where you left off
 - idle or closed sandboxes shut down automatically, nothing left running
+- warned before disconnect, never cut off without notice
+- every agent you've built is saved to your own private history
 - dark, minimal interface
 
 ## how it works
@@ -47,7 +49,8 @@ steps 2 through 4 run as one durable workflow step, so a crash mid generation do
 | [ai sdk](https://sdk.vercel.ai) | streams the model's response |
 | [sandbox](https://vercel.com/docs/sandbox) | tests every agent against a real eve runtime, then runs it live so you can talk to it |
 | [workflow sdk](https://vercel.com/docs/workflow) | runs generate and test as one durable step |
-| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent and its chat session, so reloads and share links stay in sync |
+| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent, its chat session, and per-visitor history |
+| [cron](https://vercel.com/docs/cron-jobs) | sweeps stale sandbox sessions on a schedule |
 | [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation and connect requests |
 | [ai elements](https://ai-sdk.dev/elements) | chat interface, task progress ui, loading states |
 | [streamdown](https://streamdown.ai) | renders code and markdown cleanly |
@@ -108,6 +111,8 @@ app/
     run-agent/       boots a live sandbox for chat
     stop-agent/      stops a sandbox on disconnect, idle, or tab close
     agent-chat/      streams chat responses from the live sandbox
+    agents/          returns the current visitor's private history
+    cron/cleanup/     scheduled sweep for stale sandbox sessions
   agent/[id]/        shared, read only view of a generated agent
   page.tsx           the main app
 components/
