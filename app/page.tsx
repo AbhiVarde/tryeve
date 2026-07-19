@@ -238,6 +238,7 @@ function HomeInner() {
   const linkIconRefs = useRef<Map<string, LinkIconHandle>>(new Map());
   const checkIconRefs = useRef<Map<string, CheckIconHandle>>(new Map());
   const botIconRefs = useRef<Map<string, BotMessageSquareHandle>>(new Map());
+  const connectPromptIconRef = useRef<BotMessageSquareHandle>(null);
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const xIconRef = useRef<XIconHandle>(null);
@@ -559,14 +560,18 @@ function HomeInner() {
           latestAssistantMessage && startChat(latestAssistantMessage)
         }
         disabled={chatLoadingId === latestAssistantMessage?.id}
+        onMouseEnter={() => connectPromptIconRef.current?.startAnimation()}
+        onMouseLeave={() => connectPromptIconRef.current?.stopAnimation()}
         className="w-full cursor-pointer"
       >
-        {chatLoadingId === latestAssistantMessage?.id && (
+        {chatLoadingId === latestAssistantMessage?.id ? (
           <Spinner className="size-4" />
+        ) : (
+          <BotMessageSquareIcon ref={connectPromptIconRef} size={15} />
         )}
         <span className="animate-in fade-in duration-300">
           {chatLoadingId === latestAssistantMessage?.id
-            ? "connecting"
+            ? "connecting..."
             : "connect to your agent"}
         </span>
       </Button>
@@ -627,10 +632,10 @@ function HomeInner() {
         <span className="animate-in fade-in duration-300">
           {chatSession
             ? status === "streaming"
-              ? "sending"
+              ? "sending..."
               : "send"
             : busy
-              ? "generating agent"
+              ? "generating agent..."
               : "generate agent"}
         </span>
       </Button>
@@ -698,6 +703,9 @@ function HomeInner() {
                   const finishedTesting =
                     state === "passed" || state === "failed";
                   const isThisChat = chatSession?.agentMessageId === message.id;
+                  const isPromptedByBottomBar =
+                    showConnectPrompt &&
+                    message.id === latestAssistantMessage?.id;
 
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
@@ -779,46 +787,49 @@ function HomeInner() {
                               />
                               share
                             </button>
-                            <button
-                              onClick={() => startChat(message)}
-                              disabled={
-                                chatLoadingId === message.id || isThisChat
-                              }
-                              onMouseEnter={() =>
-                                botIconRefs.current
-                                  .get(message.id)
-                                  ?.startAnimation()
-                              }
-                              onMouseLeave={() =>
-                                botIconRefs.current
-                                  .get(message.id)
-                                  ?.stopAnimation()
-                              }
-                              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                            >
-                              {chatLoadingId === message.id ? (
-                                <Spinner className="size-3.5" />
-                              ) : isThisChat ? (
-                                <CheckIcon
-                                  size={14}
-                                  className="text-emerald-500"
-                                />
-                              ) : (
-                                <BotMessageSquareIcon
-                                  ref={(el) => {
-                                    if (el)
-                                      botIconRefs.current.set(message.id, el);
-                                    else botIconRefs.current.delete(message.id);
-                                  }}
-                                  size={14}
-                                />
-                              )}
-                              {chatLoadingId === message.id
-                                ? "connecting"
-                                : isThisChat
-                                  ? "connected"
-                                  : "connect"}
-                            </button>
+                            {!isPromptedByBottomBar && (
+                              <button
+                                onClick={() => startChat(message)}
+                                disabled={
+                                  chatLoadingId === message.id || isThisChat
+                                }
+                                onMouseEnter={() =>
+                                  botIconRefs.current
+                                    .get(message.id)
+                                    ?.startAnimation()
+                                }
+                                onMouseLeave={() =>
+                                  botIconRefs.current
+                                    .get(message.id)
+                                    ?.stopAnimation()
+                                }
+                                className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                              >
+                                {chatLoadingId === message.id ? (
+                                  <Spinner className="size-3.5" />
+                                ) : isThisChat ? (
+                                  <CheckIcon
+                                    size={14}
+                                    className="text-emerald-500"
+                                  />
+                                ) : (
+                                  <BotMessageSquareIcon
+                                    ref={(el) => {
+                                      if (el)
+                                        botIconRefs.current.set(message.id, el);
+                                      else
+                                        botIconRefs.current.delete(message.id);
+                                    }}
+                                    size={14}
+                                  />
+                                )}
+                                {chatLoadingId === message.id
+                                  ? "connecting..."
+                                  : isThisChat
+                                    ? "connected"
+                                    : "connect"}
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -871,10 +882,10 @@ function HomeInner() {
                           )}
                           {phase === "generating" ? (
                             <Shimmer duration={1.5}>
-                              generating agent files
+                              generating agent files...
                             </Shimmer>
                           ) : (
-                            "generating agent files"
+                            "generating agent files..."
                           )}
                         </span>
                       </TaskItem>
@@ -887,11 +898,11 @@ function HomeInner() {
                           )}
                           {phase === "testing" ? (
                             <Shimmer duration={1.5}>
-                              running sandbox test
+                              running sandbox test...
                             </Shimmer>
                           ) : (
                             <span className="text-muted-foreground/50">
-                              running sandbox test
+                              running sandbox test...
                             </span>
                           )}
                         </span>

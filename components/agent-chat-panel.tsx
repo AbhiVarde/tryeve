@@ -67,10 +67,10 @@ export function useAgentChat(
 }
 
 const THINKING_WORDS = [
-  "thinking",
-  "reasoning",
-  "checking your data",
-  "putting it together",
+  "thinking...",
+  "reasoning...",
+  "checking your data...",
+  "putting it together...",
 ];
 
 function ThinkingIndicator() {
