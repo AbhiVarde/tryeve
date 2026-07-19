@@ -295,7 +295,16 @@ function HomeInner() {
   useEffect(() => {
     if (!chatSession) return;
 
-    const timer = setTimeout(
+    const warnTimer = setTimeout(
+      () => {
+        toast.warning("still there? disconnecting in 1 minute of inactivity", {
+          duration: 10000,
+        });
+      },
+      4 * 60 * 1000,
+    );
+
+    const disconnectTimer = setTimeout(
       () => {
         fetch("/api/stop-agent", {
           method: "POST",
@@ -308,7 +317,10 @@ function HomeInner() {
       5 * 60 * 1000,
     );
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(warnTimer);
+      clearTimeout(disconnectTimer);
+    };
   }, [chatSession, agentMessages.length]);
 
   const activeMessage = selectedFile
