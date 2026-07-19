@@ -1,6 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
-import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
+import { checkRateLimit } from "@vercel/firewall";
+import { put } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -74,6 +75,15 @@ function getSandboxEnv() {
 }
 
 export async function POST(req: Request) {
+  const { rateLimited } = await checkRateLimit("rate-limit-ai-routes");
+
+  if (rateLimited) {
+    return Response.json(
+      { ok: false, error: "too many requests, try again in a minute" },
+      { status: 429 },
+    );
+  }
+
   const { code, shareId } = await req.json();
 
   if (!code || typeof code !== "string") {

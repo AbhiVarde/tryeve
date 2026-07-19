@@ -16,6 +16,7 @@
     "@streamdown/mermaid": "^1.0.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.6.1",
+    "@vercel/firewall": "^1.2.1",
     "@vercel/sandbox": "^2.6.1",
     "ai": "^7.0.29",
     "class-variance-authority": "^0.7.1",
