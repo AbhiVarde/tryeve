@@ -1,5 +1,5 @@
 import { start } from "workflow/api";
-import { put } from "@vercel/blob";
+import { put, head } from "@vercel/blob";
 import { nanoid } from "nanoid";
 import { checkRateLimit } from "@vercel/firewall";
 import { buildAgentWorkflow } from "@/app/workflows/build-agent";
@@ -29,6 +29,25 @@ export async function POST(req: Request) {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     },
   );
+
+  try {
+    const existing = await head("agents/index.json", {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    }).catch(() => null);
+
+    const history: { id: string; prompt: string; createdAt: string }[] =
+      existing ? await (await fetch(existing.url)).json() : [];
+
+    history.unshift({ id, prompt, createdAt: new Date().toISOString() });
+
+    await put("agents/index.json", JSON.stringify(history.slice(0, 200)), {
+      access: "public",
+      addRandomSuffix: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+  } catch {
+    // history index is best-effort, generation still succeeds without it
+  }
 
   return Response.json({ ...result, id });
 }

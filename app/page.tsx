@@ -24,6 +24,7 @@ import {
   CircleHelpIcon,
   type CircleHelpIconHandle,
 } from "@/components/ui/circle-help";
+import { HistoryIcon, type HistoryIconHandle } from "@/components/ui/history";
 import {
   BotMessageSquareIcon,
   type BotMessageSquareHandle,
@@ -231,6 +232,16 @@ function HomeInner() {
     index: number;
   } | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<
+    {
+      id: string;
+      prompt: string;
+      createdAt: string;
+    }[]
+  >([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const [testStatus, setTestStatus] = useState<Record<string, TestResult>>({});
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
@@ -245,6 +256,7 @@ function HomeInner() {
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const xIconRef = useRef<XIconHandle>(null);
   const circleHelpIconRef = useRef<CircleHelpIconHandle>(null);
+  const historyIconRef = useRef<HistoryIconHandle>(null);
   const logoutIconRef = useRef<LogoutIconHandle>(null);
 
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
@@ -261,7 +273,7 @@ function HomeInner() {
     setChatSession((prev) => (prev ? { ...prev, ...patch } : prev)),
   );
 
-  const panelOpen = !!selectedFile || showInfo;
+  const panelOpen = !!selectedFile || showInfo || showHistory;
 
   const chatSessionRef = useRef<ChatSession | null>(null);
   useEffect(() => {
@@ -421,12 +433,28 @@ function HomeInner() {
 
   function openInfo() {
     setSelectedFile(null);
+    setShowHistory(false);
     setShowInfo((prev) => !prev);
+  }
+
+  function openHistory() {
+    setSelectedFile(null);
+    setShowInfo(false);
+    setShowHistory((prev) => !prev);
+
+    if (!historyLoading && history.length === 0) {
+      setHistoryLoading(true);
+      fetch("/api/agents")
+        .then((res) => res.json())
+        .then((data) => setHistory(Array.isArray(data) ? data : []))
+        .finally(() => setHistoryLoading(false));
+    }
   }
 
   function closePanel() {
     setSelectedFile(null);
     setShowInfo(false);
+    setShowHistory(false);
   }
 
   function endChat() {
@@ -673,15 +701,26 @@ function HomeInner() {
         hideOnMobile={panelOpen}
         onLogoClick={resetSession}
         rightSlot={
-          <button
-            onClick={openInfo}
-            onMouseEnter={() => circleHelpIconRef.current?.startAnimation()}
-            onMouseLeave={() => circleHelpIconRef.current?.stopAnimation()}
-            aria-label="about tryeve"
-            className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
-          >
-            <CircleHelpIcon ref={circleHelpIconRef} size={16} />
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={openHistory}
+              onMouseEnter={() => historyIconRef.current?.startAnimation()}
+              onMouseLeave={() => historyIconRef.current?.stopAnimation()}
+              aria-label="past agents"
+              className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
+            >
+              <HistoryIcon ref={historyIconRef} size={16} />
+            </button>
+            <button
+              onClick={openInfo}
+              onMouseEnter={() => circleHelpIconRef.current?.startAnimation()}
+              onMouseLeave={() => circleHelpIconRef.current?.stopAnimation()}
+              aria-label="about tryeve"
+              className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
+            >
+              <CircleHelpIcon ref={circleHelpIconRef} size={16} />
+            </button>
+          </div>
         }
       />
 
@@ -998,7 +1037,11 @@ function HomeInner() {
                     <ChevronLeftIcon ref={chevronLeftIconRef} size={16} />
                   </button>
                   <span className="truncate font-mono text-sm font-medium">
-                    {showInfo ? "tryeve/about.md" : panelFile?.filename}
+                    {showInfo
+                      ? "tryeve/about.md"
+                      : showHistory
+                        ? "tryeve/history.md"
+                        : panelFile?.filename}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1014,7 +1057,40 @@ function HomeInner() {
                 </div>
               </div>
 
-              {showInfo ? (
+              {showHistory ? (
+                <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
+                  {historyLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Spinner className="size-5 text-muted-foreground" />
+                    </div>
+                  ) : history.length === 0 ? (
+                    <p className="font-mono text-xs text-muted-foreground">
+                      no agents built yet
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-1">
+                      {history.map((entry) => (
+                        <li key={entry.id}>
+                          <a
+                            href={`/?a=${entry.id}`}
+                            className="block rounded-md px-3 py-2.5 transition-colors hover:bg-accent"
+                          >
+                            <p className="truncate font-mono text-xs text-foreground/90">
+                              {entry.prompt}
+                            </p>
+                            <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                              {new Date(entry.createdAt).toLocaleDateString(
+                                undefined,
+                                { month: "short", day: "numeric" },
+                              )}
+                            </p>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : showInfo ? (
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
                   <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
                     <div>
