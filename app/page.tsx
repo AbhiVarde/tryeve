@@ -248,6 +248,7 @@ function HomeInner() {
 
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
   const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
+  const [showGenerateForm, setShowGenerateForm] = useState(false);
 
   const {
     messages: agentMessages,
@@ -391,6 +392,7 @@ function HomeInner() {
     setChatSession(null);
     setTestStatus({});
     setInput("");
+    setShowGenerateForm(false);
     router.replace("/");
   }
 
@@ -453,6 +455,7 @@ function HomeInner() {
         continuationToken: null,
         turnCount: 0,
       });
+      setShowGenerateForm(false);
     } catch {
       toast.error("failed to connect to your agent. please try again.");
     } finally {
@@ -523,6 +526,8 @@ function HomeInner() {
         [assistantId]: result.passed ? "passed" : "failed",
       }));
 
+      setShowGenerateForm(false);
+
       if (result.id) router.replace(`/?a=${result.id}`);
     } catch {
       toast.error(
@@ -538,7 +543,42 @@ function HomeInner() {
   const nearLimit = remaining <= 40;
   const submitting = chatSession ? status === "streaming" : busy;
 
-  const inputBar = (
+  const latestAssistantMessage =
+    [...messages].reverse().find((m) => m.role === "assistant") ?? null;
+  const latestPassed =
+    !!latestAssistantMessage &&
+    testStatus[latestAssistantMessage.id] === "passed";
+  const showConnectPrompt =
+    latestPassed && !chatSession && !showGenerateForm && !busy;
+
+  const inputBar = showConnectPrompt ? (
+    <div className="w-full space-y-2">
+      <Button
+        type="button"
+        onClick={() =>
+          latestAssistantMessage && startChat(latestAssistantMessage)
+        }
+        disabled={chatLoadingId === latestAssistantMessage?.id}
+        className="w-full cursor-pointer"
+      >
+        {chatLoadingId === latestAssistantMessage?.id && (
+          <Spinner className="size-4" />
+        )}
+        <span className="animate-in fade-in duration-300">
+          {chatLoadingId === latestAssistantMessage?.id
+            ? "connecting"
+            : "connect to your agent"}
+        </span>
+      </Button>
+      <button
+        type="button"
+        onClick={() => setShowGenerateForm(true)}
+        className="mx-auto block cursor-pointer font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        or describe a new agent
+      </button>
+    </div>
+  ) : (
     <form onSubmit={onSubmit} className="w-full space-y-2">
       {chatSession && (
         <div className="flex items-center justify-between rounded-md bg-primary/5 px-3 py-2 font-mono text-xs text-muted-foreground">
