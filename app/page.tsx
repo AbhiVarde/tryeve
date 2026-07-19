@@ -30,6 +30,10 @@ import {
   type BotMessageSquareHandle,
 } from "@/components/ui/bot-message-square";
 import { LogoutIcon, type LogoutIconHandle } from "@/components/ui/logout";
+import {
+  CornerDownRightIcon,
+  type CornerDownRightIconHandle,
+} from "@/components/ui/corner-down-right";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
@@ -65,6 +69,7 @@ type Message = {
   shareId?: string;
 };
 type ChatSession = AgentSession & { agentMessageId: string };
+type HistoryEntry = { id: string; prompt: string; createdAt: string };
 
 const MAX_INPUT_LENGTH = 500;
 const MIN_PROMPT_LENGTH = 12;
@@ -95,6 +100,8 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     items: [
       "reload the page anytime, your agent and chat pick up right where you left off",
       "idle or closed sandboxes shut down automatically, nothing left running",
+      "warned before disconnect, never cut off without notice",
+      "your history is private, only shared links are public",
     ],
   },
 ];
@@ -119,6 +126,10 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
     name: "blob",
     description:
       "stores each generated agent and its live chat session, so shared links and reloads stay in sync",
+  },
+  {
+    name: "cron",
+    description: "sweeps stale sandbox sessions on a schedule",
   },
   {
     name: "firewall",
@@ -220,6 +231,71 @@ https://eve.dev/docs/introduction
   URL.revokeObjectURL(url);
 }
 
+function formatRelativeTime(dateString: string) {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateString).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function groupHistory(entries: HistoryEntry[]) {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - 7);
+
+  const buckets: Record<string, HistoryEntry[]> = {
+    today: [],
+    yesterday: [],
+    "this week": [],
+    earlier: [],
+  };
+
+  for (const entry of entries) {
+    const d = new Date(entry.createdAt);
+    if (d >= startOfToday) buckets.today.push(entry);
+    else if (d >= startOfYesterday) buckets.yesterday.push(entry);
+    else if (d >= startOfWeek) buckets["this week"].push(entry);
+    else buckets.earlier.push(entry);
+  }
+
+  return Object.entries(buckets).filter(([, v]) => v.length > 0);
+}
+
+function useIconRefs<
+  T extends { startAnimation: () => void; stopAnimation: () => void },
+>() {
+  const refs = useRef<Map<string, T>>(new Map());
+
+  function setRef(key: string) {
+    return (el: T | null) => {
+      if (el) refs.current.set(key, el);
+      else refs.current.delete(key);
+    };
+  }
+
+  function onEnter(key: string) {
+    return () => refs.current.get(key)?.startAnimation();
+  }
+
+  function onLeave(key: string) {
+    return () => refs.current.get(key)?.stopAnimation();
+  }
+
+  return { setRef, onEnter, onLeave };
+}
+
 function HomeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -233,24 +309,20 @@ function HomeInner() {
   } | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<
-    {
-      id: string;
-      prompt: string;
-      createdAt: string;
-    }[]
-  >([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [hoveredHistoryId, setHoveredHistoryId] = useState<string | null>(null);
 
   const [testStatus, setTestStatus] = useState<Record<string, TestResult>>({});
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
   const lastFileKey = useRef<string | null>(null);
 
-  const downloadIconRefs = useRef<Map<string, DownloadIconHandle>>(new Map());
-  const linkIconRefs = useRef<Map<string, LinkIconHandle>>(new Map());
-  const checkIconRefs = useRef<Map<string, CheckIconHandle>>(new Map());
-  const botIconRefs = useRef<Map<string, BotMessageSquareHandle>>(new Map());
+  const downloadIcons = useIconRefs<DownloadIconHandle>();
+  const linkIcons = useIconRefs<LinkIconHandle>();
+  const checkIcons = useIconRefs<CheckIconHandle>();
+  const historyRowIcons = useIconRefs<CornerDownRightIconHandle>();
+
   const connectPromptIconRef = useRef<BotMessageSquareHandle>(null);
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
@@ -401,7 +473,7 @@ function HomeInner() {
             turnCount: 0,
           });
         } catch {
-          // sandbox no longer reachable, stay disconnected
+          setChatSession((prev) => prev);
         }
       })
       .finally(() => {
@@ -440,9 +512,10 @@ function HomeInner() {
   function openHistory() {
     setSelectedFile(null);
     setShowInfo(false);
-    setShowHistory((prev) => !prev);
+    const next = !showHistory;
+    setShowHistory(next);
 
-    if (!historyLoading && history.length === 0) {
+    if (next && !historyLoading) {
       setHistoryLoading(true);
       fetch("/api/agents")
         .then((res) => res.json())
@@ -767,10 +840,6 @@ function HomeInner() {
                   const state = result?.state;
                   const finishedTesting =
                     state === "passed" || state === "failed";
-                  const isThisChat = chatSession?.agentMessageId === message.id;
-                  const isPromptedByBottomBar =
-                    showConnectPrompt &&
-                    message.id === latestAssistantMessage?.id;
 
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
@@ -804,28 +873,12 @@ function HomeInner() {
                           <div className="flex items-center gap-4 sm:gap-3.5">
                             <button
                               onClick={() => downloadZip(files)}
-                              onMouseEnter={() =>
-                                downloadIconRefs.current
-                                  .get(message.id)
-                                  ?.startAnimation()
-                              }
-                              onMouseLeave={() =>
-                                downloadIconRefs.current
-                                  .get(message.id)
-                                  ?.stopAnimation()
-                              }
+                              onMouseEnter={downloadIcons.onEnter(message.id)}
+                              onMouseLeave={downloadIcons.onLeave(message.id)}
                               className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                             >
                               <DownloadIcon
-                                ref={(el) => {
-                                  if (el)
-                                    downloadIconRefs.current.set(
-                                      message.id,
-                                      el,
-                                    );
-                                  else
-                                    downloadIconRefs.current.delete(message.id);
-                                }}
+                                ref={downloadIcons.setRef(message.id)}
                                 size={14}
                               />
                               download
@@ -837,71 +890,16 @@ function HomeInner() {
                                 );
                                 toast.success("link copied to your clipboard");
                               }}
-                              onMouseEnter={() =>
-                                linkIconRefs.current
-                                  .get(message.id)
-                                  ?.startAnimation()
-                              }
-                              onMouseLeave={() =>
-                                linkIconRefs.current
-                                  .get(message.id)
-                                  ?.stopAnimation()
-                              }
+                              onMouseEnter={linkIcons.onEnter(message.id)}
+                              onMouseLeave={linkIcons.onLeave(message.id)}
                               className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                             >
                               <LinkIcon
-                                ref={(el) => {
-                                  if (el)
-                                    linkIconRefs.current.set(message.id, el);
-                                  else linkIconRefs.current.delete(message.id);
-                                }}
+                                ref={linkIcons.setRef(message.id)}
                                 size={14}
                               />
                               share
                             </button>
-                            {!isPromptedByBottomBar && state === "passed" && (
-                              <button
-                                onClick={() => startChat(message)}
-                                disabled={
-                                  chatLoadingId === message.id || isThisChat
-                                }
-                                onMouseEnter={() =>
-                                  botIconRefs.current
-                                    .get(message.id)
-                                    ?.startAnimation()
-                                }
-                                onMouseLeave={() =>
-                                  botIconRefs.current
-                                    .get(message.id)
-                                    ?.stopAnimation()
-                                }
-                                className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                              >
-                                {chatLoadingId === message.id ? (
-                                  <Spinner className="size-3.5" />
-                                ) : isThisChat ? (
-                                  <CheckIcon
-                                    size={14}
-                                    className="text-emerald-500"
-                                  />
-                                ) : (
-                                  <BotMessageSquareIcon
-                                    ref={(el) => {
-                                      if (el)
-                                        botIconRefs.current.set(message.id, el);
-                                      else
-                                        botIconRefs.current.delete(message.id);
-                                    }}
-                                    size={14}
-                                  />
-                                )}
-                                {chatLoadingId === message.id
-                                  ? "connecting..."
-                                  : isThisChat
-                                    ? "connected"
-                                    : "connect"}
-                              </button>
-                            )}
                           </div>
                         )}
                       </div>
@@ -913,20 +911,13 @@ function HomeInner() {
                             <button
                               key={file.filename}
                               onClick={() => openFile(message.id, idx)}
-                              onMouseEnter={() =>
-                                checkIconRefs.current.get(key)?.startAnimation()
-                              }
-                              onMouseLeave={() =>
-                                checkIconRefs.current.get(key)?.stopAnimation()
-                              }
+                              onMouseEnter={checkIcons.onEnter(key)}
+                              onMouseLeave={checkIcons.onLeave(key)}
                               className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/40 bg-background px-2.5 py-1 font-mono text-xs transition-colors hover:bg-accent hover:text-accent-foreground"
                             >
                               {file.filename}
                               <CheckIcon
-                                ref={(el) => {
-                                  if (el) checkIconRefs.current.set(key, el);
-                                  else checkIconRefs.current.delete(key);
-                                }}
+                                ref={checkIcons.setRef(key)}
                                 size={16}
                                 className="text-muted-foreground/70"
                               />
@@ -1013,7 +1004,7 @@ function HomeInner() {
         )}
 
         <div className="h-full w-full overflow-hidden">
-          {(panelFile && selectedFile) || showInfo ? (
+          {(panelFile && selectedFile) || showInfo || showHistory ? (
             <div
               className={`relative flex h-full min-w-0 flex-col transition-opacity duration-200 ease-in-out ${
                 panelOpen ? "opacity-100 delay-100" : "opacity-0 md:opacity-100"
@@ -1060,34 +1051,96 @@ function HomeInner() {
               {showHistory ? (
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
                   {historyLoading ? (
-                    <div className="flex justify-center py-12">
-                      <Spinner className="size-5 text-muted-foreground" />
+                    <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
+                      {Array.from({ length: 2 }).map((_, groupIdx) => (
+                        <div key={groupIdx}>
+                          <div className="mb-2 h-2.5 w-12 animate-pulse rounded bg-accent/40" />
+                          <div className="flex flex-col gap-2.5 py-1">
+                            {Array.from({ length: groupIdx === 0 ? 3 : 2 }).map(
+                              (_, rowIdx) => (
+                                <div
+                                  key={rowIdx}
+                                  className="flex items-baseline justify-between gap-4"
+                                >
+                                  <div
+                                    className="h-3 animate-pulse rounded bg-accent/40"
+                                    style={{ width: `${60 - rowIdx * 8}%` }}
+                                  />
+                                  <div className="h-2.5 w-10 shrink-0 animate-pulse rounded bg-accent/30" />
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : history.length === 0 ? (
-                    <p className="font-mono text-xs text-muted-foreground">
-                      no agents built yet
-                    </p>
+                    <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+                      <HistoryIcon
+                        size={22}
+                        className="text-muted-foreground/40"
+                      />
+                      <div>
+                        <p className="font-mono text-sm text-foreground/80">
+                          no agents yet
+                        </p>
+                        <p className="mt-1 font-mono text-xs text-muted-foreground">
+                          agents you build will show up here
+                        </p>
+                      </div>
+                    </div>
                   ) : (
-                    <ul className="flex flex-col gap-1">
-                      {history.map((entry) => (
-                        <li key={entry.id}>
-                          <a
-                            href={`/?a=${entry.id}`}
-                            className="block rounded-md px-3 py-2.5 transition-colors hover:bg-accent"
-                          >
-                            <p className="truncate font-mono text-xs text-foreground/90">
-                              {entry.prompt}
-                            </p>
-                            <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                              {new Date(entry.createdAt).toLocaleDateString(
-                                undefined,
-                                { month: "short", day: "numeric" },
-                              )}
-                            </p>
-                          </a>
-                        </li>
+                    <div
+                      className="mx-auto flex w-full max-w-xl flex-col gap-5"
+                      onMouseLeave={() => setHoveredHistoryId(null)}
+                    >
+                      {groupHistory(history).map(([label, entries]) => (
+                        <div key={label}>
+                          <p className="mb-2 font-mono text-[11px] tracking-wide text-muted-foreground/70">
+                            {label}
+                          </p>
+                          <ul className="flex flex-col">
+                            {entries.map((entry) => {
+                              const dimmed =
+                                hoveredHistoryId !== null &&
+                                hoveredHistoryId !== entry.id;
+
+                              return (
+                                <li key={entry.id}>
+                                  <a
+                                    href={`/?a=${entry.id}`}
+                                    onMouseEnter={() => {
+                                      setHoveredHistoryId(entry.id);
+                                      historyRowIcons.onEnter(entry.id)();
+                                    }}
+                                    onMouseLeave={historyRowIcons.onLeave(
+                                      entry.id,
+                                    )}
+                                    className={`group flex items-baseline justify-between gap-4 py-1.5 font-mono text-xs leading-relaxed transition-opacity duration-200 ${
+                                      dimmed ? "opacity-40" : "opacity-100"
+                                    }`}
+                                  >
+                                    <span className="flex min-w-0 items-baseline gap-1.5 truncate text-foreground/80 group-hover:text-foreground">
+                                      <CornerDownRightIcon
+                                        ref={historyRowIcons.setRef(entry.id)}
+                                        size={12}
+                                        className="shrink-0 translate-y-px text-muted-foreground/60"
+                                      />
+                                      <span className="truncate">
+                                        {entry.prompt}
+                                      </span>
+                                    </span>
+                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                      {formatRelativeTime(entry.createdAt)}
+                                    </span>
+                                  </a>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   )}
                 </div>
               ) : showInfo ? (

@@ -8,7 +8,8 @@ export async function GET() {
     const res = await fetch(blob.url);
     const history = await res.json();
     return Response.json(history);
-  } catch {
+  } catch (err) {
+    console.error("agents history fetch failed:", err);
     return Response.json([]);
   }
 }

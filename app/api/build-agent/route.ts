@@ -43,10 +43,12 @@ export async function POST(req: Request) {
     await put("agents/index.json", JSON.stringify(history.slice(0, 200)), {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-  } catch {
-    // history index is best-effort, generation still succeeds without it
+  } catch (err) {
+    console.error("history index write failed:", err);
+    // best-effort, generation still succeeds without it
   }
 
   return Response.json({ ...result, id });
