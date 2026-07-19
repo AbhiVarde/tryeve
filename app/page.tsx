@@ -55,6 +55,7 @@ import {
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
+type TestResult = { state: TestState; error?: string };
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -229,7 +230,7 @@ function HomeInner() {
     index: number;
   } | null>(null);
   const [showInfo, setShowInfo] = useState(false);
-  const [testStatus, setTestStatus] = useState<Record<string, TestState>>({});
+  const [testStatus, setTestStatus] = useState<Record<string, TestResult>>({});
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
   const lastFileKey = useRef<string | null>(null);
@@ -354,7 +355,10 @@ function HomeInner() {
             shareId,
           },
         ]);
-        setTestStatus((prev) => ({ ...prev, [assistantId]: "passed" }));
+        setTestStatus((prev) => ({
+          ...prev,
+          [assistantId]: { state: "passed" },
+        }));
 
         try {
           const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
@@ -524,7 +528,10 @@ function HomeInner() {
 
       setTestStatus((prev) => ({
         ...prev,
-        [assistantId]: result.passed ? "passed" : "failed",
+        [assistantId]: {
+          state: result.passed ? "passed" : "failed",
+          error: result.error,
+        },
       }));
 
       setShowGenerateForm(false);
@@ -548,7 +555,7 @@ function HomeInner() {
     [...messages].reverse().find((m) => m.role === "assistant") ?? null;
   const latestPassed =
     !!latestAssistantMessage &&
-    testStatus[latestAssistantMessage.id] === "passed";
+    testStatus[latestAssistantMessage.id]?.state === "passed";
   const showConnectPrompt =
     latestPassed && !chatSession && !showGenerateForm && !busy;
 
@@ -699,7 +706,8 @@ function HomeInner() {
                   }
 
                   const files = parseFiles(message.text);
-                  const state = testStatus[message.id];
+                  const result = testStatus[message.id];
+                  const state = result?.state;
                   const finishedTesting =
                     state === "passed" || state === "failed";
                   const isThisChat = chatSession?.agentMessageId === message.id;
@@ -710,23 +718,30 @@ function HomeInner() {
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-                          {`${files.length} file${files.length !== 1 ? "s" : ""} generated`}
-                          {finishedTesting && (
-                            <span
-                              className={
-                                state === "passed"
-                                  ? "text-emerald-500"
-                                  : "text-red-400"
-                              }
-                            >
-                              ·{" "}
-                              {state === "passed"
-                                ? "tests passed"
-                                : "tests failed"}
-                            </span>
+                        <div className="flex flex-col gap-1">
+                          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+                            {`${files.length} file${files.length !== 1 ? "s" : ""} generated`}
+                            {finishedTesting && (
+                              <span
+                                className={
+                                  state === "passed"
+                                    ? "text-emerald-500"
+                                    : "text-red-400"
+                                }
+                              >
+                                ·{" "}
+                                {state === "passed"
+                                  ? "tests passed"
+                                  : "tests failed"}
+                              </span>
+                            )}
+                          </p>
+                          {state === "failed" && result?.error && (
+                            <p className="font-mono text-xs text-red-400/80">
+                              {result.error}
+                            </p>
                           )}
-                        </p>
+                        </div>
 
                         {finishedTesting && (
                           <div className="flex items-center gap-4 sm:gap-3.5">
@@ -787,7 +802,7 @@ function HomeInner() {
                               />
                               share
                             </button>
-                            {!isPromptedByBottomBar && (
+                            {!isPromptedByBottomBar && state === "passed" && (
                               <button
                                 onClick={() => startChat(message)}
                                 disabled={
