@@ -66,6 +66,7 @@ type Message = {
 type ChatSession = AgentSession & { agentMessageId: string };
 
 const MAX_INPUT_LENGTH = 500;
+const MIN_PROMPT_LENGTH = 12;
 
 const FEATURE_GROUPS: { label: string; items: string[] }[] = [
   {
@@ -493,6 +494,11 @@ function HomeInner() {
     }
     if (trimmed.length > MAX_INPUT_LENGTH) {
       toast.error(`keep your prompt under ${MAX_INPUT_LENGTH} characters`);
+      return;
+    }
+
+    if (!chatSession && trimmed.length < MIN_PROMPT_LENGTH) {
+      toast.error("describe what the agent should actually do");
       return;
     }
 
