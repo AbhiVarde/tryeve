@@ -18,6 +18,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - generates real, working eve files
 - every agent is tested against a live eve runtime before you see it
 - generation and testing run as one durable step, survives crashes
+- if a build fails, the reason is shown and you can retry with one click
 - inspect every file with syntax highlighting
 - export the full agent as a zip
 - share a live link to any agent you build
@@ -26,8 +27,8 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - reload the page anytime, your agent and chat pick up right where you left off
 - idle or closed sandboxes shut down automatically, nothing left running
 - warned before disconnect, never cut off without notice
-- every agent you've built is saved to your own private history
-- dark, minimal interface
+- every agent you've built is saved to your own private history, delete any entry or clear it all
+- dark, minimal interface  
 
 ## how it works
 

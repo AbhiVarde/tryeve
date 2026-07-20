@@ -38,6 +38,7 @@ import {
   CornerDownRightIcon,
   type CornerDownRightIconHandle,
 } from "@/components/ui/corner-down-right";
+import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
@@ -85,8 +86,9 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     items: [
       "describe an agent in plain english",
       "generates real, working eve files",
-      "every agent is tested against a live eve runtime before you see it",
+      "tested against a live eve runtime before you see it",
       "generation and testing run as one durable step, survives crashes",
+      "if a build fails, the reason is shown and you can retry with one click",
     ],
   },
   {
@@ -97,7 +99,6 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "share a live link to any agent you build",
       "connect to your agent right after it's built, no install needed",
       "chat with it live, with markdown-formatted replies",
-      "auto-scrolling chat with a jump-to-latest button",
     ],
   },
   {
@@ -106,7 +107,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "reload the page anytime, your agent and chat pick up right where you left off",
       "idle or closed sandboxes shut down automatically, nothing left running",
       "warned before disconnect, never cut off without notice",
-      "your history is private, only shared links are public",
+      "your history is private, delete any entry or clear it all",
     ],
   },
 ];
@@ -328,6 +329,7 @@ function HomeInner() {
   const checkIcons = useIconRefs<CheckIconHandle>();
   const historyRowIcons = useIconRefs<CornerDownRightIconHandle>();
   const retryIcons = useIconRefs<RefreshCCWIconWIcon>();
+  const deleteIcons = useIconRefs<DeleteIconHandle>();
 
   const connectPromptIconRef = useRef<BotMessageSquareHandle>(null);
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
@@ -528,6 +530,37 @@ function HomeInner() {
         .then((data) => setHistory(Array.isArray(data) ? data : []))
         .catch(() => toast.error("couldn't load your history, try again"))
         .finally(() => setHistoryLoading(false));
+    }
+  }
+
+  async function deleteHistoryEntry(id: string) {
+    setHistory((prev) => prev.filter((entry) => entry.id !== id));
+    try {
+      await fetch("/api/agents", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      toast.error("couldn't remove that entry, try again.");
+    }
+  }
+
+  async function clearAllHistory() {
+    const confirmed = window.confirm(
+      "remove all agents from your history? this doesn't delete anything you've already shared.",
+    );
+    if (!confirmed) return;
+
+    setHistory([]);
+    try {
+      await fetch("/api/agents", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+    } catch {
+      toast.error("couldn't clear history, try again.");
     }
   }
 
@@ -1120,6 +1153,16 @@ function HomeInner() {
 
               {showHistory ? (
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
+                  {!historyLoading && history.length > 0 && (
+                    <div className="mx-auto mb-4 flex w-full max-w-xl justify-end">
+                      <button
+                        onClick={clearAllHistory}
+                        className="cursor-pointer font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        clear all
+                      </button>
+                    </div>
+                  )}
                   {historyLoading ? (
                     <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
                       {Array.from({ length: 2 }).map((_, groupIdx) => (
@@ -1176,19 +1219,24 @@ function HomeInner() {
                                 hoveredHistoryId !== entry.id;
 
                               return (
-                                <li key={entry.id}>
+                                <li
+                                  key={entry.id}
+                                  onMouseEnter={() =>
+                                    setHoveredHistoryId(entry.id)
+                                  }
+                                  className={`group flex items-center gap-2 py-1.5 transition-opacity duration-200 ${
+                                    dimmed ? "opacity-40" : "opacity-100"
+                                  }`}
+                                >
                                   <a
                                     href={`/?a=${entry.id}`}
-                                    onMouseEnter={() => {
-                                      setHoveredHistoryId(entry.id);
-                                      historyRowIcons.onEnter(entry.id)();
-                                    }}
+                                    onMouseEnter={historyRowIcons.onEnter(
+                                      entry.id,
+                                    )}
                                     onMouseLeave={historyRowIcons.onLeave(
                                       entry.id,
                                     )}
-                                    className={`group flex items-baseline justify-between gap-4 py-1.5 font-mono text-xs leading-relaxed transition-opacity duration-200 ${
-                                      dimmed ? "opacity-40" : "opacity-100"
-                                    }`}
+                                    className="flex min-w-0 flex-1 items-baseline justify-between gap-4 font-mono text-xs leading-relaxed"
                                   >
                                     <span className="flex min-w-0 items-baseline gap-1.5 truncate text-foreground/80 group-hover:text-foreground">
                                       <CornerDownRightIcon
@@ -1204,6 +1252,18 @@ function HomeInner() {
                                       {formatRelativeTime(entry.createdAt)}
                                     </span>
                                   </a>
+                                  <button
+                                    onClick={() => deleteHistoryEntry(entry.id)}
+                                    onMouseEnter={deleteIcons.onEnter(entry.id)}
+                                    onMouseLeave={deleteIcons.onLeave(entry.id)}
+                                    className="shrink-0 cursor-pointer text-muted-foreground/50 transition-colors hover:text-foreground"
+                                    aria-label="remove from history"
+                                  >
+                                    <DeleteIcon
+                                      ref={deleteIcons.setRef(entry.id)}
+                                      size={12}
+                                    />
+                                  </button>
                                 </li>
                               );
                             })}
@@ -1215,7 +1275,7 @@ function HomeInner() {
                 </div>
               ) : showInfo ? (
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
-                  <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
+                  <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
                     <div>
                       <p className="font-mono text-sm font-medium">
                         tryeve{" "}
@@ -1230,16 +1290,16 @@ function HomeInner() {
                     </div>
 
                     <div>
-                      <p className="mb-4 font-mono text-xs tracking-wide text-muted-foreground">
+                      <p className="mb-3 font-mono text-xs tracking-wide text-muted-foreground">
                         features
                       </p>
-                      <div className="flex flex-col gap-5">
+                      <div className="flex flex-col gap-4">
                         {FEATURE_GROUPS.map((group) => (
                           <div key={group.label}>
                             <p className="mb-2 font-mono text-[11px] text-muted-foreground/70">
                               {group.label}
                             </p>
-                            <ul className="flex flex-col gap-2.5">
+                            <ul className="flex flex-col gap-1.5">
                               {group.items.map((feature) => (
                                 <li
                                   key={feature}
@@ -1267,7 +1327,7 @@ function HomeInner() {
                           products
                         </p>
                       </div>
-                      <div className="flex flex-col gap-2.5">
+                      <div className="flex flex-col gap-2">
                         {VERCEL_PRODUCTS.map((p) => (
                           <p
                             key={p.name}
