@@ -41,6 +41,10 @@ reload the page anytime. your agent, your chat, your files, all still there.
 
 steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
 
+for the full technical breakdown, including real bugs hit building this, see [HOW_IT_WORKS.md](./HOW_IT_WORKS.md).
+
+## built with ▲
+
 ## built with ▲
 
 | product | role |
