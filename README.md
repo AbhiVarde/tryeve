@@ -1,8 +1,8 @@
 # ▲ tryeve
 
-describe an agent. get a working one.
+**Agent Runtime for eve.**
 
-a free, browser based tool that builds, tests, and runs a real [eve](https://eve.dev) agent from a plain english description. no install, no terminal.
+tested against a live eve runtime, ready to talk before you ever see it. no install, no terminal.
 
 [live demo](https://tryeve.abhivarde.in) · built with ▲ [vercel](https://vercel.com)
 
@@ -45,23 +45,21 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 
 ## built with ▲
 
-## built with ▲
-
-| product | role |
-|---|---|
-| [next.js](https://nextjs.org) | the app itself |
-| [ai gateway](https://vercel.com/docs/ai-gateway) | routes the generation request to a model |
-| [ai sdk](https://sdk.vercel.ai) | streams the model's response |
-| [sandbox](https://vercel.com/docs/sandbox) | tests every agent against a real eve runtime, then runs it live so you can talk to it |
-| [workflow sdk](https://vercel.com/docs/workflow) | runs generate and test as one durable step |
-| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent, its chat session, and per-visitor history |
-| [cron](https://vercel.com/docs/cron-jobs) | sweeps stale sandbox sessions on a schedule |
-| [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation and connect requests |
-| [ai elements](https://ai-sdk.dev/elements) | chat interface, task progress ui, loading states |
-| [streamdown](https://streamdown.ai) | renders code and markdown cleanly |
-| [shadcn/ui](https://ui.shadcn.com) | every ui component |
-| [vercel](https://vercel.com) | hosts and deploys the app |
-| [analytics](https://vercel.com/docs/analytics) | tracks real usage without slowing anything down |
+| product                                              | role                                                                                   |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [next.js](https://nextjs.org)                        | the app itself                                                                         |
+| [ai gateway](https://vercel.com/docs/ai-gateway)     | routes the generation request to a model                                              |
+| [ai sdk](https://sdk.vercel.ai)                      | streams the model's response                                                          |
+| [sandbox](https://vercel.com/docs/sandbox)           | tests every agent against a real eve runtime, then runs it live so you can talk to it |
+| [workflow sdk](https://vercel.com/docs/workflow)     | runs generate and test as one durable step                                            |
+| [blob](https://vercel.com/docs/storage/vercel-blob)  | stores each agent, its chat session, and per-visitor history                          |
+| [cron](https://vercel.com/docs/cron-jobs)            | sweeps stale sandbox sessions on a schedule                                           |
+| [firewall](https://vercel.com/docs/vercel-firewall)  | rate limits generation and connect requests                                           |
+| [ai elements](https://ai-sdk.dev/elements)           | chat interface, task progress ui, loading states                                      |
+| [streamdown](https://streamdown.ai)                  | renders code and markdown cleanly                                                     |
+| [shadcn/ui](https://ui.shadcn.com)                   | every ui component                                                                    |
+| [vercel](https://vercel.com)                         | hosts and deploys the app                                                             |
+| [analytics](https://vercel.com/docs/analytics)       | tracks real usage without slowing anything down                                       |
 
 icons animated by [lucide-animated](https://lucide-animated.com).
 

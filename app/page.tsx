@@ -61,6 +61,7 @@ import {
   AgentConversation,
   type AgentSession,
 } from "@/components/agent-chat-panel";
+import { Badge } from "@/components/ui/badge";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
@@ -858,12 +859,20 @@ function HomeInner() {
         ) : messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-16 sm:px-6">
             <div className="relative z-10 flex w-full max-w-xl flex-col items-center text-center">
-              <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+              <Badge
+                variant="outline"
+                className="rounded-full px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+              >
+                Agent Runtime
+              </Badge>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                 describe an agent. get a working one.
               </h1>
+
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-                no install, no terminal. built, tested, and ready to talk to,
-                right here.
+                tested against a live eve runtime, ready to talk before you ever
+                see it.
               </p>
 
               <div className="mt-10 w-full">{inputBar}</div>
@@ -1219,11 +1228,15 @@ function HomeInner() {
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
                   <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
                     <div>
-                      <p className="font-mono text-sm font-medium">tryeve</p>
+                      <p className="font-mono text-sm font-medium">
+                        tryeve{" "}
+                        <span className="text-xs font-medium tracking-wide text-muted-foreground/70">
+                          · Agent Runtime
+                        </span>
+                      </p>
                       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                        ↳ a free, browser-based tool that builds, tests, and
-                        runs a real eve agent from a plain description, no
-                        install, no terminal.
+                        ↳ tested against a live eve runtime, ready to talk
+                        before you ever see it.
                       </p>
                     </div>
 
