@@ -12,6 +12,10 @@ import {
 } from "@/components/ui/download";
 import { LinkIcon, type LinkIconHandle } from "@/components/ui/link";
 import {
+  RefreshCWIcon,
+  type RefreshCCWIconWIcon,
+} from "@/components/ui/refresh-cw";
+import {
   ChevronLeftIcon,
   type ChevronLeftIconHandle,
 } from "@/components/ui/chevron-left";
@@ -322,6 +326,7 @@ function HomeInner() {
   const linkIcons = useIconRefs<LinkIconHandle>();
   const checkIcons = useIconRefs<CheckIconHandle>();
   const historyRowIcons = useIconRefs<CornerDownRightIconHandle>();
+  const retryIcons = useIconRefs<RefreshCCWIconWIcon>();
 
   const connectPromptIconRef = useRef<BotMessageSquareHandle>(null);
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
@@ -579,6 +584,50 @@ function HomeInner() {
       toast.error("failed to connect to your agent. please try again.");
     } finally {
       setChatLoadingId(null);
+    }
+  }
+
+  async function retryGenerate(prompt: string) {
+    setBusy(true);
+    setPhase("generating");
+    setTimeout(() => setPhase("testing"), 16000);
+
+    const assistantId = crypto.randomUUID();
+
+    try {
+      const res = await fetch("/api/build-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const result = await res.json();
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          text: result.code ?? "",
+          kind: "generate",
+          shareId: result.id,
+        },
+      ]);
+
+      setTestStatus((prev) => ({
+        ...prev,
+        [assistantId]: {
+          state: result.passed ? "passed" : "failed",
+          error: result.error,
+        },
+      }));
+
+      setShowGenerateForm(false);
+      if (result.id) router.replace(`/?a=${result.id}`);
+    } catch {
+      toast.error("something went wrong retrying. please try again.");
+    } finally {
+      setBusy(false);
+      setPhase(null);
     }
   }
 
@@ -863,9 +912,32 @@ function HomeInner() {
                             )}
                           </p>
                           {state === "failed" && result?.error && (
-                            <p className="font-mono text-xs text-red-400/80">
-                              {result.error}
-                            </p>
+                            <div className="flex flex-col gap-2">
+                              <p className="font-mono text-xs text-red-400/80">
+                                {result.error}
+                              </p>
+                              <button
+                                onClick={() => {
+                                  const userMsg = messages.find(
+                                    (m) =>
+                                      m.role === "user" &&
+                                      messages.indexOf(m) ===
+                                        messages.indexOf(message) - 1,
+                                  );
+                                  if (userMsg) retryGenerate(userMsg.text);
+                                }}
+                                disabled={busy}
+                                onMouseEnter={retryIcons.onEnter(message.id)}
+                                onMouseLeave={retryIcons.onLeave(message.id)}
+                                className="flex w-fit cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                              >
+                                <RefreshCWIcon
+                                  ref={retryIcons.setRef(message.id)}
+                                  size={12}
+                                />
+                                retry
+                              </button>
+                            </div>
                           )}
                         </div>
 
