@@ -524,8 +524,9 @@ function HomeInner() {
     if (next && !historyLoading) {
       setHistoryLoading(true);
       fetch("/api/agents")
-        .then((res) => res.json())
+        .then((res) => (res.ok ? res.json() : Promise.reject()))
         .then((data) => setHistory(Array.isArray(data) ? data : []))
+        .catch(() => toast.error("couldn't load your history, try again"))
         .finally(() => setHistoryLoading(false));
     }
   }
@@ -789,6 +790,12 @@ function HomeInner() {
           value={input}
           maxLength={MAX_INPUT_LENGTH}
           onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
           className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1"
         />
         <span
@@ -854,7 +861,9 @@ function HomeInner() {
       >
         {restoring ? (
           <div className="flex flex-1 items-center justify-center">
-            <Spinner className="size-5 text-muted-foreground" />
+            <p className="font-mono text-sm text-muted-foreground">
+              <Shimmer duration={1.5}>loading your agent...</Shimmer>
+            </p>
           </div>
         ) : messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-16 sm:px-6">
@@ -927,13 +936,12 @@ function HomeInner() {
                               </p>
                               <button
                                 onClick={() => {
-                                  const userMsg = messages.find(
-                                    (m) =>
-                                      m.role === "user" &&
-                                      messages.indexOf(m) ===
-                                        messages.indexOf(message) - 1,
+                                  const messageIndex = messages.findIndex(
+                                    (m) => m.id === message.id,
                                   );
-                                  if (userMsg) retryGenerate(userMsg.text);
+                                  const userMsg = messages[messageIndex - 1];
+                                  if (userMsg?.role === "user")
+                                    retryGenerate(userMsg.text);
                                 }}
                                 disabled={busy}
                                 onMouseEnter={retryIcons.onEnter(message.id)}
