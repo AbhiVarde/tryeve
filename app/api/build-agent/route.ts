@@ -28,8 +28,18 @@ export async function POST(req: Request) {
   }
 
   const { prompt } = await req.json();
-  const run = await start(buildAgentWorkflow, [prompt]);
-  const result = await run.returnValue;
+
+  let result;
+  try {
+    const run = await start(buildAgentWorkflow, [prompt]);
+    result = await run.returnValue;
+  } catch (err) {
+    console.error("build-agent workflow failed:", err);
+    return Response.json(
+      { error: "couldn't build your agent, please try again" },
+      { status: 500 },
+    );
+  }
 
   const id = nanoid(8);
 

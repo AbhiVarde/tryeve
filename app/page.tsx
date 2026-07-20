@@ -589,12 +589,23 @@ function HomeInner() {
     }
   }
 
-  async function retryGenerate(prompt: string) {
+  async function generateAgent(prompt: string) {
     setBusy(true);
     setPhase("generating");
     setTimeout(() => setPhase("testing"), 16000);
 
     const assistantId = crypto.randomUUID();
+
+    const fail = (error: string) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", text: "", kind: "generate" },
+      ]);
+      setTestStatus((prev) => ({
+        ...prev,
+        [assistantId]: { state: "failed", error },
+      }));
+    };
 
     try {
       const res = await fetch("/api/build-agent", {
@@ -602,7 +613,13 @@ function HomeInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
-      const result = await res.json();
+
+      const result = await res.json().catch(() => null);
+
+      if (!res.ok || !result || result.error) {
+        fail(result?.error ?? "couldn't build your agent, please try again");
+        return;
+      }
 
       setMessages((prev) => [
         ...prev,
@@ -626,11 +643,15 @@ function HomeInner() {
       setShowGenerateForm(false);
       if (result.id) router.replace(`/?a=${result.id}`);
     } catch {
-      toast.error("something went wrong retrying. please try again.");
+      fail("network error, check your connection and try again");
     } finally {
       setBusy(false);
       setPhase(null);
     }
+  }
+
+  async function retryGenerate(prompt: string) {
+    await generateAgent(prompt);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -670,51 +691,9 @@ function HomeInner() {
       text: trimmed,
       kind: "generate",
     };
+
     setMessages((prev) => [...prev, userMessage]);
-    setBusy(true);
-    setPhase("generating");
-    setTimeout(() => setPhase("testing"), 16000);
-
-    const assistantId = crypto.randomUUID();
-
-    try {
-      const res = await fetch("/api/build-agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed }),
-      });
-      const result = await res.json();
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: assistantId,
-          role: "assistant",
-          text: result.code ?? "",
-          kind: "generate",
-          shareId: result.id,
-        },
-      ]);
-
-      setTestStatus((prev) => ({
-        ...prev,
-        [assistantId]: {
-          state: result.passed ? "passed" : "failed",
-          error: result.error,
-        },
-      }));
-
-      setShowGenerateForm(false);
-
-      if (result.id) router.replace(`/?a=${result.id}`);
-    } catch {
-      toast.error(
-        "something went wrong building your agent. please try again.",
-      );
-    } finally {
-      setBusy(false);
-      setPhase(null);
-    }
+    await generateAgent(trimmed);
   }
 
   const remaining = MAX_INPUT_LENGTH - input.length;
@@ -861,9 +840,9 @@ function HomeInner() {
       >
         {restoring ? (
           <div className="flex flex-1 items-center justify-center">
-            <p className="font-mono text-sm text-muted-foreground">
+            <div className="font-mono text-sm text-muted-foreground">
               <Shimmer duration={1.5}>loading your agent...</Shimmer>
-            </p>
+            </div>
           </div>
         ) : messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-16 sm:px-6">
@@ -913,8 +892,10 @@ function HomeInner() {
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex flex-col gap-1">
                           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-                            {`${files.length} file${files.length !== 1 ? "s" : ""} generated`}
-                            {finishedTesting && (
+                            {files.length === 0 && state === "failed"
+                              ? "generation failed"
+                              : `${files.length} file${files.length !== 1 ? "s" : ""} generated`}
+                            {finishedTesting && files.length > 0 && (
                               <span
                                 className={
                                   state === "passed"
@@ -958,7 +939,7 @@ function HomeInner() {
                           )}
                         </div>
 
-                        {finishedTesting && (
+                        {finishedTesting && files.length > 0 && (
                           <div className="flex items-center gap-4 sm:gap-3.5">
                             <button
                               onClick={() => downloadZip(files)}

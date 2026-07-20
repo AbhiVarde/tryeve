@@ -94,7 +94,9 @@ function ThinkingIndicator() {
         transition={{ duration: 0.25 }}
         className="inline-block"
       >
-        <Shimmer duration={1.2}>{THINKING_WORDS[index]}</Shimmer>
+        <Shimmer duration={1.2} className="font-mono text-sm">
+          {THINKING_WORDS[index]}
+        </Shimmer>
       </motion.span>
     </AnimatePresence>
   );
