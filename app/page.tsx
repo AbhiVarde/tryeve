@@ -683,7 +683,13 @@ function HomeInner() {
     }
   }
 
-  async function retryGenerate(prompt: string) {
+  async function retryGenerate(prompt: string, messageId: string) {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    setTestStatus((prev) => {
+      const next = { ...prev };
+      delete next[messageId];
+      return next;
+    });
     await generateAgent(prompt);
   }
 
@@ -957,7 +963,7 @@ function HomeInner() {
                                   );
                                   const userMsg = messages[messageIndex - 1];
                                   if (userMsg?.role === "user")
-                                    retryGenerate(userMsg.text);
+                                    retryGenerate(userMsg.text, message.id);
                                 }}
                                 disabled={busy}
                                 onMouseEnter={retryIcons.onEnter(message.id)}
