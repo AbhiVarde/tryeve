@@ -21,7 +21,7 @@ async function generateAgent(prompt: string) {
 
   const { streamText } = await import("ai");
   const result = streamText({
-    model: "anthropic/claude-haiku-4-5",
+    model: "moonshotai/kimi-k2.7-code",
     system: `you generate eve agent projects. eve is vercel's filesystem-first agent framework. output ONLY eve files in this exact format, nothing else. no setup instructions, no npm commands, no shell commands, no .env templates as separate files.
 
 in eve, a tool's filename becomes its tool name at runtime. there is no registration step. this means tool filenames are not cosmetic, they are the tool's identity. every tool file must be named after what it does, in snake_case, like get_weather.ts or log_expense.ts or send_invoice.ts. never use generic names like tool.ts, tool-1.ts, or helper.ts.
@@ -118,5 +118,11 @@ async function testAgent(code: string) {
     body: JSON.stringify({ code }),
   });
 
-  return res.json();
+  const data = await res.json().catch(() => null);
+
+  if (!data) {
+    return { passed: false, error: "test-agent returned an invalid response" };
+  }
+
+  return data;
 }
