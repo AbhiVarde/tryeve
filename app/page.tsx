@@ -878,8 +878,8 @@ function HomeInner() {
             </div>
           </div>
         ) : messages.length === 0 ? (
-          <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-16 sm:px-6">
-            <div className="relative z-10 flex w-full max-w-xl flex-col items-center text-center">
+          <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-14 sm:px-6 sm:py-20">
+            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-5 text-center sm:gap-6">
               <Badge
                 variant="outline"
                 className="rounded-full px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
@@ -887,16 +887,18 @@ function HomeInner() {
                 Agent Runtime
               </Badge>
 
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-                describe an agent. get a working one.
-              </h1>
+              <div className="flex flex-col gap-2.5 sm:gap-3">
+                <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+                  describe an agent. get a working one.
+                </h1>
 
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-                tested against a live eve runtime, ready to talk before you ever
-                see it.
-              </p>
+                <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  tested against a live eve runtime, ready to talk before you
+                  ever see it.
+                </p>
+              </div>
 
-              <div className="mt-10 w-full">{inputBar}</div>
+              <div className="mt-3 w-full sm:mt-4">{inputBar}</div>
             </div>
           </div>
         ) : (
@@ -1090,7 +1092,7 @@ function HomeInner() {
       <div
         className={`fixed inset-0 z-20 flex h-full flex-col bg-background transition-transform duration-300 ease-in-out will-change-transform ${
           panelOpen ? "translate-x-0" : "translate-x-full"
-        } md:relative md:inset-auto md:z-auto md:translate-x-0 md:transition-[width] md:duration-300 md:ease-in-out md:border-l md:border-border/60 ${
+        } md:relative md:inset-auto md:z-auto md:transition-[width] md:duration-300 md:ease-in-out md:border-l md:border-border/60 ${
           panelOpen ? "md:w-1/2" : "md:w-0"
         }`}
       >
@@ -1347,17 +1349,30 @@ function HomeInner() {
 
                     <div className="pt-2">
                       <div className="h-px bg-linear-to-r from-transparent via-border to-transparent" />
-                      <p className="mt-4 text-xs text-muted-foreground">
-                        icons animated by{" "}
-                        <a
-                          href="https://lucide-animated.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline decoration-border underline-offset-2 transition-colors hover:text-foreground"
-                        >
-                          lucide-animated
-                        </a>
-                      </p>
+                      <div className="mt-4 flex flex-col items-center gap-2 text-xs text-muted-foreground sm:flex-row sm:justify-between">
+                        <span>
+                          icons animated by{" "}
+                          <a
+                            href="https://lucide-animated.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline decoration-border underline-offset-2 transition-colors hover:text-foreground"
+                          >
+                            lucide-animated
+                          </a>
+                        </span>
+                        <span>
+                          brought to you by{" "}
+                          <a
+                            href="https://abhivarde.in"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline decoration-border underline-offset-2 transition-colors hover:text-foreground"
+                          >
+                            abhivarde.in
+                          </a>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
