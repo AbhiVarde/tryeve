@@ -508,6 +508,7 @@ function HomeInner() {
 
   function openFile(messageId: string, index: number) {
     setShowInfo(false);
+    setShowHistory(false);
     setSelectedFile({ messageId, index });
   }
 
