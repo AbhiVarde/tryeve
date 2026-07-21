@@ -506,6 +506,22 @@ function HomeInner() {
     router.replace("/");
   }
 
+  function startNewAgent() {
+    if (busy) return;
+    if (chatSession) {
+      endChat();
+    }
+    setMessages([]);
+    setSelectedFile(null);
+    setPanelFile(null);
+    setShowInfo(false);
+    setShowHistory(false);
+    setTestStatus({});
+    setInput("");
+    setShowGenerateForm(true);
+    router.replace("/");
+  }
+
   function openFile(messageId: string, index: number) {
     setShowInfo(false);
     setShowHistory(false);
@@ -769,7 +785,7 @@ function HomeInner() {
       </Button>
       <button
         type="button"
-        onClick={() => setShowGenerateForm(true)}
+        onClick={startNewAgent}
         className="mx-auto block cursor-pointer font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
         or describe a new agent
