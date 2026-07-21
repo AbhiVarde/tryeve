@@ -1,5 +1,12 @@
 import { FatalError } from "workflow";
 
+function getBaseUrl() {
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "http://localhost:3000";
+}
+
 export async function buildAgentWorkflow(prompt: string) {
   "use workflow";
 
@@ -105,14 +112,11 @@ now generate a complete agent for the user's request, following this exact forma
 async function testAgent(code: string) {
   "use step";
 
-  const res = await fetch(
-    `${process.env.VERCEL_URL ?? "http://localhost:3000"}/api/test-agent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    },
-  );
+  const res = await fetch(`${getBaseUrl()}/api/test-agent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
 
   return res.json();
 }
