@@ -59,7 +59,9 @@ export async function POST(req: Request) {
     }).catch(() => null);
 
     const history: { id: string; prompt: string; createdAt: string }[] =
-      existing ? await (await fetch(existing.url)).json() : [];
+      existing
+        ? await (await fetch(existing.url, { cache: "no-store" })).json()
+        : [];
 
     history.unshift({ id, prompt, createdAt: new Date().toISOString() });
 
@@ -70,6 +72,7 @@ export async function POST(req: Request) {
         access: "public",
         addRandomSuffix: false,
         allowOverwrite: true,
+        cacheControlMaxAge: 0,
         token: process.env.BLOB_READ_WRITE_TOKEN,
       },
     );

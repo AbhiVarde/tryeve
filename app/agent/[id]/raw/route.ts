@@ -12,7 +12,7 @@ export async function GET(
     const blob = await head(key, {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    const res = await fetch(blob.url);
+    const res = await fetch(blob.url, { cache: "no-store" });
     const data = await res.json();
     return Response.json(data);
   } catch {

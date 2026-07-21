@@ -1,7 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
 import { nanoid } from "nanoid";
 import { checkRateLimit } from "@vercel/firewall";
-import { put } from "@vercel/blob";
+import { head, put } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -91,6 +91,31 @@ export async function POST(req: Request) {
       { ok: false, error: "code is required" },
       { status: 400 },
     );
+  }
+
+  if (shareId && typeof shareId === "string") {
+    try {
+      const existing = await head(`agents/${shareId}-session.json`, {
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      const session: { sandboxName: string; url: string } = await (
+        await fetch(existing.url, { cache: "no-store" })
+      ).json();
+
+      const alive = await fetch(session.url, { method: "GET" })
+        .then((r) => r.ok)
+        .catch(() => false);
+
+      if (alive) {
+        return Response.json({
+          ok: true,
+          sandboxName: session.sandboxName,
+          url: session.url,
+        });
+      }
+    } catch {
+      // no existing session found, continue to create a new one below
+    }
   }
 
   const files = parseFiles(code);

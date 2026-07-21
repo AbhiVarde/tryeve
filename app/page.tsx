@@ -548,11 +548,6 @@ function HomeInner() {
   }
 
   async function clearAllHistory() {
-    const confirmed = window.confirm(
-      "remove all agents from your history? this doesn't delete anything you've already shared.",
-    );
-    if (!confirmed) return;
-
     setHistory([]);
     try {
       await fetch("/api/agents", {
@@ -560,6 +555,7 @@ function HomeInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true }),
       });
+      toast.success("history cleared");
     } catch {
       toast.error("couldn't clear history, try again.");
     }

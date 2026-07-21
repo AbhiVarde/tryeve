@@ -11,7 +11,7 @@ export async function GET() {
     const blob = await head(`agents/history/${visitorId}.json`, {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    const res = await fetch(blob.url);
+    const res = await fetch(blob.url, { cache: "no-store" });
     const history = await res.json();
     return Response.json(history);
   } catch (err) {
@@ -54,7 +54,7 @@ export async function DELETE(req: Request) {
     if (!blob) return Response.json({ ok: true });
 
     const history: { id: string; prompt: string; createdAt: string }[] = await (
-      await fetch(blob.url)
+      await fetch(blob.url, { cache: "no-store" })
     ).json();
 
     const filtered = history.filter((entry) => entry.id !== id);
