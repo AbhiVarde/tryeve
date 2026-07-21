@@ -132,6 +132,16 @@
   }
 }
 
+::selection {
+  background-color: oklch(0.97 0 0);
+  color: oklch(0.145 0 0);
+}
+
+::-moz-selection {
+  background-color: oklch(0.97 0 0);
+  color: oklch(0.145 0 0);
+}
+
 html {
   scroll-behavior: smooth;
 }
