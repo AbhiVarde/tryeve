@@ -498,11 +498,15 @@ function HomeInner() {
 
   function resetSession() {
     if (busy) return;
+    if (chatSession) {
+      endChat();
+    }
     setMessages([]);
     setSelectedFile(null);
     setPanelFile(null);
     setShowInfo(false);
     setChatSession(null);
+    setChatKey(crypto.randomUUID());
     setTestStatus({});
     setInput("");
     setShowGenerateForm(false);
