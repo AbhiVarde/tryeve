@@ -344,13 +344,16 @@ function HomeInner() {
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
   const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
+  const [chatKey, setChatKey] = useState(() => crypto.randomUUID());
 
   const {
     messages: agentMessages,
     sendMessage,
     status,
-  } = useAgentChat(chatSession, (patch) =>
-    setChatSession((prev) => (prev ? { ...prev, ...patch } : prev)),
+  } = useAgentChat(
+    chatSession,
+    (patch) => setChatSession((prev) => (prev ? { ...prev, ...patch } : prev)),
+    chatSession?.sandboxName ?? chatKey,
   );
 
   const panelOpen = !!selectedFile || showInfo || showHistory;
@@ -519,6 +522,7 @@ function HomeInner() {
     setTestStatus({});
     setInput("");
     setShowGenerateForm(true);
+    setChatKey(crypto.randomUUID());
     router.replace("/");
   }
 

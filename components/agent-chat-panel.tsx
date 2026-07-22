@@ -29,6 +29,7 @@ function getText(parts: { type: string }[]) {
 export function useAgentChat(
   session: AgentSession | null,
   onSessionUpdate: (patch: Partial<AgentSession>) => void,
+  chatId: string,
 ) {
   const transport = useMemo(
     () =>
@@ -52,6 +53,7 @@ export function useAgentChat(
   );
 
   return useChat({
+    id: chatId,
     transport,
     experimental_throttle: 40,
     onData: (part: any) => {
