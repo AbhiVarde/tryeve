@@ -560,6 +560,17 @@ function HomeInner() {
 
   async function deleteHistoryEntry(id: string) {
     setHistory((prev) => prev.filter((entry) => entry.id !== id));
+
+    if (chatSession) {
+      const activeShareId = messages.find(
+        (m) => m.id === chatSession.agentMessageId,
+      )?.shareId;
+      if (activeShareId === id) {
+        endChat();
+        setChatKey(crypto.randomUUID());
+      }
+    }
+
     try {
       await fetch("/api/agents", {
         method: "DELETE",
@@ -573,6 +584,12 @@ function HomeInner() {
 
   async function clearAllHistory() {
     setHistory([]);
+
+    if (chatSession) {
+      endChat();
+      setChatKey(crypto.randomUUID());
+    }
+
     try {
       await fetch("/api/agents", {
         method: "DELETE",
