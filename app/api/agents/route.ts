@@ -104,6 +104,7 @@ export async function DELETE(req: Request) {
       access: "public",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
 
