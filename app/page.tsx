@@ -82,6 +82,13 @@ type HistoryEntry = { id: string; prompt: string; createdAt: string };
 const MAX_INPUT_LENGTH = 500;
 const MIN_PROMPT_LENGTH = 12;
 
+const GENERATE_MESSAGES = [
+  "generating agent files...",
+  "writing instructions...",
+  "shaping tool schemas...",
+  "almost done generating...",
+];
+
 const FEATURE_GROUPS: { label: string; items: string[] }[] = [
   {
     label: "build & test",
@@ -342,6 +349,7 @@ function HomeInner() {
   const logoutIconRef = useRef<LogoutIconHandle>(null);
 
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
+  const [genMsgIndex, setGenMsgIndex] = useState(0);
 
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
   const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
@@ -684,7 +692,12 @@ function HomeInner() {
   async function generateAgent(prompt: string) {
     setBusy(true);
     setPhase("generating");
-    setTimeout(() => setPhase("testing"), 16000);
+    setGenMsgIndex(0);
+
+    const genMsgTimer = setInterval(() => {
+      setGenMsgIndex((i) => Math.min(i + 1, GENERATE_MESSAGES.length - 1));
+    }, 4000);
+    const phaseTimer = setTimeout(() => setPhase("testing"), 16000);
 
     const assistantId = crypto.randomUUID();
 
@@ -746,8 +759,11 @@ function HomeInner() {
     } catch {
       fail("network error, check your connection and try again");
     } finally {
+      clearInterval(genMsgTimer);
+      clearTimeout(phaseTimer);
       setBusy(false);
       setPhase(null);
+      setGenMsgIndex(0);
     }
   }
 
@@ -1124,7 +1140,7 @@ function HomeInner() {
                           )}
                           {phase === "generating" ? (
                             <Shimmer duration={1.5}>
-                              generating agent files...
+                              {GENERATE_MESSAGES[genMsgIndex]}
                             </Shimmer>
                           ) : (
                             "generating agent files..."
