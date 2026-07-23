@@ -53,6 +53,22 @@ export async function POST(req: Request) {
     },
   );
 
+  if (result.passed && result.sandboxName && result.url) {
+    try {
+      await put(
+        `agents/${id}-session.json`,
+        JSON.stringify({ sandboxName: result.sandboxName, url: result.url }),
+        {
+          access: "public",
+          addRandomSuffix: false,
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+        },
+      );
+    } catch (err) {
+      console.error("session blob write failed:", err);
+    }
+  }
+
   try {
     const existing = await head(`agents/history/${visitorId}.json`, {
       token: process.env.BLOB_READ_WRITE_TOKEN,

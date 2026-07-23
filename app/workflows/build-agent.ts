@@ -92,7 +92,13 @@ export async function buildAgentWorkflow(prompt: string) {
   const code = await generateAgent(prompt);
   const result = await testAgent(code);
 
-  return { code, passed: result.passed, error: result.error ?? null };
+  return {
+    code,
+    passed: result.passed,
+    error: result.error ?? null,
+    sandboxName: result.sandboxName ?? null,
+    url: result.url ?? null,
+  };
 }
 
 async function generateAgent(prompt: string): Promise<string> {
@@ -131,9 +137,12 @@ async function generateAgent(prompt: string): Promise<string> {
   );
 }
 
-async function testAgent(
-  code: string,
-): Promise<{ passed: boolean; error?: string }> {
+async function testAgent(code: string): Promise<{
+  passed: boolean;
+  error?: string;
+  sandboxName?: string;
+  url?: string;
+}> {
   "use step";
 
   let res: Response;

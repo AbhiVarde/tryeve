@@ -101,10 +101,11 @@ export async function POST(req: Request) {
     });
   }
 
+  const sandboxName = `eve-agent-test-${nanoid(8)}`;
   const sandbox = await Sandbox.create({
-    name: `eve-agent-test-${nanoid(8)}`,
+    name: sandboxName,
     runtime: "node24",
-    timeout: 90_000,
+    timeout: 600_000,
     ports: [3000],
     env: sandboxEnv,
   });
@@ -144,6 +145,7 @@ export async function POST(req: Request) {
 
     if (install.exitCode !== 0) {
       const err = await install.stderr();
+      await sandbox.stop();
       return Response.json({
         passed: false,
         error: `install failed: ${err.trim().split("\n")[0]}`,
@@ -160,6 +162,7 @@ export async function POST(req: Request) {
     const ready = await waitForServer(url, 45_000);
 
     if (!ready) {
+      await sandbox.stop();
       return Response.json({
         passed: false,
         error:
@@ -175,6 +178,7 @@ export async function POST(req: Request) {
         body: JSON.stringify({ message: "hello, are you working?" }),
       });
     } catch {
+      await sandbox.stop();
       return Response.json({
         passed: false,
         error: "agent started but didn't respond to a test message",
@@ -183,6 +187,7 @@ export async function POST(req: Request) {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
+      await sandbox.stop();
       return Response.json({
         passed: false,
         error: errText || "agent rejected the test message",
@@ -192,8 +197,11 @@ export async function POST(req: Request) {
     return Response.json({
       passed: true,
       output: `${files.length} file(s) validated, agent responded to a live test message`,
+      sandboxName,
+      url,
     });
-  } finally {
-    await sandbox.stop();
+  } catch (err) {
+    await sandbox.stop().catch(() => {});
+    throw err;
   }
 }

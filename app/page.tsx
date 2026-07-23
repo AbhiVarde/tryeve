@@ -73,6 +73,8 @@ type Message = {
   text: string;
   kind: "generate" | "chat";
   shareId?: string;
+  sandboxName?: string;
+  url?: string;
 };
 type ChatSession = AgentSession & { agentMessageId: string };
 type HistoryEntry = { id: string; prompt: string; createdAt: string };
@@ -629,6 +631,25 @@ function HomeInner() {
     setChatLoadingId(message.id);
 
     try {
+      if (message.sandboxName && message.url) {
+        const alive = await fetch(message.url, { method: "GET" })
+          .then((r) => r.ok)
+          .catch(() => false);
+
+        if (alive) {
+          setChatSession({
+            agentMessageId: message.id,
+            url: message.url,
+            sandboxName: message.sandboxName,
+            sessionId: null,
+            continuationToken: null,
+            turnCount: 0,
+          });
+          setShowGenerateForm(false);
+          return;
+        }
+      }
+
       const res = await fetch("/api/run-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -700,6 +721,8 @@ function HomeInner() {
           text: result.code ?? "",
           kind: "generate",
           shareId: result.id,
+          sandboxName: result.sandboxName ?? undefined,
+          url: result.url ?? undefined,
         },
       ]);
 
