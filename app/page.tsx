@@ -711,6 +711,13 @@ function HomeInner() {
         },
       }));
 
+      if (result.id) {
+        setHistory((prev) => [
+          { id: result.id, prompt, createdAt: new Date().toISOString() },
+          ...prev,
+        ]);
+      }
+
       setShowGenerateForm(false);
       if (result.id) router.replace(`/?a=${result.id}`);
     } catch {
