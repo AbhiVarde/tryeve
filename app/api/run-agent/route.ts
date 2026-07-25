@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { checkRateLimit } from "@vercel/firewall";
 import { head, put } from "@vercel/blob";
 import { cookies } from "next/headers";
+import { canCreateSandbox, trackSandbox } from "@/app/lib/sandbox-quota";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -142,6 +143,17 @@ export async function POST(req: Request) {
     }
   }
 
+  const cookieStore2 = await cookies();
+  const runVisitorId = cookieStore2.get("tryeve_vid")?.value;
+
+  if (!(await canCreateSandbox(runVisitorId))) {
+    return Response.json({
+      ok: false,
+      error:
+        "too many active agents right now, stop one before connecting another",
+    });
+  }
+
   const files = parseFiles(code);
   const sandboxName = `eve-agent-${nanoid(8)}`;
   const sandboxEnv = getSandboxEnv();
@@ -161,6 +173,7 @@ export async function POST(req: Request) {
     ports: [3000],
     env: sandboxEnv,
   });
+  await trackSandbox(runVisitorId, sandboxName);
 
   await Promise.all([
     sandbox.fs.mkdir("agent/tools", { recursive: true }),

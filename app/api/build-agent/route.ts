@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
   let result;
   try {
-    const run = await start(buildAgentWorkflow, [prompt]);
+    const run = await start(buildAgentWorkflow, [prompt, visitorId]);
     result = await run.returnValue;
   } catch (err) {
     console.error("build-agent workflow failed:", err);

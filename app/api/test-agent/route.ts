@@ -1,5 +1,10 @@
 import { Sandbox } from "@vercel/sandbox";
 import { nanoid } from "nanoid";
+import {
+  canCreateSandbox,
+  trackSandbox,
+  untrackSandbox,
+} from "@/app/lib/sandbox-quota";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -73,7 +78,7 @@ function getSandboxEnv() {
 }
 
 export async function POST(req: Request) {
-  const { code } = await req.json();
+  const { code, visitorId } = await req.json();
 
   if (!code || typeof code !== "string") {
     return Response.json(
@@ -88,6 +93,14 @@ export async function POST(req: Request) {
     return Response.json({
       passed: false,
       error: "no tool or agent files found to test",
+    });
+  }
+
+  if (!(await canCreateSandbox(visitorId))) {
+    return Response.json({
+      passed: false,
+      error:
+        "too many active agents right now, stop one before generating another",
     });
   }
 
@@ -109,6 +122,7 @@ export async function POST(req: Request) {
     ports: [3000],
     env: sandboxEnv,
   });
+  await trackSandbox(visitorId, sandboxName);
 
   try {
     await Promise.all([
@@ -146,6 +160,7 @@ export async function POST(req: Request) {
     if (install.exitCode !== 0) {
       const err = await install.stderr();
       await sandbox.stop();
+      await untrackSandbox(visitorId, sandboxName);
       return Response.json({
         passed: false,
         error: `install failed: ${err.trim().split("\n")[0]}`,

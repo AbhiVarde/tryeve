@@ -20,9 +20,23 @@ export async function GET(req: Request) {
       new Date(b.uploadedAt).getTime() < staleCutoff,
   );
 
-  await Promise.all(
-    stale.map((b) => del(b.url, { token: process.env.BLOB_READ_WRITE_TOKEN })),
+  const staleActiveIndexes = blobs.filter(
+    (b) =>
+      b.pathname.startsWith("agents/active/") &&
+      new Date(b.uploadedAt).getTime() < staleCutoff,
   );
 
-  return Response.json({ ok: true, removed: stale.length });
+  await Promise.all([
+    ...stale.map((b) =>
+      del(b.url, { token: process.env.BLOB_READ_WRITE_TOKEN }),
+    ),
+    ...staleActiveIndexes.map((b) =>
+      del(b.url, { token: process.env.BLOB_READ_WRITE_TOKEN }),
+    ),
+  ]);
+
+  return Response.json({
+    ok: true,
+    removed: stale.length + staleActiveIndexes.length,
+  });
 }

@@ -86,11 +86,11 @@ function getBaseUrl() {
   return "http://localhost:3000";
 }
 
-export async function buildAgentWorkflow(prompt: string) {
+export async function buildAgentWorkflow(prompt: string, visitorId?: string) {
   "use workflow";
 
   const code = await generateAgent(prompt);
-  const result = await testAgent(code);
+  const result = await testAgent(code, visitorId);
 
   return {
     code,
@@ -137,7 +137,10 @@ async function generateAgent(prompt: string): Promise<string> {
   );
 }
 
-async function testAgent(code: string): Promise<{
+async function testAgent(
+  code: string,
+  visitorId?: string,
+): Promise<{
   passed: boolean;
   error?: string;
   sandboxName?: string;
@@ -150,7 +153,7 @@ async function testAgent(code: string): Promise<{
     res = await fetch(`${getBaseUrl()}/api/test-agent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, visitorId }),
     });
   } catch (err) {
     console.error("testAgent: fetch failed", err);

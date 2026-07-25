@@ -1,6 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
 import { del, head } from "@vercel/blob";
 import { cookies } from "next/headers";
+import { untrackSandbox } from "@/app/lib/sandbox-quota";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,10 @@ export async function POST(req: Request) {
   } catch {
     // sandbox already gone, nothing to stop
   }
+
+  const cookieStore3 = await cookies();
+  const stopVisitorId = cookieStore3.get("tryeve_vid")?.value;
+  await untrackSandbox(stopVisitorId, sandboxName);
 
   if (shareId && typeof shareId === "string") {
     try {
