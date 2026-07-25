@@ -166,13 +166,24 @@ export async function POST(req: Request) {
     });
   }
 
-  const sandbox = await Sandbox.create({
-    name: sandboxName,
-    runtime: "node24",
-    timeout: 600_000,
-    ports: [3000],
-    env: sandboxEnv,
-  });
+  let sandbox: Awaited<ReturnType<typeof Sandbox.create>>;
+
+  try {
+    sandbox = await Sandbox.create({
+      name: sandboxName,
+      runtime: "node24",
+      timeout: 600_000,
+      ports: [3000],
+      env: sandboxEnv,
+    });
+  } catch (err) {
+    console.error("sandbox create failed:", err);
+    return Response.json({
+      ok: false,
+      error: "high demand right now, please try again in a moment",
+    });
+  }
+
   await trackSandbox(runVisitorId, sandboxName);
 
   await Promise.all([
