@@ -1,4 +1,5 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
+import { checkRateLimit } from "@vercel/firewall";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -12,6 +13,15 @@ function clean(text: string) {
 }
 
 export async function POST(req: Request) {
+  const { rateLimited } = await checkRateLimit("rate-limit-ai-routes");
+
+  if (rateLimited) {
+    return Response.json(
+      { error: "too many messages, slow down a moment" },
+      { status: 429 },
+    );
+  }
+
   const { url, message, sessionId, continuationToken, turnCount } =
     await req.json();
 

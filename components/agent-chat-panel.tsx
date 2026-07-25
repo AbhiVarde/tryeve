@@ -82,6 +82,9 @@ export function useAgentChat(
         });
       }
     },
+    onError: (err) => {
+      console.error("agent chat error:", err);
+    },
   });
 }
 
