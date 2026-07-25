@@ -385,16 +385,10 @@ function HomeInner() {
       );
     }
 
-    function onVisibilityChange() {
-      if (document.visibilityState === "hidden") stopActiveSandbox();
-    }
-
     window.addEventListener("beforeunload", stopActiveSandbox);
-    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.removeEventListener("beforeunload", stopActiveSandbox);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

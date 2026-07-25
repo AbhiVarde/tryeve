@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s · tryeve",
   },
   description:
-    "a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description. no install, no terminal.",
+    "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
   keywords: [
     "eve",
     "ai agent builder",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "tryeve, describe an agent, get a working one",
     description:
-      "a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description. no install, no terminal.",
+      "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
     url: "https://tryeve.abhivarde.in",
     siteName: "tryeve",
     type: "website",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     creator: "@varde_abhi",
     title: "tryeve, describe an agent, get a working one",
     description:
-      "a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description. no install, no terminal.",
+      "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
     images: ["/og-image.png"],
   },
   robots: {
@@ -87,7 +87,7 @@ const jsonLd = {
     priceCurrency: "USD",
   },
   description:
-    "a free, browser based tool that builds, tests, and runs a real eve agent from a plain english description.",
+    "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
   author: {
     "@type": "Person",
     name: "abhi varde",
