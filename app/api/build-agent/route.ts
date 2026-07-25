@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
   await put(
     `agents/${id}.json`,
-    JSON.stringify({ prompt, code: result.code }),
+    JSON.stringify({ prompt, code: result.code, ownerId: visitorId }),
     {
       access: "public",
       addRandomSuffix: false,
