@@ -5,8 +5,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const isSession = new URL(req.url).searchParams.get("session") === "1";
-  const key = isSession ? `agents/${id}-session.json` : `agents/${id}.json`;
+  const search = new URL(req.url).searchParams;
+  const isSession = search.get("session") === "1";
+  const isTranscript = search.get("transcript") === "1";
+  const key = isTranscript
+    ? `agents/${id}-transcript.json`
+    : isSession
+      ? `agents/${id}-session.json`
+      : `agents/${id}.json`;
 
   try {
     const blob = await head(key, {
@@ -16,6 +22,8 @@ export async function GET(
     const data = await res.json();
     return Response.json(data);
   } catch {
-    return Response.json({ error: "not found" }, { status: 404 });
+    return isTranscript
+      ? Response.json([])
+      : Response.json({ error: "not found" }, { status: 404 });
   }
 }

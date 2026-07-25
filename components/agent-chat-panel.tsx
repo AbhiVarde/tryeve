@@ -19,17 +19,33 @@ export type AgentSession = {
   turnCount: number;
 };
 
-function getText(parts: { type: string }[]) {
+export function getText(parts: { type: string }[]) {
   const part = parts.find(
     (p): p is { type: "text"; text: string } => p.type === "text",
   );
   return part?.text ?? "";
 }
 
+export type StoredMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+};
+
+function toInitialMessages(stored?: StoredMessage[] | null) {
+  if (!stored || stored.length === 0) return undefined;
+  return stored.map((m) => ({
+    id: m.id,
+    role: m.role,
+    parts: [{ type: "text" as const, text: m.text }],
+  }));
+}
+
 export function useAgentChat(
   session: AgentSession | null,
   onSessionUpdate: (patch: Partial<AgentSession>) => void,
   chatId: string,
+  initialMessages?: StoredMessage[] | null,
 ) {
   const transport = useMemo(
     () =>
@@ -55,6 +71,7 @@ export function useAgentChat(
   return useChat({
     id: chatId,
     transport,
+    messages: toInitialMessages(initialMessages),
     experimental_throttle: 40,
     onData: (part: any) => {
       if (part.type === "data-session") {
@@ -66,6 +83,26 @@ export function useAgentChat(
       }
     },
   });
+}
+
+export function useTranscriptSync(
+  shareId: string | undefined,
+  agentMessages: { id: string; role: string; parts: { type: string }[] }[],
+  status: string,
+) {
+  useEffect(() => {
+    if (!shareId || status !== "ready" || agentMessages.length === 0) return;
+    const payload = agentMessages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      text: getText(m.parts),
+    }));
+    fetch("/api/save-transcript", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shareId, messages: payload }),
+    }).catch(() => {});
+  }, [shareId, agentMessages, status]);
 }
 
 const THINKING_WORDS = [

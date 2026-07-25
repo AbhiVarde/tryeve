@@ -59,8 +59,10 @@ import { PanelGlow } from "@/components/panel-glow";
 import { VercelMark } from "@/components/vercel-mark";
 import {
   useAgentChat,
+  useTranscriptSync,
   AgentConversation,
   type AgentSession,
+  type StoredMessage,
 } from "@/components/agent-chat-panel";
 import { Badge } from "@/components/ui/badge";
 
@@ -355,6 +357,9 @@ function HomeInner() {
   const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [chatKey, setChatKey] = useState(() => crypto.randomUUID());
+  const [initialMessages, setInitialMessages] = useState<
+    StoredMessage[] | null
+  >(null);
 
   const {
     messages: agentMessages,
@@ -364,7 +369,13 @@ function HomeInner() {
     chatSession,
     (patch) => setChatSession((prev) => (prev ? { ...prev, ...patch } : prev)),
     chatSession?.sandboxName ?? chatKey,
+    initialMessages,
   );
+
+  const activeShareId = chatSession
+    ? messages.find((m) => m.id === chatSession.agentMessageId)?.shareId
+    : undefined;
+  useTranscriptSync(activeShareId, agentMessages, status);
 
   const panelOpen = !!selectedFile || showInfo || showHistory;
 
@@ -473,7 +484,16 @@ function HomeInner() {
         }));
 
         try {
-          const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
+          const [sessionRes, transcriptRes] = await Promise.all([
+            fetch(`/agent/${shareId}/raw?session=1`),
+            fetch(`/agent/${shareId}/raw?transcript=1`),
+          ]);
+
+          const transcript: StoredMessage[] = transcriptRes.ok
+            ? await transcriptRes.json()
+            : [];
+          if (!cancelled) setInitialMessages(transcript);
+
           if (!sessionRes.ok) return;
           const session: { sandboxName: string; url: string } =
             await sessionRes.json();
@@ -511,6 +531,7 @@ function HomeInner() {
     setShowInfo(false);
     setChatSession(null);
     setChatKey(crypto.randomUUID());
+    setInitialMessages(null);
     setTestStatus({});
     setInput("");
     setShowGenerateForm(false);
