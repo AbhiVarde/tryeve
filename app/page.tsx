@@ -34,6 +34,7 @@ import {
   type BotMessageSquareHandle,
 } from "@/components/ui/bot-message-square";
 import { LogoutIcon, type LogoutIconHandle } from "@/components/ui/logout";
+import { GithubIcon, type GithubIconHandle } from "@/components/ui/github";
 import {
   CornerDownRightIcon,
   type CornerDownRightIconHandle,
@@ -334,6 +335,7 @@ function HomeInner() {
   const deleteIcons = useIconRefs<DeleteIconHandle>();
 
   const connectPromptIconRef = useRef<BotMessageSquareHandle>(null);
+  const deployIconRef = useRef<GithubIconHandle>(null);
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const xIconRef = useRef<XIconHandle>(null);
@@ -904,6 +906,28 @@ function HomeInner() {
             : "connect to your agent"}
         </span>
       </Button>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() =>
+          latestAssistantMessage && deployToGithub(latestAssistantMessage)
+        }
+        disabled={deployingId === latestAssistantMessage?.id}
+        onMouseEnter={() => deployIconRef.current?.startAnimation()}
+        onMouseLeave={() => deployIconRef.current?.stopAnimation()}
+        className="w-full cursor-pointer"
+      >
+        {deployingId === latestAssistantMessage?.id ? (
+          <Spinner className="size-4" />
+        ) : (
+          <GithubIcon ref={deployIconRef} size={15} />
+        )}
+        <span className="animate-in fade-in duration-300">
+          {deployingId === latestAssistantMessage?.id
+            ? "deploying..."
+            : "deploy to github"}
+        </span>
+      </Button>
       <button
         type="button"
         onClick={startNewAgent}
@@ -920,16 +944,40 @@ function HomeInner() {
             <span className="size-1.5 rounded-full bg-emerald-500" />
             agent connected
           </span>
-          <button
-            type="button"
-            onClick={endChat}
-            onMouseEnter={() => logoutIconRef.current?.startAnimation()}
-            onMouseLeave={() => logoutIconRef.current?.stopAnimation()}
-            className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <LogoutIcon ref={logoutIconRef} size={13} />
-            disconnect
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const agentMessage = messages.find(
+                  (m) => m.id === chatSession.agentMessageId,
+                );
+                if (agentMessage) deployToGithub(agentMessage);
+              }}
+              disabled={deployingId === chatSession.agentMessageId}
+              onMouseEnter={() => deployIconRef.current?.startAnimation()}
+              onMouseLeave={() => deployIconRef.current?.stopAnimation()}
+              className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              {deployingId === chatSession.agentMessageId ? (
+                <Spinner className="size-3" />
+              ) : (
+                <GithubIcon ref={deployIconRef} size={13} />
+              )}
+              {deployingId === chatSession.agentMessageId
+                ? "deploying..."
+                : "deploy"}
+            </button>
+            <button
+              type="button"
+              onClick={endChat}
+              onMouseEnter={() => logoutIconRef.current?.startAnimation()}
+              onMouseLeave={() => logoutIconRef.current?.stopAnimation()}
+              className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <LogoutIcon ref={logoutIconRef} size={13} />
+              disconnect
+            </button>
+          </div>
         </div>
       )}
       <div className="relative">
@@ -1144,18 +1192,6 @@ function HomeInner() {
                                 size={14}
                               />
                               share
-                            </button>
-                            <button
-                              onClick={() => deployToGithub(message)}
-                              disabled={deployingId === message.id}
-                              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                            >
-                              {deployingId === message.id ? (
-                                <Spinner className="size-3" />
-                              ) : null}
-                              {deployingId === message.id
-                                ? "deploying..."
-                                : "deploy to github"}
                             </button>
                           </div>
                         )}
