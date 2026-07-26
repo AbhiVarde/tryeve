@@ -124,6 +124,7 @@ export async function POST(req: Request) {
       timeout: 600_000,
       ports: [3000],
       env: sandboxEnv,
+      persistent: false,
     });
   } catch (err) {
     console.error("sandbox create failed:", err);
