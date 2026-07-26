@@ -107,17 +107,22 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     items: [
       "inspect every file with syntax highlighting",
       "export the full agent as a zip",
-      "share a live link to any agent you build",
+      "deploy any agent straight to your own GitHub, no OAuth setup needed",
+      "share a live link, anyone with it can chat with your agent directly",
       "connect to your agent right after it's built, no install needed",
       "chat with it live, with markdown-formatted replies",
+      "your chat history is saved, reopening an agent restores the real conversation",
     ],
   },
   {
-    label: "reliability",
+    label: "reliability & privacy",
     items: [
       "reload the page anytime, your agent and chat pick up right where you left off",
+      "switching tabs never disconnects your agent, only real exits do",
       "idle or closed sandboxes shut down automatically, nothing left running",
       "warned before disconnect, never cut off without notice",
+      "only you can overwrite or stop your own agent, others can still chat with it",
+      "concurrent sandboxes are capped per visitor to keep usage fair for everyone",
       "your history is private, delete any entry or clear it all",
     ],
   },
@@ -142,7 +147,7 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   {
     name: "blob",
     description:
-      "stores each generated agent and its live chat session, so shared links and reloads stay in sync",
+      "stores each agent, its live session, and its chat transcript, so shared links and reloads stay in sync",
   },
   {
     name: "cron",
@@ -151,7 +156,12 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   {
     name: "firewall",
     description:
-      "rate limits generation and connect requests to keep usage fair",
+      "rate limits generation, connect, and chat requests to keep usage fair",
+  },
+  {
+    name: "connect",
+    description:
+      "issues short-lived, user-scoped GitHub tokens to deploy your agent, no stored secrets",
   },
   {
     name: "ai elements",
