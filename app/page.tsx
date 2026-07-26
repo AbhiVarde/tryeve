@@ -130,49 +130,30 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
 
 const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   { name: "next.js", description: "the app itself" },
-  {
-    name: "ai gateway",
-    description: "routes the generation request to a model",
-  },
+  { name: "ai gateway", description: "routes generation to a model" },
   { name: "ai sdk", description: "streams the model's response" },
-  {
-    name: "sandbox",
-    description:
-      "tests every agent against a real eve runtime, then runs it live so you can talk to it",
-  },
+  { name: "sandbox", description: "tests and runs each agent live" },
   {
     name: "workflow sdk",
-    description: "runs generate and test as one durable step, survives crashes",
+    description: "runs generate + test as one durable step",
   },
-  {
-    name: "blob",
-    description:
-      "stores each agent, its live session, and its chat transcript, so shared links and reloads stay in sync",
-  },
-  {
-    name: "cron",
-    description: "sweeps stale sandbox sessions on a schedule",
-  },
+  { name: "blob", description: "stores agents, sessions, and chat history" },
+  { name: "cron", description: "sweeps stale sandbox sessions" },
   {
     name: "firewall",
-    description:
-      "rate limits generation, connect, and chat requests to keep usage fair",
+    description: "rate limits generation, connect, and chat",
   },
   {
     name: "connect",
-    description:
-      "issues short-lived, user-scoped GitHub tokens to deploy your agent, no stored secrets",
+    description: "issues scoped GitHub tokens to deploy, no stored secrets",
   },
-  {
-    name: "ai elements",
-    description: "the chat interface, task progress ui, shimmer loading text",
-  },
+  { name: "ai elements", description: "chat ui, progress, and loading states" },
   { name: "streamdown", description: "renders code and markdown cleanly" },
   { name: "shadcn/ui", description: "every ui component" },
   { name: "vercel", description: "hosts and deploys the app" },
   {
     name: "analytics",
-    description: "tracks real usage without slowing anything down",
+    description: "tracks usage without slowing things down",
   },
 ];
 
