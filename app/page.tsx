@@ -355,6 +355,7 @@ function HomeInner() {
 
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
   const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
+  const [deployingId, setDeployingId] = useState<string | null>(null);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [chatKey, setChatKey] = useState(() => crypto.randomUUID());
   const [initialMessages, setInitialMessages] = useState<
@@ -648,6 +649,49 @@ function HomeInner() {
       });
     }
     setChatSession(null);
+  }
+
+  async function deployToGithub(message: Message) {
+    setDeployingId(message.id);
+    try {
+      const promptMsg = messages.find(
+        (m) =>
+          m.role === "user" &&
+          messages[messages.indexOf(m) + 1]?.id === message.id,
+      );
+
+      const res = await fetch("/api/deploy-github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: promptMsg?.text ?? "generated agent",
+          code: message.text,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.needsAuth && data.authorizeUrl) {
+        window.open(data.authorizeUrl, "_blank");
+        toast.info("authorize GitHub in the new tab, then click deploy again");
+        return;
+      }
+
+      if (!data.ok) {
+        toast.error(data.error ?? "couldn't deploy to GitHub, try again");
+        return;
+      }
+
+      toast.success("pushed to GitHub", {
+        action: {
+          label: "open repo",
+          onClick: () => window.open(data.repoUrl, "_blank"),
+        },
+      });
+    } catch {
+      toast.error("failed to reach GitHub, please try again");
+    } finally {
+      setDeployingId(null);
+    }
   }
 
   async function startChat(message: Message) {
@@ -1109,6 +1153,18 @@ function HomeInner() {
                                 size={14}
                               />
                               share
+                            </button>
+                            <button
+                              onClick={() => deployToGithub(message)}
+                              disabled={deployingId === message.id}
+                              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                            >
+                              {deployingId === message.id ? (
+                                <Spinner className="size-3" />
+                              ) : null}
+                              {deployingId === message.id
+                                ? "deploying..."
+                                : "deploy to github"}
                             </button>
                           </div>
                         )}
