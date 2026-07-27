@@ -4,6 +4,7 @@ import { checkRateLimit } from "@vercel/firewall";
 import { head, put } from "@vercel/blob";
 import { cookies } from "next/headers";
 import { canCreateSandbox, trackSandbox } from "@/app/lib/sandbox-quota";
+import { markPaused, markResumed } from "@/app/lib/system-status";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -179,12 +180,20 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("sandbox create failed:", err);
+    const apiMessage = (err as any)?.json?.error?.message;
+
+    if (apiMessage) {
+      await markPaused(apiMessage);
+      return Response.json({ ok: false, error: apiMessage });
+    }
+
     return Response.json({
       ok: false,
-      error: "high demand right now, please try again in a moment",
+      error: "couldn't start a sandbox right now, please try again in a moment",
     });
   }
 
+  await markResumed();
   await trackSandbox(runVisitorId, sandboxName);
 
   await Promise.all([

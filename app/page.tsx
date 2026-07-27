@@ -66,6 +66,8 @@ import {
   type StoredMessage,
 } from "@/components/agent-chat-panel";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ClockIcon } from "lucide-react";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
@@ -256,6 +258,22 @@ function formatRelativeTime(dateString: string) {
   });
 }
 
+function formatPauseMessage(reason: string | null) {
+  if (!reason) return "generation is temporarily unavailable, check back soon";
+
+  const match = reason.match(/(\d{4}-\d{2}-\d{2})T/);
+  if (match) {
+    const date = new Date(match[1]);
+    const formatted = date.toLocaleDateString(undefined, {
+      month: "long",
+      day: "numeric",
+    });
+    return `generation is paused while usage resets, back on ${formatted}`;
+  }
+
+  return "generation is temporarily unavailable, check back soon";
+}
+
 function groupHistory(entries: HistoryEntry[]) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -344,6 +362,8 @@ function HomeInner() {
   const logoutIconRef = useRef<LogoutIconHandle>(null);
 
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
+  const [systemPaused, setSystemPaused] = useState(false);
+  const [pauseReason, setPauseReason] = useState<string | null>(null);
   const [genMsgIndex, setGenMsgIndex] = useState(0);
 
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
@@ -442,6 +462,18 @@ function HomeInner() {
     lastFileKey.current = fileKey;
     if (activeFile) setPanelFile(activeFile);
   }
+
+  useEffect(() => {
+    fetch("/api/status")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.paused) {
+          setSystemPaused(true);
+          setPauseReason(data.reason ?? null);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const shareId = searchParams.get("a");
@@ -762,6 +794,16 @@ function HomeInner() {
         ...prev,
         [assistantId]: { state: "failed", error },
       }));
+
+      fetch("/api/status")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.paused) {
+            setSystemPaused(true);
+            setPauseReason(data.reason ?? null);
+          }
+        })
+        .catch(() => {});
     };
 
     try {
@@ -831,6 +873,14 @@ function HomeInner() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (systemPaused && !chatSession) {
+      toast.error(
+        pauseReason ?? "generation is temporarily paused, try again shortly",
+      );
+      return;
+    }
+
     const trimmed = input.trim();
     if (!trimmed) {
       toast.error(
@@ -938,6 +988,14 @@ function HomeInner() {
     </div>
   ) : (
     <form onSubmit={onSubmit} className="w-full space-y-2">
+      {systemPaused && !chatSession && (
+        <Alert className="border-border/60 bg-black/20 py-2.5">
+          <ClockIcon className="size-3.5 text-muted-foreground" />
+          <AlertDescription className="font-mono text-xs leading-relaxed text-muted-foreground">
+            {formatPauseMessage(pauseReason)}
+          </AlertDescription>
+        </Alert>
+      )}
       {chatSession && (
         <div className="flex items-center justify-between rounded-md bg-primary/5 px-3 py-2 font-mono text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
@@ -983,12 +1041,15 @@ function HomeInner() {
       <div className="relative">
         <Textarea
           placeholder={
-            chatSession
-              ? "message your agent..."
-              : "an agent that summarizes github issues..."
+            systemPaused && !chatSession
+              ? "generation is temporarily unavailable..."
+              : chatSession
+                ? "message your agent..."
+                : "an agent that summarizes github issues..."
           }
           value={input}
           maxLength={MAX_INPUT_LENGTH}
+          disabled={systemPaused && !chatSession}
           onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -996,7 +1057,7 @@ function HomeInner() {
               e.currentTarget.form?.requestSubmit();
             }
           }}
-          className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1"
+          className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
         />
         <span
           className={`pointer-events-none absolute right-3 bottom-2.5 font-mono text-[11px] tabular-nums transition-colors ${
@@ -1008,7 +1069,11 @@ function HomeInner() {
       </div>
       <Button
         type="submit"
-        disabled={submitting || input.trim().length === 0}
+        disabled={
+          submitting ||
+          input.trim().length === 0 ||
+          (systemPaused && !chatSession)
+        }
         className="w-full cursor-pointer"
       >
         {submitting && <Spinner className="size-4" />}
