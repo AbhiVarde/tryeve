@@ -724,8 +724,13 @@ function HomeInner() {
 
     try {
       if (message.sandboxName && message.url) {
-        const alive = await fetch(message.url, { method: "GET" })
-          .then((r) => r.ok)
+        const alive = await fetch("/api/ping-agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: message.url }),
+        })
+          .then((r) => r.json())
+          .then((d) => d.alive)
           .catch(() => false);
 
         if (alive) {

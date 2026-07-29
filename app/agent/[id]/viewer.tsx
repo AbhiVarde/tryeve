@@ -66,8 +66,13 @@ export function AgentViewer({
 
         const sessionData: { sandboxName: string; url: string } =
           await sessionRes.json();
-        const alive = await fetch(sessionData.url, { method: "GET" })
-          .then((r) => r.ok)
+        const alive = await fetch("/api/ping-agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: sessionData.url }),
+        })
+          .then((r) => r.json())
+          .then((d) => d.alive)
           .catch(() => false);
 
         if (cancelled || !alive) return;
