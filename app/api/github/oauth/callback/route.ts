@@ -11,9 +11,12 @@ export async function GET(req: Request) {
   const expectedState = cookieStore.get("tryeve_gh_oauth_state")?.value;
 
   if (!code || !state || !expectedState || state !== expectedState) {
-    return Response.redirect(
-      "https://tryeve.abhivarde.in/?ghOauthError=1",
-      302,
+    return new Response(
+      `<!DOCTYPE html><html><body style="background:#000;color:#fff;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+        <p>something went wrong, you can close this window and try again</p>
+        <script>window.close();</script>
+      </body></html>`,
+      { headers: { "Content-Type": "text/html" } },
     );
   }
 
@@ -51,8 +54,11 @@ export async function GET(req: Request) {
     path: "/",
   });
 
-  return Response.redirect(
-    "https://tryeve.abhivarde.in/?ghOauthConnected=1",
-    302,
+  return new Response(
+    `<!DOCTYPE html><html><body style="background:#000;color:#fff;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+      <p>connected, you can close this window</p>
+      <script>window.close();</script>
+    </body></html>`,
+    { headers: { "Content-Type": "text/html" } },
   );
 }

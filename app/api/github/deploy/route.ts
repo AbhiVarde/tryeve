@@ -164,27 +164,28 @@ export async function POST(req: Request) {
     },
   ];
 
-  const pushResults = await Promise.all(
-    allFiles.map((file) =>
-      githubFetch(
-        appAuth.token!,
-        `/repos/${user.login}/${repoName}/contents/${file.filename}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            message: `add ${file.filename}`,
-            content: Buffer.from(file.content).toString("base64"),
-          }),
-        },
-      ),
-    ),
-  );
+  const failedFiles: string[] = [];
 
-  const failed = pushResults.some((r) => !r.ok);
-  if (failed) {
+  for (const file of allFiles) {
+    const res = await githubFetch(
+      appAuth.token!,
+      `/repos/${user.login}/${repoName}/contents/${file.filename}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          message: `add ${file.filename}`,
+          content: Buffer.from(file.content).toString("base64"),
+        }),
+      },
+    );
+
+    if (!res.ok) failedFiles.push(file.filename);
+  }
+
+  if (failedFiles.length > 0) {
     return Response.json({
       ok: false,
-      error: "repository created, but some files failed to upload",
+      error: `repo created, but ${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}`,
       repoUrl: repo.html_url,
     });
   }

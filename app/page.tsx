@@ -676,6 +676,33 @@ function HomeInner() {
     setChatSession(null);
   }
 
+  function openAuthPopupAndRetry(url: string, message: Message) {
+    const popup = window.open(
+      url,
+      "tryeve-github-auth",
+      "width=600,height=720",
+    );
+
+    if (!popup) {
+      toast.error(
+        "popup was blocked, allow popups for this site and try again",
+      );
+      setDeployingId(null);
+      return;
+    }
+
+    toast.info(
+      "complete the GitHub authorization in the popup, we'll pick up automatically",
+    );
+
+    const timer = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(timer);
+        deployToGithub(message);
+      }
+    }, 500);
+  }
+
   async function deployToGithub(message: Message) {
     setDeployingId(message.id);
     try {
@@ -696,24 +723,28 @@ function HomeInner() {
       const data = await res.json();
 
       if (data.needsAuth && data.authorizeUrl) {
-        window.open(data.authorizeUrl, "_blank");
-        toast.info("authorize GitHub in the new tab, then click deploy again");
+        openAuthPopupAndRetry(data.authorizeUrl, message);
         return;
       }
 
       if (!data.ok) {
-        toast.error(data.error ?? "couldn't deploy to GitHub, try again");
+        toast.error(
+          data.error ?? "couldn't deploy to GitHub, please try again",
+        );
         return;
       }
 
-      toast.success("pushed to GitHub", {
+      toast.success("your agent is live on GitHub", {
+        description: "view the repository to see your files",
         action: {
           label: "open repo",
           onClick: () => window.open(data.repoUrl, "_blank"),
         },
       });
     } catch {
-      toast.error("failed to reach GitHub, please try again");
+      toast.error(
+        "couldn't reach GitHub, please check your connection and try again",
+      );
     } finally {
       setDeployingId(null);
     }
@@ -1251,7 +1282,10 @@ function HomeInner() {
                                 navigator.clipboard.writeText(
                                   `${window.location.origin}/agent/${message.shareId}`,
                                 );
-                                toast.success("link copied to your clipboard");
+                                toast.success("share link copied", {
+                                  description:
+                                    "anyone with this link can chat with your agent",
+                                });
                               }}
                               onMouseEnter={linkIcons.onEnter(message.id)}
                               onMouseLeave={linkIcons.onLeave(message.id)}
