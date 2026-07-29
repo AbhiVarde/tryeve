@@ -1,6 +1,6 @@
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
-import { getGithubToken } from "@/app/lib/github-connect";
+import { getGithubToken, getGithubOAuthToken } from "@/app/lib/github-connect";
 
 export const runtime = "nodejs";
 
@@ -81,29 +81,48 @@ export async function POST(req: Request) {
     );
   }
 
-  let auth;
+  let appAuth;
   try {
-    auth = await getGithubToken(visitorId);
+    appAuth = await getGithubToken(visitorId);
   } catch (err) {
-    console.error("github token request failed:", err);
+    console.error("github app token request failed:", err);
     return Response.json({
       ok: false,
       error: "couldn't reach GitHub right now, try again in a moment",
     });
   }
 
-  if (auth.needsAuth) {
+  if (appAuth.needsAuth) {
     return Response.json({
       ok: false,
       needsAuth: true,
-      authorizeUrl: auth.authorizeUrl,
+      authorizeUrl: appAuth.authorizeUrl,
+    });
+  }
+
+  let oauthAuth;
+  try {
+    oauthAuth = await getGithubOAuthToken(visitorId);
+  } catch (err) {
+    console.error("github oauth token request failed:", err);
+    return Response.json({
+      ok: false,
+      error: "couldn't reach GitHub right now, try again in a moment",
+    });
+  }
+
+  if (oauthAuth.needsAuth) {
+    return Response.json({
+      ok: false,
+      needsAuth: true,
+      authorizeUrl: oauthAuth.authorizeUrl,
     });
   }
 
   const files = parseFiles(code);
   const repoName = slugify(prompt);
 
-  const userRes = await githubFetch(auth.token!, "/user");
+  const userRes = await githubFetch(appAuth.token!, "/user");
   if (!userRes.ok) {
     return Response.json({
       ok: false,
@@ -112,7 +131,7 @@ export async function POST(req: Request) {
   }
   const user = await userRes.json();
 
-  const createRes = await githubFetch(auth.token!, "/user/repos", {
+  const createRes = await githubFetch(oauthAuth.token!, "/user/repos", {
     method: "POST",
     body: JSON.stringify({
       name: repoName,
@@ -157,7 +176,7 @@ export async function POST(req: Request) {
   const pushResults = await Promise.all(
     allFiles.map((file) =>
       githubFetch(
-        auth.token!,
+        appAuth.token!,
         `/repos/${user.login}/${repoName}/contents/${file.filename}`,
         {
           method: "PUT",
