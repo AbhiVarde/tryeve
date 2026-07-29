@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     return Response.json({
       ok: false,
       needsAuth: true,
-      authorizeUrl: "https://tryeve.abhivarde.in/api/github-oauth/start",
+      authorizeUrl: "https://tryeve.abhivarde.in/api/github/oauth/start",
     });
   }
 

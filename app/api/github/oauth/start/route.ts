@@ -17,7 +17,7 @@ export async function GET() {
 
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_OAUTH_CLIENT_ID!,
-    redirect_uri: "https://tryeve.abhivarde.in/api/github-oauth/callback",
+    redirect_uri: "https://tryeve.abhivarde.in/api/github/oauth/callback",
     scope: "repo",
     state,
   });

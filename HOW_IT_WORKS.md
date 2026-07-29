@@ -72,6 +72,11 @@ a share link lets anyone view an agent's files and chat with it. it doesn't let 
 ↳ every stop during testing snapshotted anyway, exhausting a month's storage quota in a day  
 ↳ fix: `persistent: false` on every `Sandbox.create()`, stopping now discards instead of saving
 
+**github apps can't create personal repos**  
+↳ vercel connect's github connector is a github app under the hood  
+↳ github apps are blocked from `POST /user/repos` on personal accounts by design, org repos only  
+↳ fix: repo creation split off to a direct, self-hosted classic oauth flow, connect kept for pushing files
+
 ## what's deliberately not built
 
 hosting a generated agent as its own live service was built, then removed.
@@ -80,4 +85,4 @@ hosting a generated agent as its own live service was built, then removed.
 ↳ a deployed agent with no channel or frontend is a live endpoint with nothing to show  
 ↳ it stayed out
 
-deploying the generated code to the user's own github made the cut instead. it's not hosting, it's handing over files the person owns, through a short-lived scoped token, not a stored secret. one produces a repo they control, the other a process nobody asked for.
+deploying the generated code to the user's own github made the cut instead. it's not hosting, it's handing over files the person owns. pushing those files uses a short-lived scoped token from a github app, issued through connect. creating the repo itself uses a separate classic oauth token, because github apps cannot create repositories on personal accounts, only on organizations, so connect's github app can't do that one step. either way, one produces a repo they control, the other a process nobody asked for.

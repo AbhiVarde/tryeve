@@ -110,7 +110,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     items: [
       "inspect every file with syntax highlighting",
       "export the full agent as a zip",
-      "deploy any agent straight to your own GitHub, no OAuth setup needed",
+      "deploy any agent straight to your own GitHub, one-time authorization",
       "share a live link, anyone with it can chat with your agent directly",
       "connect to your agent right after it's built, no install needed",
       "chat with it live, with markdown-formatted replies",
@@ -148,7 +148,7 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   },
   {
     name: "connect",
-    description: "issues scoped GitHub tokens to deploy, no stored secrets",
+    description: "issues scoped GitHub tokens to push generated files",
   },
   { name: "ai elements", description: "chat ui, progress, and loading states" },
   { name: "streamdown", description: "renders code and markdown cleanly" },
@@ -685,7 +685,7 @@ function HomeInner() {
           messages[messages.indexOf(m) + 1]?.id === message.id,
       );
 
-      const res = await fetch("/api/deploy-github", {
+      const res = await fetch("/api/github/deploy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -52,22 +52,22 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 
 ## built with ▲
 
-| product | role |
-| --- | --- |
-| [next.js](https://nextjs.org) | the app itself |
-| [ai gateway](https://vercel.com/docs/ai-gateway) | routes the generation request to a model |
-| [ai sdk](https://sdk.vercel.ai) | streams the model's response |
-| [sandbox](https://vercel.com/docs/sandbox) | tests every agent against a real eve runtime, then runs it live so you can talk to it |
-| [workflow sdk](https://vercel.com/docs/workflow) | runs generate and test as one durable step |
-| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent, its live session, chat transcript, and per-visitor history |
-| [cron](https://vercel.com/docs/cron-jobs) | sweeps stale sandbox sessions on a schedule |
-| [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation, connect, and chat requests |
-| [connect](https://vercel.com/docs/connect) | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
-| [ai elements](https://ai-sdk.dev/elements) | chat interface, task progress ui, loading states |
-| [streamdown](https://streamdown.ai) | renders code and markdown cleanly |
-| [shadcn/ui](https://ui.shadcn.com) | every ui component |
-| [vercel](https://vercel.com) | hosts and deploys the app |
-| [analytics](https://vercel.com/docs/analytics) | tracks real usage without slowing anything down |
+| product                                             | role                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [next.js](https://nextjs.org)                       | the app itself                                                                              |
+| [ai gateway](https://vercel.com/docs/ai-gateway)    | routes the generation request to a model                                                    |
+| [ai sdk](https://sdk.vercel.ai)                     | streams the model's response                                                                |
+| [sandbox](https://vercel.com/docs/sandbox)          | tests every agent against a real eve runtime, then runs it live so you can talk to it       |
+| [workflow sdk](https://vercel.com/docs/workflow)    | runs generate and test as one durable step                                                  |
+| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent, its live session, chat transcript, and per-visitor history               |
+| [cron](https://vercel.com/docs/cron-jobs)           | sweeps stale sandbox sessions on a schedule                                                 |
+| [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation, connect, and chat requests                                          |
+| [connect](https://vercel.com/docs/connect)          | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
+| [ai elements](https://ai-sdk.dev/elements)          | chat interface, task progress ui, loading states                                            |
+| [streamdown](https://streamdown.ai)                 | renders code and markdown cleanly                                                           |
+| [shadcn/ui](https://ui.shadcn.com)                  | every ui component                                                                          |
+| [vercel](https://vercel.com)                        | hosts and deploys the app                                                                   |
+| [analytics](https://vercel.com/docs/analytics)      | tracks real usage without slowing anything down                                             |
 
 icons animated by [lucide-animated](https://lucide-animated.com).
 
@@ -111,11 +111,15 @@ OPENAI_API_KEY=
 
 # optional, only needed for GitHub deploy
 GITHUB_CONNECTOR_UID=github/tryeve
+GITHUB_OAUTH_CLIENT_ID=
+GITHUB_OAUTH_CLIENT_SECRET=
 ```
 
 `VERCEL_OIDC_TOKEN` is generated automatically when the project is linked and deployed on vercel. for local development, `vercel env pull` handles this for you.
 
-`GITHUB_CONNECTOR_UID` defaults to `github/tryeve`. GitHub deploy requires creating a GitHub connector in the Vercel dashboard first (`vercel connect create github --name tryeve`), linking it to this project, and authorizing it — see [Vercel Connect docs](https://vercel.com/docs/connect) for setup.
+`GITHUB_CONNECTOR_UID` defaults to `github/tryeve`, used to push generated files via a Vercel Connect GitHub App connector — see [Vercel Connect docs](https://vercel.com/docs/connect) for setup.
+
+`GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` come from a separate, plain GitHub OAuth App, used only to create the repository itself. GitHub Apps cannot create repositories on personal accounts, so repo creation goes through a direct classic OAuth flow instead of Connect.
 
 ## project structure
 
@@ -129,7 +133,9 @@ app/
     agent-chat/       streams chat responses from the live sandbox, rate limited
     agents/           returns the current visitor's private history
     save-transcript/  persists chat messages so past conversations survive reloads
-    deploy-github/    pushes a generated agent to the user's own GitHub via Connect
+    github/deploy/          creates the repo (direct OAuth) and pushes files (via Connect)
+    github/oauth/start/     redirects to GitHub's OAuth consent screen
+    github/oauth/callback/  exchanges the OAuth code for a token, stores it
     cron/cleanup/     scheduled sweep for stale sandbox sessions
   agent/[id]/         shared agent view, includes real chat, not just file viewing
   page.tsx            the main app

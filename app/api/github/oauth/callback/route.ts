@@ -29,7 +29,7 @@ export async function GET(req: Request) {
       client_id: process.env.GITHUB_OAUTH_CLIENT_ID,
       client_secret: process.env.GITHUB_OAUTH_CLIENT_SECRET,
       code,
-      redirect_uri: "https://tryeve.abhivarde.in/api/github-oauth/callback",
+      redirect_uri: "https://tryeve.abhivarde.in/api/github/oauth/callback",
     }),
   });
 
