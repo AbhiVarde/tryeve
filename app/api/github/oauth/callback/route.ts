@@ -36,6 +36,7 @@ export async function GET(req: Request) {
   const tokenData = await tokenRes.json().catch(() => null);
 
   if (!tokenData?.access_token) {
+    console.error("github token exchange failed:", JSON.stringify(tokenData));
     return Response.redirect(
       "https://tryeve.abhivarde.in/?ghOauthError=1",
       302,
