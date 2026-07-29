@@ -7,6 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { CheckIcon, type CheckIconHandle } from "@/components/ui/check";
 import {
+  FileTextIcon,
+  type FileTextIconHandle,
+} from "@/components/ui/file-text";
+import {
   DownloadIcon,
   type DownloadIconHandle,
 } from "@/components/ui/download";
@@ -348,7 +352,7 @@ function HomeInner() {
 
   const downloadIcons = useIconRefs<DownloadIconHandle>();
   const linkIcons = useIconRefs<LinkIconHandle>();
-  const checkIcons = useIconRefs<CheckIconHandle>();
+  const fileChipIcons = useIconRefs<FileTextIconHandle>();
   const historyRowIcons = useIconRefs<CornerDownRightIconHandle>();
   const retryIcons = useIconRefs<RefreshCCWIconWIcon>();
   const deleteIcons = useIconRefs<DeleteIconHandle>();
@@ -1312,16 +1316,16 @@ function HomeInner() {
                             <button
                               key={file.filename}
                               onClick={() => openFile(message.id, idx)}
-                              onMouseEnter={checkIcons.onEnter(key)}
-                              onMouseLeave={checkIcons.onLeave(key)}
+                              onMouseEnter={fileChipIcons.onEnter(key)}
+                              onMouseLeave={fileChipIcons.onLeave(key)}
                               className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/40 bg-background px-2.5 py-1 font-mono text-xs transition-colors hover:bg-accent hover:text-accent-foreground"
                             >
-                              {file.filename}
-                              <CheckIcon
-                                ref={checkIcons.setRef(key)}
-                                size={16}
+                              <FileTextIcon
+                                ref={fileChipIcons.setRef(key)}
+                                size={13}
                                 className="text-muted-foreground/70"
                               />
+                              {file.filename}
                             </button>
                           );
                         })}
