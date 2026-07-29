@@ -4,7 +4,8 @@ import {
   UserAuthorizationRequiredError,
 } from "@vercel/connect";
 
-const CONNECTOR = process.env.GITHUB_CONNECTOR_UID ?? "github/tryeve";
+const CONNECTOR =
+  process.env.GITHUB_CONNECTOR_UID ?? "github/tryeve-agent-deploy-syncui";
 const SCOPES = ["repo"];
 
 export async function getGithubToken(visitorId: string) {
