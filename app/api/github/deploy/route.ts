@@ -31,13 +31,36 @@ function parseFiles(raw: string): FileBlock[] {
   return blocks;
 }
 
+const STOP_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "that",
+  "which",
+  "with",
+  "for",
+  "and",
+  "or",
+  "to",
+  "of",
+  "in",
+  "on",
+  "is",
+  "it",
+  "this",
+  "agent",
+  "agents",
+]);
+
 function slugify(prompt: string) {
-  const base = prompt
+  const words = prompt
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-  return `eve-agent-${base || "generated"}`;
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter((w) => w && !STOP_WORDS.has(w));
+
+  const base = words.slice(0, 4).join("-") || "generated";
+  return `${base}-agent`;
 }
 
 async function githubFetch(token: string, path: string, init?: RequestInit) {
@@ -126,7 +149,7 @@ export async function POST(req: Request) {
     method: "POST",
     body: JSON.stringify({
       name: repoName,
-      description: `an eve agent built with tryeve: ${prompt}`,
+      description: prompt.length > 100 ? `${prompt.slice(0, 97)}...` : prompt,
       private: false,
       auto_init: false,
     }),
@@ -160,7 +183,26 @@ export async function POST(req: Request) {
     },
     {
       filename: "README.md",
-      content: `# ${repoName}\n\nbuilt with tryeve.\n\n## run it\n\nnpm install\nnpm run dev\n`,
+      content: `# ${repoName}
+
+${prompt}
+
+built and tested with [tryeve](https://tryeve.abhivarde.in), an agent runtime for [eve](https://eve.dev).
+
+## run it
+
+\`\`\`
+npm install
+npm run dev
+\`\`\`
+
+## structure
+
+- \`agent/instructions.md\` defines what this agent does
+- \`agent/tools/\` contains the typed tools it can call
+
+eve reads everything under \`agent/\` automatically, no registration needed.
+`,
     },
   ];
 

@@ -422,7 +422,7 @@ function HomeInner() {
 
     const warnTimer = setTimeout(
       () => {
-        toast.warning("still there? disconnecting in 1 minute of inactivity", {
+        toast.warning("disconnecting in 1 minute due to inactivity", {
           duration: 10000,
         });
       },
@@ -437,7 +437,7 @@ function HomeInner() {
           body: JSON.stringify({ sandboxName: chatSession.sandboxName }),
         });
         setChatSession(null);
-        toast.info("agent disconnected after 5 minutes of inactivity");
+        toast.info("disconnected after 5 minutes of inactivity");
       },
       5 * 60 * 1000,
     );
@@ -604,7 +604,7 @@ function HomeInner() {
       fetch("/api/agents")
         .then((res) => (res.ok ? res.json() : Promise.reject()))
         .then((data) => setHistory(Array.isArray(data) ? data : []))
-        .catch(() => toast.error("couldn't load your history, try again"))
+        .catch(() => toast.error("couldn't load history, try again"))
         .finally(() => setHistoryLoading(false));
     }
   }
@@ -629,7 +629,7 @@ function HomeInner() {
         body: JSON.stringify({ id }),
       });
     } catch {
-      toast.error("couldn't remove that entry, try again.");
+      toast.error("couldn't remove that entry");
     }
   }
 
@@ -684,16 +684,12 @@ function HomeInner() {
     );
 
     if (!popup) {
-      toast.error(
-        "popup was blocked, allow popups for this site and try again",
-      );
+      toast.error("popup blocked, allow popups and try again");
       setDeployingId(null);
       return;
     }
 
-    toast.info(
-      "complete the GitHub authorization in the popup, we'll pick up automatically",
-    );
+    toast.info("authorize in the popup, we'll continue automatically");
 
     const timer = setInterval(() => {
       if (popup.closed) {
@@ -728,23 +724,19 @@ function HomeInner() {
       }
 
       if (!data.ok) {
-        toast.error(
-          data.error ?? "couldn't deploy to GitHub, please try again",
-        );
+        toast.error(data.error ?? "deploy failed, please try again");
         return;
       }
 
-      toast.success("your agent is live on GitHub", {
-        description: "view the repository to see your files",
+      toast.success("deployed to GitHub", {
+        description: "your agent is now a repository under your account",
         action: {
           label: "open repo",
           onClick: () => window.open(data.repoUrl, "_blank"),
         },
       });
     } catch {
-      toast.error(
-        "couldn't reach GitHub, please check your connection and try again",
-      );
+      toast.error("couldn't reach GitHub, check your connection");
     } finally {
       setDeployingId(null);
     }
@@ -786,10 +778,7 @@ function HomeInner() {
       const data = await res.json();
 
       if (!data.ok) {
-        toast.error(
-          data.error ??
-            "unable to reach your agent. check the connection and try again.",
-        );
+        toast.error(data.error ?? "couldn't reach your agent, try again");
         return;
       }
 
@@ -803,7 +792,7 @@ function HomeInner() {
       });
       setShowGenerateForm(false);
     } catch {
-      toast.error("failed to connect to your agent. please try again.");
+      toast.error("connection failed, please try again");
     } finally {
       setChatLoadingId(null);
     }
@@ -1282,9 +1271,9 @@ function HomeInner() {
                                 navigator.clipboard.writeText(
                                   `${window.location.origin}/agent/${message.shareId}`,
                                 );
-                                toast.success("share link copied", {
+                                toast.success("link copied", {
                                   description:
-                                    "anyone with this link can chat with your agent",
+                                    "anyone with it can chat with your agent",
                                 });
                               }}
                               onMouseEnter={linkIcons.onEnter(message.id)}
