@@ -80,6 +80,7 @@ type Message = {
   shareId?: string;
   sandboxName?: string;
   url?: string;
+  repoUrl?: string;
 };
 type ChatSession = AgentSession & { agentMessageId: string };
 type HistoryEntry = { id: string; prompt: string; createdAt: string };
@@ -728,13 +729,13 @@ function HomeInner() {
         return;
       }
 
-      toast.success("deployed to GitHub", {
-        description: "your agent is now a repository under your account",
-        action: {
-          label: "open repo",
-          onClick: () => window.open(data.repoUrl, "_blank"),
-        },
-      });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === message.id ? { ...m, repoUrl: data.repoUrl } : m,
+        ),
+      );
+
+      toast.success("deployed to GitHub");
     } catch {
       toast.error("couldn't reach GitHub, check your connection");
     } finally {
@@ -984,9 +985,13 @@ function HomeInner() {
       <Button
         type="button"
         variant="outline"
-        onClick={() =>
-          latestAssistantMessage && deployToGithub(latestAssistantMessage)
-        }
+        onClick={() => {
+          if (latestAssistantMessage?.repoUrl) {
+            window.open(latestAssistantMessage.repoUrl, "_blank");
+          } else if (latestAssistantMessage) {
+            deployToGithub(latestAssistantMessage);
+          }
+        }}
         disabled={deployingId === latestAssistantMessage?.id}
         onMouseEnter={() => deployIconRef.current?.startAnimation()}
         onMouseLeave={() => deployIconRef.current?.stopAnimation()}
@@ -1000,7 +1005,9 @@ function HomeInner() {
         <span className="animate-in fade-in duration-300">
           {deployingId === latestAssistantMessage?.id
             ? "deploying..."
-            : "deploy to github"}
+            : latestAssistantMessage?.repoUrl
+              ? "view on github"
+              : "deploy to github"}
         </span>
       </Button>
       <button
@@ -1034,7 +1041,12 @@ function HomeInner() {
                 const agentMessage = messages.find(
                   (m) => m.id === chatSession.agentMessageId,
                 );
-                if (agentMessage) deployToGithub(agentMessage);
+                if (!agentMessage) return;
+                if (agentMessage.repoUrl) {
+                  window.open(agentMessage.repoUrl, "_blank");
+                } else {
+                  deployToGithub(agentMessage);
+                }
               }}
               disabled={deployingId === chatSession.agentMessageId}
               onMouseEnter={() => deployIconRef.current?.startAnimation()}
@@ -1048,7 +1060,10 @@ function HomeInner() {
               )}
               {deployingId === chatSession.agentMessageId
                 ? "deploying..."
-                : "deploy"}
+                : messages.find((m) => m.id === chatSession.agentMessageId)
+                      ?.repoUrl
+                  ? "view on github"
+                  : "deploy"}
             </button>
             <button
               type="button"
