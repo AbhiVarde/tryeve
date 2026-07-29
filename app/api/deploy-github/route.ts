@@ -1,6 +1,6 @@
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
-import { getGithubToken, getGithubOAuthToken } from "@/app/lib/github-connect";
+import { getGithubToken } from "@/app/lib/github-connect";
 
 export const runtime = "nodejs";
 
@@ -100,22 +100,13 @@ export async function POST(req: Request) {
     });
   }
 
-  let oauthAuth;
-  try {
-    oauthAuth = await getGithubOAuthToken(visitorId);
-  } catch (err) {
-    console.error("github oauth token request failed:", err);
-    return Response.json({
-      ok: false,
-      error: "couldn't reach GitHub right now, try again in a moment",
-    });
-  }
+  const oauthToken = cookieStore.get("tryeve_gh_token")?.value;
 
-  if (oauthAuth.needsAuth) {
+  if (!oauthToken) {
     return Response.json({
       ok: false,
       needsAuth: true,
-      authorizeUrl: oauthAuth.authorizeUrl,
+      authorizeUrl: "https://tryeve.abhivarde.in/api/github-oauth/start",
     });
   }
 
@@ -131,7 +122,7 @@ export async function POST(req: Request) {
   }
   const user = await userRes.json();
 
-  const createRes = await githubFetch(oauthAuth.token!, "/user/repos", {
+  const createRes = await githubFetch(oauthToken, "/user/repos", {
     method: "POST",
     body: JSON.stringify({
       name: repoName,
