@@ -217,24 +217,22 @@ async function downloadZip(files: FileBlock[]) {
     "README.md",
     `# your eve agent
 
-built with tryeve.
+built and tested with [tryeve](https://tryeve.abhivarde.in), an agent runtime for [eve](https://eve.dev).
 
 ## run it
 
+\`\`\`
 npm install
 npm run dev
-
-eve reads everything under agent/ automatically. no registration, no extra config.
+\`\`\`
 
 ## structure
 
-agent/instructions.md defines what your agent does
-agent/agent.ts sets the model, only present if your agent needs a specific one
-agent/tools/ contains typed tools the agent can call, the filename is the tool name
+- \`agent/instructions.md\` defines what this agent does
+- \`agent/agent.ts\` sets the model, only present if the agent needs a specific one
+- \`agent/tools/\` contains typed tools the agent can call, the filename is the tool name
 
-## docs
-
-https://eve.dev/docs/introduction
+eve reads everything under \`agent/\` automatically, no registration needed.
 `,
   );
 
@@ -514,6 +512,18 @@ function HomeInner() {
           [assistantId]: { state: "passed" },
         }));
 
+        fetch(`/agent/${shareId}/raw?repo=1`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data: { repoUrl?: string } | null) => {
+            if (cancelled || !data?.repoUrl) return;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, repoUrl: data.repoUrl } : m,
+              ),
+            );
+          })
+          .catch(() => {});
+
         try {
           const transcriptRes = await fetch(
             `/agent/${shareId}/raw?transcript=1`,
@@ -778,6 +788,7 @@ function HomeInner() {
         body: JSON.stringify({
           prompt: promptMsg?.text ?? "generated agent",
           code: message.text,
+          shareId: message.shareId,
         }),
       });
       const data = await res.json();

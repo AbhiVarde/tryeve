@@ -8,11 +8,14 @@ export async function GET(
   const search = new URL(req.url).searchParams;
   const isSession = search.get("session") === "1";
   const isTranscript = search.get("transcript") === "1";
-  const key = isTranscript
-    ? `agents/${id}-transcript.json`
-    : isSession
-      ? `agents/${id}-session.json`
-      : `agents/${id}.json`;
+  const isRepo = search.get("repo") === "1";
+  const key = isRepo
+    ? `agents/${id}-repo.json`
+    : isTranscript
+      ? `agents/${id}-transcript.json`
+      : isSession
+        ? `agents/${id}-session.json`
+        : `agents/${id}.json`;
 
   try {
     const blob = await head(key, {

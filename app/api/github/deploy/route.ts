@@ -1,5 +1,6 @@
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
+import { put } from "@vercel/blob";
 import { getGithubToken } from "@/app/lib/github-connect";
 
 export const runtime = "nodejs";
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { prompt, code } = await req.json();
+  const { prompt, code, shareId } = await req.json();
 
   if (!prompt || !code || typeof code !== "string") {
     return Response.json(
@@ -230,6 +231,22 @@ eve reads everything under \`agent/\` automatically, no registration needed.
       error: `repo created, but ${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}`,
       repoUrl: repo.html_url,
     });
+  }
+
+  try {
+    await put(
+      `agents/${shareId}-repo.json`,
+      JSON.stringify({ repoUrl: repo.html_url }),
+      {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        cacheControlMaxAge: 0,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      },
+    );
+  } catch (err) {
+    console.error("deploy: repo status write failed", err);
   }
 
   return Response.json({ ok: true, repoUrl: repo.html_url });
