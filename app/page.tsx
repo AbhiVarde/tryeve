@@ -614,17 +614,26 @@ function HomeInner() {
     }
   }
 
+  function clearViewedAgent() {
+    setMessages([]);
+    setSelectedFile(null);
+    setPanelFile(null);
+    setTestStatus({});
+    setInitialMessages(null);
+    router.replace("/");
+  }
+
   async function deleteHistoryEntry(id: string) {
     setHistory((prev) => prev.filter((entry) => entry.id !== id));
 
-    if (chatSession) {
-      const activeShareId = messages.find(
-        (m) => m.id === chatSession.agentMessageId,
-      )?.shareId;
-      if (activeShareId === id) {
+    const isCurrentlyViewed = messages.some((m) => m.shareId === id);
+
+    if (isCurrentlyViewed) {
+      if (chatSession) {
         endChat();
         setChatKey(crypto.randomUUID());
       }
+      clearViewedAgent();
     }
 
     try {
@@ -641,9 +650,12 @@ function HomeInner() {
   async function clearAllHistory() {
     setHistory([]);
 
-    if (chatSession) {
-      endChat();
-      setChatKey(crypto.randomUUID());
+    if (messages.length > 0) {
+      if (chatSession) {
+        endChat();
+        setChatKey(crypto.randomUUID());
+      }
+      clearViewedAgent();
     }
 
     try {
