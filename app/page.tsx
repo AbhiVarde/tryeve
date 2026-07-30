@@ -515,25 +515,51 @@ function HomeInner() {
         }));
 
         try {
-          const [sessionRes, transcriptRes] = await Promise.all([
-            fetch(`/agent/${shareId}/raw?session=1`),
-            fetch(`/agent/${shareId}/raw?transcript=1`),
-          ]);
-
+          const transcriptRes = await fetch(
+            `/agent/${shareId}/raw?transcript=1`,
+          );
           const transcript: StoredMessage[] = transcriptRes.ok
             ? await transcriptRes.json()
             : [];
           if (!cancelled) setInitialMessages(transcript);
 
-          if (!sessionRes.ok) return;
-          const session: { sandboxName: string; url: string } =
-            await sessionRes.json();
-          const pingRes = await fetch(session.url, { method: "GET" });
-          if (cancelled || !pingRes.ok) return;
+          const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
+          let session: { sandboxName: string; url: string } | null = null;
+          let alive = false;
+
+          if (sessionRes.ok) {
+            const parsed = (await sessionRes.json()) as {
+              sandboxName: string;
+              url: string;
+            };
+            session = parsed;
+            alive = await fetch("/api/ping-agent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: parsed.url }),
+            })
+              .then((r) => r.json())
+              .then((d) => d.alive)
+              .catch(() => false);
+          }
+
+          if (!alive) {
+            const reviveRes = await fetch("/api/revive-agent", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ shareId }),
+            });
+            const revived = await reviveRes.json().catch(() => null);
+            if (!revived?.ok) return;
+            session = { sandboxName: revived.sandboxName, url: revived.url };
+          }
+
+          if (cancelled || !session) return;
+          const finalSession = session;
           setChatSession({
             agentMessageId: assistantId,
-            url: session.url,
-            sandboxName: session.sandboxName,
+            url: finalSession.url,
+            sandboxName: finalSession.sandboxName,
             sessionId: null,
             continuationToken: null,
             turnCount: 0,

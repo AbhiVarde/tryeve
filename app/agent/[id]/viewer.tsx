@@ -56,6 +56,7 @@ export function AgentViewer({
 
   const [session, setSession] = useState<AgentSession | null>(null);
   const [connecting, setConnecting] = useState(true);
+  const [reviving, setReviving] = useState(false);
   const [initialMessages, setInitialMessages] = useState<
     StoredMessage[] | null
   >(null);
@@ -69,36 +70,58 @@ export function AgentViewer({
   useEffect(() => {
     let cancelled = false;
 
+    async function pingAlive(url: string) {
+      return fetch("/api/ping-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      })
+        .then((r) => r.json())
+        .then((d) => d.alive)
+        .catch(() => false);
+    }
+
     async function connect() {
       try {
-        const [sessionRes, transcriptRes] = await Promise.all([
-          fetch(`/agent/${shareId}/raw?session=1`),
-          fetch(`/agent/${shareId}/raw?transcript=1`),
-        ]);
-
+        const transcriptRes = await fetch(`/agent/${shareId}/raw?transcript=1`);
         const transcript: StoredMessage[] = transcriptRes.ok
           ? await transcriptRes.json()
           : [];
         if (!cancelled) setInitialMessages(transcript);
 
-        if (!sessionRes.ok) return;
+        const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
+        let alive = false;
+        let sessionData: { sandboxName: string; url: string } | null = null;
 
-        const sessionData: { sandboxName: string; url: string } =
-          await sessionRes.json();
-        const alive = await fetch("/api/ping-agent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: sessionData.url }),
-        })
-          .then((r) => r.json())
-          .then((d) => d.alive)
-          .catch(() => false);
+        if (sessionRes.ok) {
+          const parsed = (await sessionRes.json()) as {
+            sandboxName: string;
+            url: string;
+          };
+          sessionData = parsed;
+          alive = await pingAlive(parsed.url);
+        }
 
-        if (cancelled || !alive) return;
+        if (!alive) {
+          if (!cancelled) setReviving(true);
+          const reviveRes = await fetch("/api/revive-agent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shareId }),
+          });
+          const revived = await reviveRes.json().catch(() => null);
+          if (cancelled) return;
+          setReviving(false);
+          if (!revived?.ok) return;
+          sessionData = { sandboxName: revived.sandboxName, url: revived.url };
+        }
+
+        if (cancelled || !sessionData) return;
+        const finalSession = sessionData;
 
         setSession({
-          url: sessionData.url,
-          sandboxName: sessionData.sandboxName,
+          url: finalSession.url,
+          sandboxName: finalSession.sandboxName,
           sessionId: null,
           continuationToken: null,
           turnCount: 0,
@@ -187,11 +210,13 @@ export function AgentViewer({
 
           <div className="flex flex-col gap-3">
             <p className="font-mono text-xs text-muted-foreground">
-              {connecting
-                ? "connecting to this agent..."
-                : session
-                  ? "chat with this agent"
-                  : "this agent's live session has ended, files are still viewable via the icon above"}
+              {reviving
+                ? "waking this agent back up..."
+                : connecting
+                  ? "connecting to this agent..."
+                  : session
+                    ? "chat with this agent"
+                    : "couldn't reconnect right now, files are still viewable below"}
             </p>
 
             {session && (
