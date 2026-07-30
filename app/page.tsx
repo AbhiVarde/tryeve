@@ -720,26 +720,47 @@ function HomeInner() {
   }
 
   function openAuthPopupAndRetry(url: string, message: Message) {
-    const popup = window.open(
+    const width = 520;
+    const height = 680;
+    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+
+    const popupRef = window.open(
       url,
       "tryeve-github-auth",
-      "width=600,height=720",
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
     );
 
-    if (!popup) {
+    if (!popupRef) {
       toast.error("popup blocked, allow popups and try again");
       setDeployingId(null);
       return;
     }
 
+    const popup: Window = popupRef;
+
     toast.info("authorize in the popup, we'll continue automatically");
 
-    const timer = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(timer);
-        deployToGithub(message);
-      }
+    let fired = false;
+    const finish = () => {
+      if (fired) return;
+      fired = true;
+      clearInterval(closeTimer);
+      window.removeEventListener("focus", onFocus);
+      deployToGithub(message);
+    };
+
+    const closeTimer = setInterval(() => {
+      if (popup.closed) finish();
     }, 500);
+
+    function onFocus() {
+      // give the popup a moment to actually close or finish redirecting
+      setTimeout(() => {
+        if (popup.closed || fired) finish();
+      }, 400);
+    }
+    window.addEventListener("focus", onFocus);
   }
 
   async function deployToGithub(message: Message) {
