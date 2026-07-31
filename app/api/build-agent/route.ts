@@ -4,8 +4,14 @@ import { nanoid } from "nanoid";
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { buildAgentWorkflow } from "@/app/workflows/build-agent";
+import { checkBotId } from "botid/server";
 
 export async function POST(req: Request) {
+  const botCheck = await checkBotId();
+  if (botCheck.isBot) {
+    return Response.json({ error: "request blocked" }, { status: 403 });
+  }
+
   const { rateLimited } = await checkRateLimit("rate-limit-ai-routes");
 
   if (rateLimited) {

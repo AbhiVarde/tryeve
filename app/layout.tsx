@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from "@vercel/analytics/next";
 import { BackgroundGlow } from "@/components/background-glow";
+import { BotIdClient } from "botid/client";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -95,6 +96,8 @@ const jsonLd = {
   },
 };
 
+const protectedRoutes = [{ path: "/api/build-agent", method: "POST" }];
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -107,6 +110,7 @@ export default function RootLayout({
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <BotIdClient protect={protectedRoutes} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
