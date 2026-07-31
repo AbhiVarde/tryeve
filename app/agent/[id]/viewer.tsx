@@ -33,6 +33,7 @@ import {
   type AgentSession,
   type StoredMessage,
 } from "@/components/agent-chat-panel";
+import { AppShell } from "@/components/app-shell";
 
 type FileBlock = { filename: string; content: string };
 
@@ -172,7 +173,7 @@ export function AgentViewer({
     selectedFileIndex !== null ? files[selectedFileIndex] : null;
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden">
+    <AppShell>
       <TopBar
         hideOnMobile={filesPanelOpen}
         rightSlot={
@@ -375,6 +376,6 @@ export function AgentViewer({
           )}
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

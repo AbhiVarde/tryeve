@@ -8,12 +8,13 @@ import {
   type ArrowRightIconHandle,
 } from "@/components/ui/arrow-right";
 import { TopBar } from "@/components/topbar";
+import { AppShell } from "@/components/app-shell";
 
 export default function NotFound() {
   const arrowRef = useRef<ArrowRightIconHandle>(null);
 
   return (
-    <main className="relative flex min-h-screen w-full flex-col overflow-hidden">
+    <AppShell as="main" variant="column">
       <TopBar />
 
       <section className="relative mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-6 text-center">
@@ -42,6 +43,6 @@ export default function NotFound() {
           </Link>
         </Button>
       </section>
-    </main>
+    </AppShell>
   );
 }

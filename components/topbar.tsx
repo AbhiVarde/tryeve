@@ -28,44 +28,45 @@ export function TopBar({
     </span>
   );
 
-  const logoClassName = `fixed top-0 left-0 z-30 items-center px-6 py-4 opacity-90 transition-opacity hover:opacity-100 ${
-    hideOnMobile ? "hidden md:flex" : "flex"
-  }`;
-
   return (
-    <>
-      {onLogoClick ? (
-        <button
-          onClick={onLogoClick}
-          aria-label="start over"
-          className={logoClassName}
-        >
-          {logo}
-        </button>
-      ) : (
-        <Link href="/" aria-label="tryeve home" className={logoClassName}>
-          {logo}
-        </Link>
-      )}
-
-      <div
-        className={`fixed top-0 right-0 z-30 items-center gap-4 px-6 py-4 ${
-          hideOnMobile ? "hidden md:flex" : "flex"
-        }`}
-      >
-        {rightSlot}
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          onMouseEnter={() => githubIconRef.current?.startAnimation()}
-          onMouseLeave={() => githubIconRef.current?.stopAnimation()}
-          aria-label="view on github"
-          className="text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
-        >
-          <GithubIcon ref={githubIconRef} size={16} />
-        </a>
+    <div
+      className={`fixed top-0 left-0 z-30 w-full px-6 py-4 ${
+        hideOnMobile ? "hidden md:flex" : "flex"
+      }`}
+    >
+      <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between">
+        {onLogoClick ? (
+          <button
+            onClick={onLogoClick}
+            aria-label="start over"
+            className="flex items-center opacity-90 transition-opacity hover:opacity-100"
+          >
+            {logo}
+          </button>
+        ) : (
+          <Link
+            href="/"
+            aria-label="tryeve home"
+            className="flex items-center opacity-90 transition-opacity hover:opacity-100"
+          >
+            {logo}
+          </Link>
+        )}
+        <div className="flex items-center gap-4">
+          {rightSlot}
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onMouseEnter={() => githubIconRef.current?.startAnimation()}
+            onMouseLeave={() => githubIconRef.current?.stopAnimation()}
+            aria-label="view on github"
+            className="text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
+          >
+            <GithubIcon ref={githubIconRef} size={16} />
+          </a>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

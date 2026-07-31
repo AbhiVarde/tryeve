@@ -73,6 +73,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ClockIcon } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | null;
@@ -1232,7 +1233,7 @@ function HomeInner() {
   );
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden">
+    <AppShell>
       <TopBar
         hideOnMobile={panelOpen}
         onLogoClick={resetSession}
@@ -1798,7 +1799,7 @@ function HomeInner() {
           ) : null}
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }
 
