@@ -27,7 +27,6 @@ import {
   ChevronRightIcon,
   type ChevronRightIconHandle,
 } from "@/components/ui/chevron-right";
-import { XIcon, type XIconHandle } from "@/components/ui/x";
 import { HistoryIcon, type HistoryIconHandle } from "@/components/ui/history";
 import {
   LayoutGridIcon,
@@ -371,7 +370,6 @@ function HomeInner() {
   const deployIconRef = useRef<GithubIconHandle>(null);
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
-  const xIconRef = useRef<XIconHandle>(null);
   const featuresIconRef = useRef<LayoutGridIconHandle>(null);
   const builtWithIconRef = useRef<LayersIconHandle>(null);
   const historyIconRef = useRef<HistoryIconHandle>(null);
@@ -1527,7 +1525,7 @@ function HomeInner() {
             >
               <PanelGlow />
 
-              <div className="relative z-10 flex items-center justify-between border-b border-border/60 px-6 py-4">
+              <div className="relative z-10 flex items-center border-b border-border/60 px-6 py-4">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={closePanel}
@@ -1551,17 +1549,6 @@ function HomeInner() {
                           ? "tryeve/history.md"
                           : panelFile?.filename}
                   </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={closePanel}
-                    onMouseEnter={() => xIconRef.current?.startAnimation()}
-                    onMouseLeave={() => xIconRef.current?.stopAnimation()}
-                    className="cursor-pointer text-muted-foreground hover:text-foreground"
-                    aria-label="close"
-                  >
-                    <XIcon ref={xIconRef} size={16} />
-                  </button>
                 </div>
               </div>
 
