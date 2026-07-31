@@ -5,11 +5,19 @@ import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { buildAgentWorkflow } from "@/app/workflows/build-agent";
 import { checkBotId } from "botid/server";
+import { generationEnabled } from "@/flags";
 
 export async function POST(req: Request) {
   const botCheck = await checkBotId();
   if (botCheck.isBot) {
     return Response.json({ error: "request blocked" }, { status: 403 });
+  }
+
+  if (!(await generationEnabled())) {
+    return Response.json(
+      { error: "generation is temporarily disabled, check back shortly" },
+      { status: 503 },
+    );
   }
 
   const { rateLimited } = await checkRateLimit("rate-limit-ai-routes");

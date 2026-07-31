@@ -1,7 +1,7 @@
 import { FatalError } from "workflow";
+import { primaryModel } from "@/flags";
 
-const MODELS = [
-  "moonshotai/kimi-k2.7-code",
+const FALLBACK_MODELS = [
   "kwaipilot/kat-coder-pro-v2.5",
   "zai/glm-5-turbo",
 ] as const;
@@ -106,10 +106,13 @@ async function generateAgent(prompt: string): Promise<string> {
 
   const { streamText } = await import("ai");
 
+  const primary = await primaryModel();
+  const models = [primary, ...FALLBACK_MODELS];
+
   let text = "";
   let lastError: unknown = null;
 
-  for (const model of MODELS) {
+  for (const model of models) {
     try {
       const result = streamText({
         model,
