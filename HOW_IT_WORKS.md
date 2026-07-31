@@ -8,6 +8,7 @@ a model can write eve files without much trouble. what it can't guarantee is tha
 
 ## the pipeline
 
+↳ a botid check runs first, bot traffic never reaches the ai gateway  
 ↳ a prompt is routed through the ai gateway to a model, which writes real eve files  
 ↳ a vercel sandbox installs eve for real, not stubbed  
 ↳ `eve dev` boots inside the sandbox  
@@ -76,6 +77,14 @@ a share link lets anyone view an agent's files and chat with it. it doesn't let 
 ↳ vercel connect's github connector is a github app under the hood  
 ↳ github apps are blocked from `POST /user/repos` on personal accounts by design, org repos only  
 ↳ fix: repo creation split off to a direct, self-hosted classic oauth flow, connect kept for pushing files
+
+**firewall's ip limit doesn't stop a distributed botnet**  
+↳ rate limiting by ip works against a single abuser, not requests spread across many ips  
+↳ fix: botid screens actual bot signals on the generation endpoint, firewall's ip limit stays as a backstop
+
+**model choice and the kill-switch were hardcoded**  
+↳ changing the model, or pausing generation during an incident, meant a redeploy either way  
+↳ fix: flags sdk exposes both live from the dashboard, no redeploy needed
 
 ## what's deliberately not built
 

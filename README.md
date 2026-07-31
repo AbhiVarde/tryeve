@@ -16,6 +16,8 @@ reload the page anytime. your agent, your chat, your files, all still there.
 
 - describe an agent in plain english
 - generates real, working eve files
+- generation requests are screened by botid before they reach the ai gateway, bots never touch a sandbox
+- the model used for generation and a kill-switch can be flipped live from the dashboard, no redeploy
 - every agent is tested against a live eve runtime before you see it
 - generation and testing run as one durable step, survives crashes
 - if a build fails, the reason is shown and you can retry with one click
@@ -38,13 +40,14 @@ reload the page anytime. your agent, your chat, your files, all still there.
 ## how it works
 
 1. you describe an agent
-2. the ai gateway routes the request to a model, which writes real eve files
-3. a vercel sandbox installs eve for real and boots it, no stubs
-4. tryeve sends a live test message and confirms the agent actually responds
-5. if it passes, the sandbox is kept alive rather than thrown away, so connecting afterward is instant
-6. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
-7. it's also added to your own history, tracked by a private cookie, not visible to anyone else
-8. optionally, deploy the generated files straight to your own GitHub via Vercel Connect, no long-lived secret ever stored
+2. a botid check runs first, bot traffic is rejected before it costs anything
+3. the ai gateway routes the request to a model (switchable live via flags sdk), which writes real eve files
+4. a vercel sandbox installs eve for real and boots it, no stubs
+5. tryeve sends a live test message and confirms the agent actually responds
+6. if it passes, the sandbox is kept alive rather than thrown away, so connecting afterward is instant
+7. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
+8. it's also added to your own history, tracked by a private cookie, not visible to anyone else
+9. optionally, deploy the generated files straight to your own GitHub via Vercel Connect, no long-lived secret ever stored
 
 steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
 
@@ -63,6 +66,8 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 | [cron](https://vercel.com/docs/cron-jobs)           | sweeps stale sandbox sessions on a schedule                                                 |
 | [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation, connect, and chat requests                                          |
 | [connect](https://vercel.com/docs/connect)          | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
+| [botid](https://vercel.com/docs/botid)              | blocks bot traffic on generation, invisible to real users                                   |
+| [flags sdk](https://vercel.com/docs/feature-flags)  | flips the model or pauses generation live, no redeploy                                      |
 | [ai elements](https://ai-sdk.dev/elements)          | chat interface, task progress ui, loading states                                            |
 | [streamdown](https://streamdown.ai)                 | renders code and markdown cleanly                                                           |
 | [shadcn/ui](https://ui.shadcn.com)                  | every ui component                                                                          |
@@ -148,6 +153,7 @@ lib/
 
 ## security
 
+- generation requests are screened by botid before reaching a sandbox, keeping bot traffic and cost predictable
 - generated agents are tagged with their creator's identity at generation time
 - anyone with a share link can view a generated agent's files and chat with it live
 - only the original creator can overwrite or stop that agent's session, share-link visitors cannot
