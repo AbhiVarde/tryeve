@@ -28,11 +28,12 @@ import {
   type ChevronRightIconHandle,
 } from "@/components/ui/chevron-right";
 import { XIcon, type XIconHandle } from "@/components/ui/x";
-import {
-  CircleHelpIcon,
-  type CircleHelpIconHandle,
-} from "@/components/ui/circle-help";
 import { HistoryIcon, type HistoryIconHandle } from "@/components/ui/history";
+import {
+  LayoutGridIcon,
+  type LayoutGridIconHandle,
+} from "@/components/ui/layout-grid";
+import { LayersIcon, type LayersIconHandle } from "@/components/ui/layers";
 import {
   BotMessageSquareIcon,
   type BotMessageSquareHandle,
@@ -131,6 +132,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "warned before disconnect, never cut off without notice",
       "only you can overwrite or stop your own agent, others can still chat with it",
       "concurrent sandboxes are capped per visitor to keep usage fair for everyone",
+      "dead share links reconnect automatically, no dead ends",
       "your history is private, delete any entry or clear it all",
     ],
   },
@@ -154,6 +156,14 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   {
     name: "connect",
     description: "issues scoped GitHub tokens to push generated files",
+  },
+  {
+    name: "botid",
+    description: "blocks bot traffic on generation, invisible to real users",
+  },
+  {
+    name: "flags sdk",
+    description: "flips the model or pauses generation live, no redeploy",
   },
   { name: "ai elements", description: "chat ui, progress, and loading states" },
   { name: "streamdown", description: "renders code and markdown cleanly" },
@@ -337,7 +347,8 @@ function HomeInner() {
     messageId: string;
     index: number;
   } | null>(null);
-  const [showInfo, setShowInfo] = useState(false);
+  const [showFeatures, setShowFeatures] = useState(false);
+  const [showBuiltWith, setShowBuiltWith] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -360,7 +371,8 @@ function HomeInner() {
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const xIconRef = useRef<XIconHandle>(null);
-  const circleHelpIconRef = useRef<CircleHelpIconHandle>(null);
+  const featuresIconRef = useRef<LayoutGridIconHandle>(null);
+  const builtWithIconRef = useRef<LayersIconHandle>(null);
   const historyIconRef = useRef<HistoryIconHandle>(null);
   const logoutIconRef = useRef<LogoutIconHandle>(null);
 
@@ -394,7 +406,8 @@ function HomeInner() {
     : undefined;
   useTranscriptSync(activeShareId, agentMessages, status);
 
-  const panelOpen = !!selectedFile || showInfo || showHistory;
+  const panelOpen =
+    !!selectedFile || showFeatures || showBuiltWith || showHistory;
 
   const chatSessionRef = useRef<ChatSession | null>(null);
   useEffect(() => {
@@ -595,7 +608,8 @@ function HomeInner() {
     setMessages([]);
     setSelectedFile(null);
     setPanelFile(null);
-    setShowInfo(false);
+    setShowFeatures(false);
+    setShowBuiltWith(false);
     setChatSession(null);
     setChatKey(crypto.randomUUID());
     setInitialMessages(null);
@@ -613,7 +627,8 @@ function HomeInner() {
     setMessages([]);
     setSelectedFile(null);
     setPanelFile(null);
-    setShowInfo(false);
+    setShowFeatures(false);
+    setShowBuiltWith(false);
     setShowHistory(false);
     setTestStatus({});
     setInput("");
@@ -623,20 +638,30 @@ function HomeInner() {
   }
 
   function openFile(messageId: string, index: number) {
-    setShowInfo(false);
+    setShowFeatures(false);
+    setShowBuiltWith(false);
     setShowHistory(false);
     setSelectedFile({ messageId, index });
   }
 
-  function openInfo() {
+  function openFeatures() {
     setSelectedFile(null);
     setShowHistory(false);
-    setShowInfo((prev) => !prev);
+    setShowBuiltWith(false);
+    setShowFeatures((prev) => !prev);
+  }
+
+  function openBuiltWith() {
+    setSelectedFile(null);
+    setShowHistory(false);
+    setShowFeatures(false);
+    setShowBuiltWith((prev) => !prev);
   }
 
   function openHistory() {
     setSelectedFile(null);
-    setShowInfo(false);
+    setShowFeatures(false);
+    setShowBuiltWith(false);
     const next = !showHistory;
     setShowHistory(next);
 
@@ -708,7 +733,8 @@ function HomeInner() {
 
   function closePanel() {
     setSelectedFile(null);
-    setShowInfo(false);
+    setShowFeatures(false);
+    setShowBuiltWith(false);
     setShowHistory(false);
   }
 
@@ -1008,7 +1034,8 @@ function HomeInner() {
     }
 
     setSelectedFile(null);
-    setShowInfo(false);
+    setShowFeatures(false);
+    setShowBuiltWith(false);
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -1221,13 +1248,22 @@ function HomeInner() {
               <HistoryIcon ref={historyIconRef} size={16} />
             </button>
             <button
-              onClick={openInfo}
-              onMouseEnter={() => circleHelpIconRef.current?.startAnimation()}
-              onMouseLeave={() => circleHelpIconRef.current?.stopAnimation()}
-              aria-label="about tryeve"
+              onClick={openFeatures}
+              onMouseEnter={() => featuresIconRef.current?.startAnimation()}
+              onMouseLeave={() => featuresIconRef.current?.stopAnimation()}
+              aria-label="features"
               className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
             >
-              <CircleHelpIcon ref={circleHelpIconRef} size={16} />
+              <LayoutGridIcon ref={featuresIconRef} size={16} />
+            </button>
+            <button
+              onClick={openBuiltWith}
+              onMouseEnter={() => builtWithIconRef.current?.startAnimation()}
+              onMouseLeave={() => builtWithIconRef.current?.stopAnimation()}
+              aria-label="built with"
+              className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
+            >
+              <LayersIcon ref={builtWithIconRef} size={16} />
             </button>
           </div>
         }
@@ -1479,7 +1515,10 @@ function HomeInner() {
         )}
 
         <div className="h-full w-full overflow-hidden">
-          {(panelFile && selectedFile) || showInfo || showHistory ? (
+          {(panelFile && selectedFile) ||
+          showFeatures ||
+          showBuiltWith ||
+          showHistory ? (
             <div
               className={`relative flex h-full min-w-0 flex-col transition-opacity duration-200 ease-in-out ${
                 panelOpen ? "opacity-100 delay-100" : "opacity-0 md:opacity-100"
@@ -1503,11 +1542,13 @@ function HomeInner() {
                     <ChevronLeftIcon ref={chevronLeftIconRef} size={16} />
                   </button>
                   <span className="truncate font-mono text-sm font-medium">
-                    {showInfo
-                      ? "tryeve/about.md"
-                      : showHistory
-                        ? "tryeve/history.md"
-                        : panelFile?.filename}
+                    {showFeatures
+                      ? "tryeve/features.md"
+                      : showBuiltWith
+                        ? "tryeve/stack.md"
+                        : showHistory
+                          ? "tryeve/history.md"
+                          : panelFile?.filename}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1645,7 +1686,7 @@ function HomeInner() {
                     </div>
                   )}
                 </div>
-              ) : showInfo ? (
+              ) : showFeatures ? (
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
                   <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
                     <div>
@@ -1661,63 +1702,63 @@ function HomeInner() {
                       </p>
                     </div>
 
-                    <div>
-                      <p className="mb-3 font-mono text-xs tracking-wide text-muted-foreground">
-                        features
-                      </p>
-                      <div className="flex flex-col gap-4">
-                        {FEATURE_GROUPS.map((group) => (
-                          <div key={group.label}>
-                            <p className="mb-2 font-mono text-[11px] text-muted-foreground/70">
-                              {group.label}
-                            </p>
-                            <ul className="flex flex-col gap-1.5">
-                              {group.items.map((feature) => (
-                                <li
-                                  key={feature}
-                                  className="font-mono text-xs leading-relaxed text-foreground/80"
-                                >
-                                  ↳ {feature}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="flex flex-col gap-4">
+                      {FEATURE_GROUPS.map((group) => (
+                        <div key={group.label}>
+                          <p className="mb-2 font-mono text-[11px] text-muted-foreground/70">
+                            {group.label}
+                          </p>
+                          <ul className="flex flex-col gap-1.5">
+                            {group.items.map((feature) => (
+                              <li
+                                key={feature}
+                                className="font-mono text-xs leading-relaxed text-foreground/80"
+                              >
+                                ↳ {feature}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
                     </div>
-
+                  </div>
+                </div>
+              ) : showBuiltWith ? (
+                <div className="relative z-10 flex-1 overflow-auto px-6 py-8">
+                  <div className="mx-auto flex min-h-full w-full max-w-xl flex-col gap-6">
                     <div>
-                      <div className="mb-3 flex items-center gap-1.5">
-                        <p className="font-mono text-xs tracking-wide text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-mono text-sm font-medium">
                           built with
                         </p>
                         <VercelMark
-                          size={10}
+                          size={11}
                           className="translate-y-px opacity-70"
                         />
-                        <p className="font-mono text-xs tracking-wide text-muted-foreground">
+                        <p className="font-mono text-sm font-medium">
                           products
                         </p>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        {VERCEL_PRODUCTS.map((p) => (
-                          <p
-                            key={p.name}
-                            className="font-mono text-xs leading-relaxed text-foreground/80"
-                          >
-                            ↳{" "}
-                            <span className="font-medium text-foreground/90">
-                              {p.name}
-                            </span>
-                            <span className="text-muted-foreground">
-                              : {p.description}
-                            </span>
-                          </p>
-                        ))}
-                      </div>
                     </div>
 
-                    <div className="pt-2">
+                    <div className="flex flex-col gap-2">
+                      {VERCEL_PRODUCTS.map((p) => (
+                        <p
+                          key={p.name}
+                          className="font-mono text-xs leading-relaxed text-foreground/80"
+                        >
+                          ↳{" "}
+                          <span className="font-medium text-foreground/90">
+                            {p.name}
+                          </span>
+                          <span className="text-muted-foreground">
+                            : {p.description}
+                          </span>
+                        </p>
+                      ))}
+                    </div>
+
+                    <div className="mt-auto pt-6">
                       <div className="h-px bg-linear-to-r from-transparent via-border to-transparent" />
                       <div className="mt-4 flex flex-col items-center gap-2 text-xs text-muted-foreground sm:flex-row sm:justify-between">
                         <span>
