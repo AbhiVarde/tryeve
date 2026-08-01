@@ -36,6 +36,16 @@ function parseFiles(raw: string): FileBlock[] {
   return blocks;
 }
 
+function getDirectories(files: FileBlock[]): string[] {
+  const dirs = new Set<string>();
+  for (const f of files) {
+    const parts = f.filename.split("/");
+    parts.pop();
+    if (parts.length > 0) dirs.add(parts.join("/"));
+  }
+  return [...dirs];
+}
+
 const OPEN_CHANNEL_AUTH = `import { eveChannel } from "eve/channels/eve";
 import { none } from "eve/channels/auth";
 
@@ -196,10 +206,11 @@ export async function POST(req: Request) {
   await markResumed();
   await trackSandbox(runVisitorId, sandboxName);
 
-  await Promise.all([
-    sandbox.fs.mkdir("agent/tools", { recursive: true }),
-    sandbox.fs.mkdir("agent/channels", { recursive: true }),
-  ]);
+  await Promise.all(
+    [...getDirectories(files), "agent/channels"].map((dir) =>
+      sandbox.fs.mkdir(dir, { recursive: true }),
+    ),
+  );
 
   await sandbox.writeFiles([
     ...files.map((f) => ({
