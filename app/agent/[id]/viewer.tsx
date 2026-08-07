@@ -229,21 +229,13 @@ export function AgentViewer({
 
   async function deployToVercel() {
     if (repoUrl) {
-      window.open(
-        `https://vercel.com/new/clone?repository-url=${encodeURIComponent(repoUrl)}`,
-        "_blank",
-      );
+      window.open("https://vercel.com/new", "_blank");
       return;
     }
     setDeploying("vercel");
     try {
       await deployToGithub();
-      if (repoUrl) {
-        window.open(
-          `https://vercel.com/new/clone?repository-url=${encodeURIComponent(repoUrl)}`,
-          "_blank",
-        );
-      }
+      window.open("https://vercel.com/new", "_blank");
     } finally {
       setDeploying(null);
     }

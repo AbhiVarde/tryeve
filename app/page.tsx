@@ -760,7 +760,11 @@ function HomeInner() {
     setChatSession(null);
   }
 
-  function openAuthPopupAndRetry(url: string, message: Message) {
+  function openAuthPopupAndRetry(
+    url: string,
+    message: Message,
+    onDeployed?: (repoUrl: string) => void,
+  ) {
     const width = 520;
     const height = 680;
     const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
@@ -775,6 +779,7 @@ function HomeInner() {
     if (!popupRef) {
       toast.error("popup blocked, allow popups and try again");
       setDeployingId(null);
+      setVercelDeployingId(null);
       return;
     }
 
@@ -787,7 +792,7 @@ function HomeInner() {
       fired = true;
       clearInterval(closeTimer);
       window.removeEventListener("focus", onFocus);
-      deployToGithub(message);
+      deployToGithub(message, onDeployed);
     };
 
     const closeTimer = setInterval(() => {
@@ -802,7 +807,10 @@ function HomeInner() {
     window.addEventListener("focus", onFocus);
   }
 
-  async function deployToGithub(message: Message) {
+  async function deployToGithub(
+    message: Message,
+    onDeployed?: (repoUrl: string) => void,
+  ) {
     setDeployingId(message.id);
     try {
       const promptMsg = messages.find(
@@ -823,12 +831,13 @@ function HomeInner() {
       const data = await res.json();
 
       if (data.needsAuth && data.authorizeUrl) {
-        openAuthPopupAndRetry(data.authorizeUrl, message);
+        openAuthPopupAndRetry(data.authorizeUrl, message, onDeployed);
         return;
       }
 
       if (!data.ok) {
         toast.error(data.error ?? "deploy failed, please try again");
+        setVercelDeployingId(null);
         return;
       }
 
@@ -839,8 +848,10 @@ function HomeInner() {
       );
 
       toast.success("deployed to GitHub");
+      onDeployed?.(data.repoUrl);
     } catch {
       toast.error("couldn't reach GitHub, check your connection");
+      setVercelDeployingId(null);
     } finally {
       setDeployingId(null);
     }
@@ -848,19 +859,15 @@ function HomeInner() {
 
   async function deployToVercel(message: Message) {
     if (message.repoUrl) {
-      window.open(
-        `https://vercel.com/new/clone?repository-url=${encodeURIComponent(message.repoUrl)}`,
-        "_blank",
-      );
+      window.open("https://vercel.com/new", "_blank");
       return;
     }
 
     setVercelDeployingId(message.id);
-    try {
-      await deployToGithub(message);
-    } finally {
+    await deployToGithub(message, () => {
       setVercelDeployingId(null);
-    }
+      window.open("https://vercel.com/new", "_blank");
+    });
   }
 
   async function startChat(message: Message) {
