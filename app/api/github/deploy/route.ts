@@ -166,6 +166,237 @@ export async function POST(req: Request) {
 
   const repo = await createRes.json();
 
+  const openChannelAuth = `import { eveChannel } from "eve/channels/eve";
+import { none } from "eve/channels/auth";
+
+export default eveChannel({ auth: [none()] });
+`;
+
+  const nextConfig = `import { withEve } from "eve/next";
+
+const nextConfig = {};
+
+export default withEve(nextConfig);
+`;
+
+  const layout = `export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body
+        style={{
+          margin: 0,
+          background: "#0a0a0a",
+          color: "#e5e5e5",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        }}
+      >
+        {children}
+      </body>
+    </html>
+  );
+}
+`;
+
+  const chatPage = `"use client";
+
+import { useState } from "react";
+
+type ChatMessage = { role: "user" | "assistant"; text: string };
+
+export default function Home() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [continuationToken, setContinuationToken] = useState<string | null>(
+    null,
+  );
+  const [sending, setSending] = useState(false);
+
+  async function readReply(id: string) {
+    const res = await fetch(\`/eve/v1/session/\${id}/stream\`);
+    if (!res.body) return "";
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let reply = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+          if (event.type === "message.completed") {
+            reply = event.message?.text ?? event.text ?? reply;
+          }
+          if (event.type === "session.completed") {
+            reader.cancel();
+            return reply;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    return reply;
+  }
+
+  async function send(text: string) {
+    setMessages((prev) => [...prev, { role: "user", text }]);
+    setSending(true);
+
+    try {
+      const url = sessionId
+        ? \`/eve/v1/session/\${sessionId}\`
+        : "/eve/v1/session";
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          sessionId
+            ? { continuationToken, message: text }
+            : { message: text },
+        ),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      const id = sessionId ?? res.headers.get("x-eve-session-id");
+      if (id) setSessionId(id);
+      if (data.continuationToken) setContinuationToken(data.continuationToken);
+
+      const reply = id ? await readReply(id) : "";
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: reply || "no reply received" },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "something went wrong, try again" },
+      ]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <main
+      style={{
+        maxWidth: 640,
+        margin: "0 auto",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        padding: "48px 24px 24px",
+      }}
+    >
+      <p
+        style={{
+          fontSize: 12,
+          color: "#737373",
+          marginBottom: 24,
+          textAlign: "center",
+        }}
+      >
+        built with tryeve
+      </p>
+
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          marginBottom: 16,
+        }}
+      >
+        {messages.map((m, i) => (
+          <div
+            key={i}
+            style={{
+              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+              maxWidth: "85%",
+              padding: m.role === "user" ? "7px 12px" : "0",
+              borderRadius: 8,
+              background: m.role === "user" ? "#000" : "transparent",
+              color: m.role === "user" ? "#fff" : "#e5e5e5",
+              fontSize: 14,
+              lineHeight: 1.5,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {m.text}
+          </div>
+        ))}
+        {sending && (
+          <div style={{ fontSize: 13, color: "#737373" }}>thinking...</div>
+        )}
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const input = e.currentTarget.elements.namedItem(
+            "message",
+          ) as HTMLInputElement;
+          if (!input.value.trim() || sending) return;
+          const text = input.value;
+          input.value = "";
+          send(text);
+        }}
+        style={{ display: "flex", gap: 8 }}
+      >
+        <input
+          name="message"
+          placeholder="message this agent..."
+          style={{
+            flex: 1,
+            background: "#141414",
+            border: "1px solid #262626",
+            borderRadius: 8,
+            padding: "10px 12px",
+            color: "#e5e5e5",
+            fontSize: 14,
+            fontFamily: "inherit",
+            outline: "none",
+          }}
+        />
+        <button
+          type="submit"
+          disabled={sending}
+          style={{
+            background: "#fff",
+            color: "#000",
+            border: "none",
+            borderRadius: 8,
+            padding: "0 18px",
+            fontSize: 14,
+            fontFamily: "inherit",
+            cursor: sending ? "default" : "pointer",
+            opacity: sending ? 0.6 : 1,
+          }}
+        >
+          send
+        </button>
+      </form>
+    </main>
+  );
+}
+`;
+
   const allFiles: FileBlock[] = [
     ...files,
     {
@@ -174,14 +405,72 @@ export async function POST(req: Request) {
         {
           name: repoName,
           private: true,
-          type: "module",
-          scripts: { dev: "eve dev" },
-          dependencies: { eve: "latest" },
+          version: "0.1.0",
+          scripts: {
+            dev: "next dev",
+            build: "next build",
+            start: "next start",
+          },
+          dependencies: {
+            eve: "latest",
+            next: "latest",
+            react: "latest",
+            "react-dom": "latest",
+          },
+          devDependencies: {
+            typescript: "latest",
+            "@types/node": "latest",
+            "@types/react": "latest",
+            "@types/react-dom": "latest",
+          },
         },
         null,
         2,
       ),
     },
+    {
+      filename: "tsconfig.json",
+      content: JSON.stringify(
+        {
+          compilerOptions: {
+            target: "ES2017",
+            lib: ["dom", "dom.iterable", "esnext"],
+            allowJs: true,
+            skipLibCheck: true,
+            strict: true,
+            noEmit: true,
+            esModuleInterop: true,
+            module: "esnext",
+            moduleResolution: "bundler",
+            resolveJsonModule: true,
+            isolatedModules: true,
+            jsx: "preserve",
+            incremental: true,
+            plugins: [{ name: "next" }],
+            paths: { "@/*": ["./*"] },
+          },
+          include: [
+            "next-env.d.ts",
+            "**/*.ts",
+            "**/*.tsx",
+            ".next/types/**/*.ts",
+          ],
+          exclude: ["node_modules"],
+        },
+        null,
+        2,
+      ),
+    },
+    {
+      filename: "next-env.d.ts",
+      content: `/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+`,
+    },
+    { filename: "next.config.mjs", content: nextConfig },
+    { filename: "app/layout.tsx", content: layout },
+    { filename: "app/page.tsx", content: chatPage },
+    { filename: "agent/channels/eve.ts", content: openChannelAuth },
     {
       filename: "README.md",
       content: `# ${repoName}
@@ -197,10 +486,15 @@ npm install
 npm run dev
 \`\`\`
 
+## deploy
+
+[![deploy with vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=${repo.html_url})
+
 ## structure
 
 - \`agent/instructions.md\` defines what this agent does
 - \`agent/tools/\` contains the typed tools it can call
+- \`app/\` is the chat frontend, built with eve's Next.js integration
 
 eve reads everything under \`agent/\` automatically, no registration needed.
 `,
