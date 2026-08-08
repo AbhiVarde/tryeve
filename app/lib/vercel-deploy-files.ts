@@ -584,6 +584,7 @@ export function buildVercelDeployFiles(
   generated: FileBlock[],
 ): FileBlock[] {
   return [
+    ...generated,
     {
       filename: "package.json",
       content: JSON.stringify(
