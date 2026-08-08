@@ -162,7 +162,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const deployUrl = buildVercelDeployLink(repo.html_url, slugify(prompt));
+  const deployUrl = buildVercelDeployLink(repo.html_url, repoName);
 
   if (shareId && typeof shareId === "string") {
     try {
