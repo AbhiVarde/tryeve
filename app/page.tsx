@@ -540,6 +540,17 @@ function HomeInner() {
           })
           .catch(() => {});
 
+        fetch(`/agent/${shareId}/raw?vercel=1`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data: { liveUrl?: string } | null) => {
+            if (cancelled || !data?.liveUrl) return;
+            setVercelLinks((prev) => ({
+              ...prev,
+              [assistantId]: data.liveUrl!,
+            }));
+          })
+          .catch(() => {});
+
         try {
           const transcriptRes = await fetch(
             `/agent/${shareId}/raw?transcript=1`,

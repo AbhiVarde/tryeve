@@ -9,13 +9,16 @@ export async function GET(
   const isSession = search.get("session") === "1";
   const isTranscript = search.get("transcript") === "1";
   const isRepo = search.get("repo") === "1";
+  const isVercel = search.get("vercel") === "1";
   const key = isRepo
     ? `agents/${id}-repo.json`
-    : isTranscript
-      ? `agents/${id}-transcript.json`
-      : isSession
-        ? `agents/${id}-session.json`
-        : `agents/${id}.json`;
+    : isVercel
+      ? `agents/${id}-vercel.json`
+      : isTranscript
+        ? `agents/${id}-transcript.json`
+        : isSession
+          ? `agents/${id}-session.json`
+          : `agents/${id}.json`;
 
   try {
     const blob = await head(key, {
