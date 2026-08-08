@@ -22,14 +22,6 @@ async function githubFetch(token: string, path: string, init?: RequestInit) {
   });
 }
 
-function buildVercelDeployLink(repoUrl: string, projectName: string) {
-  const url = new URL("https://vercel.com/new/clone");
-  url.searchParams.set("repository-url", repoUrl);
-  url.searchParams.set("project-name", projectName);
-  url.searchParams.set("repository-name", projectName);
-  return url.toString();
-}
-
 export async function POST(req: Request) {
   const { rateLimited } = await checkRateLimit("rate-limit-ai-routes");
   if (rateLimited) {
@@ -47,6 +39,16 @@ export async function POST(req: Request) {
       { ok: false, error: "no session found, reload and try again" },
       { status: 401 },
     );
+  }
+
+  const vercelToken = process.env.VERCEL_TOKEN;
+  const vercelTeamId = process.env.VERCEL_TEAM_ID;
+
+  if (!vercelToken) {
+    return Response.json({
+      ok: false,
+      error: "vercel deploy isn't configured yet (missing VERCEL_TOKEN)",
+    });
   }
 
   const { prompt, code, shareId } = await req.json();
@@ -105,8 +107,10 @@ export async function POST(req: Request) {
     });
   }
 
+  // same repo name github/deploy already uses, so this always lands in the
+  // one repo for this agent instead of a separate copy
+  const repoName = slugify(prompt);
   const generatedFiles = parseFiles(code);
-  const repoName = `${slugify(prompt)}-live`;
   const allFiles = buildVercelDeployFiles(prompt, generatedFiles);
 
   const userRes = await githubFetch(appAuth.token!, "/user");
@@ -118,57 +122,111 @@ export async function POST(req: Request) {
   }
   const user = await userRes.json();
 
-  const createRes = await githubFetch(oauthToken, "/user/repos", {
-    method: "POST",
-    body: JSON.stringify({
-      name: repoName,
-      description: `live, working version of: ${prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt}`,
-      private: false,
-      auto_init: false,
-    }),
-  });
+  const existingRepoRes = await githubFetch(
+    appAuth.token!,
+    `/repos/${user.login}/${repoName}`,
+  );
+  let repoUrl: string;
 
-  if (!createRes.ok) {
-    const err = await createRes.json().catch(() => null);
+  if (existingRepoRes.status === 404) {
+    const createRes = await githubFetch(oauthToken, "/user/repos", {
+      method: "POST",
+      body: JSON.stringify({
+        name: repoName,
+        description: prompt.length > 100 ? `${prompt.slice(0, 97)}...` : prompt,
+        private: false,
+        auto_init: false,
+      }),
+    });
+    if (!createRes.ok) {
+      const err = await createRes.json().catch(() => null);
+      return Response.json({
+        ok: false,
+        error: err?.message ?? "couldn't create the repository",
+      });
+    }
+    const repo = await createRes.json();
+    repoUrl = repo.html_url;
+  } else if (existingRepoRes.ok) {
+    const repo = await existingRepoRes.json();
+    repoUrl = repo.html_url;
+  } else {
     return Response.json({
       ok: false,
-      error: err?.message ?? "couldn't create the repository",
+      error: "couldn't check for an existing repository",
     });
   }
 
-  const repo = await createRes.json();
+  // push (or update) every scaffold file into that same repo, alongside
+  // whatever raw agent/ files already live there from a prior github deploy
   const failedFiles: string[] = [];
 
   for (const file of allFiles) {
-    const res = await githubFetch(
-      appAuth.token!,
-      `/repos/${user.login}/${repoName}/contents/${file.filename}`,
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          message: `add ${file.filename}`,
-          content: Buffer.from(file.content).toString("base64"),
-        }),
-      },
-    );
+    const path = `/repos/${user.login}/${repoName}/contents/${file.filename}`;
+    let sha: string | undefined;
+
+    const existingFileRes = await githubFetch(appAuth.token!, path);
+    if (existingFileRes.ok) {
+      const existing = await existingFileRes.json();
+      sha = existing.sha;
+    }
+
+    const res = await githubFetch(appAuth.token!, path, {
+      method: "PUT",
+      body: JSON.stringify({
+        message: sha ? `update ${file.filename}` : `add ${file.filename}`,
+        content: Buffer.from(file.content).toString("base64"),
+        ...(sha ? { sha } : {}),
+      }),
+    });
+
     if (!res.ok) failedFiles.push(file.filename);
   }
 
   if (failedFiles.length > 0) {
     return Response.json({
       ok: false,
-      error: `repo created, but ${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}`,
-      repoUrl: repo.html_url,
+      error: `repo updated, but ${failedFiles.length} file(s) failed to push: ${failedFiles.join(", ")}`,
+      repoUrl,
     });
   }
 
-  const deployUrl = buildVercelDeployLink(repo.html_url, repoName);
+  // deploy that exact content directly, no clone, no separate repo, no
+  // manual picker on vercel's side
+  const deployRes = await fetch(
+    `https://api.vercel.com/v13/deployments${vercelTeamId ? `?teamId=${vercelTeamId}` : ""}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${vercelToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: repoName,
+        target: "production",
+        files: allFiles.map((f) => ({ file: f.filename, data: f.content })),
+        projectSettings: { framework: "nextjs" },
+      }),
+    },
+  );
+
+  const deployData = await deployRes.json();
+
+  if (!deployRes.ok) {
+    return Response.json({
+      ok: false,
+      error: deployData?.error?.message ?? "couldn't deploy to vercel",
+      repoUrl,
+    });
+  }
+
+  const liveUrl = `https://${deployData.url}`;
 
   if (shareId && typeof shareId === "string") {
     try {
       await put(
-        `agents/${shareId}-vercel-repo.json`,
-        JSON.stringify({ repoUrl: repo.html_url, deployUrl }),
+        `agents/${shareId}-vercel.json`,
+        JSON.stringify({ repoUrl, liveUrl, deploymentId: deployData.id }),
         {
           access: "public",
           addRandomSuffix: false,
@@ -178,9 +236,9 @@ export async function POST(req: Request) {
         },
       );
     } catch (err) {
-      console.error("vercel deploy-repo: status write failed", err);
+      console.error("vercel deploy: status write failed", err);
     }
   }
 
-  return Response.json({ ok: true, repoUrl: repo.html_url, deployUrl });
+  return Response.json({ ok: true, repoUrl, liveUrl });
 }

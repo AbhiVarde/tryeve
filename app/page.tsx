@@ -877,15 +877,15 @@ function HomeInner() {
       }
 
       if (!data.ok) {
-        toast.error(data.error ?? "couldn't prepare the deployment");
+        toast.error(data.error ?? "couldn't deploy to vercel");
         return;
       }
 
-      setVercelLinks((prev) => ({ ...prev, [message.id]: data.deployUrl }));
-      window.open(data.deployUrl, "_blank");
-      toast.success("opening vercel, add your model key when it asks");
+      setVercelLinks((prev) => ({ ...prev, [message.id]: data.liveUrl }));
+      window.open(data.liveUrl, "_blank");
+      toast.success("deployed, your agent is live");
     } catch {
-      toast.error("couldn't reach GitHub, check your connection");
+      toast.error("couldn't reach vercel, check your connection");
     } finally {
       setVercelDeployingId(null);
     }
