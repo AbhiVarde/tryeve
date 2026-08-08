@@ -34,6 +34,7 @@ import {
   type StoredMessage,
 } from "@/components/agent-chat-panel";
 import { AppShell } from "@/components/app-shell";
+import { VercelMark } from "@/components/vercel-mark";
 
 type FileBlock = { filename: string; content: string };
 
@@ -62,6 +63,7 @@ export function AgentViewer({
     StoredMessage[] | null
   >(null);
   const [input, setInput] = useState("");
+  const [vercelLiveUrl, setVercelLiveUrl] = useState<string | null>(null);
 
   const [filesPanelOpen, setFilesPanelOpen] = useState(false);
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
@@ -89,6 +91,13 @@ export function AgentViewer({
           ? await transcriptRes.json()
           : [];
         if (!cancelled) setInitialMessages(transcript);
+
+        fetch(`/agent/${shareId}/raw?vercel=1`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data: { liveUrl?: string } | null) => {
+            if (!cancelled && data?.liveUrl) setVercelLiveUrl(data.liveUrl);
+          })
+          .catch(() => {});
 
         const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
         let alive = false;
@@ -207,6 +216,17 @@ export function AgentViewer({
             <div className="w-full bg-black! px-3 py-1.5 font-mono text-sm text-white rounded-lg! shadow-sm">
               {prompt}
             </div>
+            {vercelLiveUrl && (
+              <a
+                href={vercelLiveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex w-fit items-center gap-1.5 rounded-md border border-border/40 bg-background px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <VercelMark size={12} />
+                view live agent
+              </a>
+            )}
           </div>
 
           <div className="flex flex-col gap-3">
