@@ -27,11 +27,6 @@ function buildVercelDeployLink(repoUrl: string, projectName: string) {
   url.searchParams.set("repository-url", repoUrl);
   url.searchParams.set("project-name", projectName);
   url.searchParams.set("repository-name", projectName);
-  url.searchParams.set("env", "ANTHROPIC_API_KEY");
-  url.searchParams.set(
-    "envDescription",
-    "model credential your agent needs to reply (an Anthropic or OpenAI key)",
-  );
   return url.toString();
 }
 

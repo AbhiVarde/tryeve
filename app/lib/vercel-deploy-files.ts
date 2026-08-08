@@ -345,15 +345,6 @@ function getDirectories(files: { filename: string }[]): string[] {
 export async function POST() {
   const modelEnv = getModelEnv();
 
-  if (Object.keys(modelEnv).length === 0) {
-    return Response.json({
-      ok: false,
-      needsCredentials: true,
-      error:
-        "no model credentials set on this project. add ANTHROPIC_API_KEY or OPENAI_API_KEY in your vercel project's environment variables, then redeploy",
-    });
-  }
-
   const sandboxName = \`eve-agent-\${nanoid(8)}\`;
   let sandbox;
 
@@ -677,15 +668,23 @@ ${prompt}
 
 built and deployed with [tryeve](https://tryeve.abhivarde.in), an agent runtime for [eve](https://eve.dev).
 
-## before this works
+## works out of the box
 
-add a model credential in this project's vercel settings, then redeploy:
+this agent runs through the Vercel AI Gateway, authenticated automatically via \`VERCEL_OIDC_TOKEN\` once deployed. nothing to configure, no key needed.
 
+## using a different model or provider
+
+by default this uses eve's default model. to pick a specific one, add \`agent/agent.ts\`:
+
+\`\`\`ts
+import { defineAgent } from "eve";
+
+export default defineAgent({
+  model: "google/gemini-2.5-flash", // any AI Gateway model id: openai/gpt-5.4-mini, groq/llama-3.3-70b, etc.
+});
 \`\`\`
-ANTHROPIC_API_KEY=
-\`\`\`
 
-or \`OPENAI_API_KEY\`, or \`AI_GATEWAY_API_KEY\`. sandbox auth itself is automatic on vercel, nothing else to set up.
+gateway ids still authenticate via OIDC, no key needed. to call a provider directly instead (bypassing the gateway), install that provider's AI SDK package and pass it to \`model\`, then set that provider's own API key as an env var on this project. see [eve's agent config docs](https://eve.dev/docs/agent-config).
 `,
     },
   ];
