@@ -1,71 +1,17 @@
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
-import { put } from "@vercel/blob";
+import { put, head } from "@vercel/blob";
 import { getGithubToken } from "@/app/lib/github-connect";
+import {
+  parseFiles,
+  buildVercelDeployFiles,
+  slugify,
+} from "@/app/lib/vercel-deploy-files";
 
 export const runtime = "nodejs";
 
-type FileBlock = { filename: string; content: string };
-
-function parseFiles(raw: string): FileBlock[] {
-  const regex = /```[a-zA-Z]*\n([\s\S]*?)```/g;
-  const blocks: FileBlock[] = [];
-  let match;
-  let i = 0;
-
-  while ((match = regex.exec(raw)) !== null) {
-    i++;
-    const body = match[1];
-    const firstLine = body.split("\n")[0];
-    const filenameMatch = firstLine.match(/(?:\/\/|#)\s*filename:\s*(.+)/i);
-    const filename = filenameMatch
-      ? filenameMatch[1].trim()
-      : i === 1
-        ? "agent/instructions.md"
-        : `agent/tools/tool-${i}.ts`;
-    const content = filenameMatch
-      ? body.split("\n").slice(1).join("\n").trim()
-      : body.trim();
-    blocks.push({ filename, content });
-  }
-
-  return blocks;
-}
-
-const STOP_WORDS = new Set([
-  "a",
-  "an",
-  "the",
-  "that",
-  "which",
-  "with",
-  "for",
-  "and",
-  "or",
-  "to",
-  "of",
-  "in",
-  "on",
-  "is",
-  "it",
-  "this",
-  "agent",
-  "agents",
-]);
-
-function slugify(prompt: string) {
-  const words = prompt
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .split(/\s+/)
-    .filter((w) => w && !STOP_WORDS.has(w));
-
-  const base = words.slice(0, 4).join("-") || "generated";
-  return `${base}-agent`;
-}
-
 async function githubFetch(token: string, path: string, init?: RequestInit) {
-  const res = await fetch(`https://api.github.com${path}`, {
+  return fetch(`https://api.github.com${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -74,7 +20,19 @@ async function githubFetch(token: string, path: string, init?: RequestInit) {
       ...init?.headers,
     },
   });
-  return res;
+}
+
+function buildVercelDeployLink(repoUrl: string, projectName: string) {
+  const url = new URL("https://vercel.com/new/clone");
+  url.searchParams.set("repository-url", repoUrl);
+  url.searchParams.set("project-name", projectName);
+  url.searchParams.set("repository-name", projectName);
+  url.searchParams.set("env", "ANTHROPIC_API_KEY");
+  url.searchParams.set(
+    "envDescription",
+    "model credential your agent needs to reply (an Anthropic or OpenAI key)",
+  );
+  return url.toString();
 }
 
 export async function POST(req: Request) {
@@ -105,6 +63,25 @@ export async function POST(req: Request) {
     );
   }
 
+  if (shareId && typeof shareId === "string") {
+    try {
+      const agentBlob = await head(`agents/${shareId}.json`, {
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      const agentData: { ownerId?: string } = await (
+        await fetch(agentBlob.url, { cache: "no-store" })
+      ).json();
+      if (agentData.ownerId && agentData.ownerId !== visitorId) {
+        return Response.json(
+          { ok: false, error: "only the creator can deploy this agent" },
+          { status: 403 },
+        );
+      }
+    } catch {
+      // no agent record found, nothing to check ownership against
+    }
+  }
+
   let appAuth;
   try {
     appAuth = await getGithubToken(visitorId);
@@ -125,7 +102,6 @@ export async function POST(req: Request) {
   }
 
   const oauthToken = cookieStore.get("tryeve_gh_token")?.value;
-
   if (!oauthToken) {
     return Response.json({
       ok: false,
@@ -134,8 +110,9 @@ export async function POST(req: Request) {
     });
   }
 
-  const files = parseFiles(code);
-  const repoName = slugify(prompt);
+  const generatedFiles = parseFiles(code);
+  const repoName = `${slugify(prompt)}-live`;
+  const allFiles = buildVercelDeployFiles(prompt, generatedFiles);
 
   const userRes = await githubFetch(appAuth.token!, "/user");
   if (!userRes.ok) {
@@ -150,7 +127,7 @@ export async function POST(req: Request) {
     method: "POST",
     body: JSON.stringify({
       name: repoName,
-      description: prompt.length > 100 ? `${prompt.slice(0, 97)}...` : prompt,
+      description: `live, working version of: ${prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt}`,
       private: false,
       auto_init: false,
     }),
@@ -165,48 +142,6 @@ export async function POST(req: Request) {
   }
 
   const repo = await createRes.json();
-
-  const allFiles: FileBlock[] = [
-    ...files,
-    {
-      filename: "package.json",
-      content: JSON.stringify(
-        {
-          name: repoName,
-          private: true,
-          type: "module",
-          scripts: { dev: "eve dev" },
-          dependencies: { eve: "latest" },
-        },
-        null,
-        2,
-      ),
-    },
-    {
-      filename: "README.md",
-      content: `# ${repoName}
-
-${prompt}
-
-built and tested with [tryeve](https://tryeve.abhivarde.in), an agent runtime for [eve](https://eve.dev).
-
-## run it
-
-\`\`\`
-npm install
-npm run dev
-\`\`\`
-
-## structure
-
-- \`agent/instructions.md\` defines what this agent does
-- \`agent/tools/\` contains the typed tools it can call
-
-eve reads everything under \`agent/\` automatically, no registration needed.
-`,
-    },
-  ];
-
   const failedFiles: string[] = [];
 
   for (const file of allFiles) {
@@ -221,7 +156,6 @@ eve reads everything under \`agent/\` automatically, no registration needed.
         }),
       },
     );
-
     if (!res.ok) failedFiles.push(file.filename);
   }
 
@@ -233,21 +167,25 @@ eve reads everything under \`agent/\` automatically, no registration needed.
     });
   }
 
-  try {
-    await put(
-      `agents/${shareId}-repo.json`,
-      JSON.stringify({ repoUrl: repo.html_url }),
-      {
-        access: "public",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        cacheControlMaxAge: 0,
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      },
-    );
-  } catch (err) {
-    console.error("deploy: repo status write failed", err);
+  const deployUrl = buildVercelDeployLink(repo.html_url, slugify(prompt));
+
+  if (shareId && typeof shareId === "string") {
+    try {
+      await put(
+        `agents/${shareId}-vercel-repo.json`,
+        JSON.stringify({ repoUrl: repo.html_url, deployUrl }),
+        {
+          access: "public",
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          cacheControlMaxAge: 0,
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+        },
+      );
+    } catch (err) {
+      console.error("vercel deploy-repo: status write failed", err);
+    }
   }
 
-  return Response.json({ ok: true, repoUrl: repo.html_url });
+  return Response.json({ ok: true, repoUrl: repo.html_url, deployUrl });
 }

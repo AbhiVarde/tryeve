@@ -46,7 +46,7 @@ import {
 import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
-import { code as codeHighlighter } from "@streamdown/code";
+import { code } from "@streamdown/code";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
   Task,
@@ -86,8 +86,6 @@ type Message = {
   sandboxName?: string;
   url?: string;
   repoUrl?: string;
-  vercelUrl?: string;
-  claimUrl?: string;
 };
 type ChatSession = AgentSession & { agentMessageId: string };
 type HistoryEntry = { id: string; prompt: string; createdAt: string };
@@ -388,7 +386,7 @@ function HomeInner() {
   const [vercelDeployingId, setVercelDeployingId] = useState<string | null>(
     null,
   );
-
+  const [vercelLinks, setVercelLinks] = useState<Record<string, string>>({});
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [chatKey, setChatKey] = useState(() => crypto.randomUUID());
   const [initialMessages, setInitialMessages] = useState<
@@ -760,11 +758,7 @@ function HomeInner() {
     setChatSession(null);
   }
 
-  function openAuthPopupAndRetry(
-    url: string,
-    message: Message,
-    onDeployed?: (repoUrl: string) => void,
-  ) {
+  function openAuthPopupAndRetry(url: string, message: Message) {
     const width = 520;
     const height = 680;
     const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
@@ -779,11 +773,11 @@ function HomeInner() {
     if (!popupRef) {
       toast.error("popup blocked, allow popups and try again");
       setDeployingId(null);
-      setVercelDeployingId(null);
       return;
     }
 
     const popup: Window = popupRef;
+
     toast.info("authorize in the popup, we'll continue automatically");
 
     let fired = false;
@@ -792,7 +786,7 @@ function HomeInner() {
       fired = true;
       clearInterval(closeTimer);
       window.removeEventListener("focus", onFocus);
-      deployToGithub(message, onDeployed);
+      deployToGithub(message);
     };
 
     const closeTimer = setInterval(() => {
@@ -800,6 +794,7 @@ function HomeInner() {
     }, 500);
 
     function onFocus() {
+      // give the popup a moment to actually close or finish redirecting
       setTimeout(() => {
         if (popup.closed || fired) finish();
       }, 400);
@@ -807,10 +802,7 @@ function HomeInner() {
     window.addEventListener("focus", onFocus);
   }
 
-  async function deployToGithub(
-    message: Message,
-    onDeployed?: (repoUrl: string) => void,
-  ) {
+  async function deployToGithub(message: Message) {
     setDeployingId(message.id);
     try {
       const promptMsg = messages.find(
@@ -831,13 +823,12 @@ function HomeInner() {
       const data = await res.json();
 
       if (data.needsAuth && data.authorizeUrl) {
-        openAuthPopupAndRetry(data.authorizeUrl, message, onDeployed);
+        openAuthPopupAndRetry(data.authorizeUrl, message);
         return;
       }
 
       if (!data.ok) {
         toast.error(data.error ?? "deploy failed, please try again");
-        setVercelDeployingId(null);
         return;
       }
 
@@ -848,26 +839,56 @@ function HomeInner() {
       );
 
       toast.success("deployed to GitHub");
-      onDeployed?.(data.repoUrl);
     } catch {
       toast.error("couldn't reach GitHub, check your connection");
-      setVercelDeployingId(null);
     } finally {
       setDeployingId(null);
     }
   }
 
   async function deployToVercel(message: Message) {
-    if (message.repoUrl) {
-      window.open("https://vercel.com/new", "_blank");
+    if (vercelLinks[message.id]) {
+      window.open(vercelLinks[message.id], "_blank");
       return;
     }
 
     setVercelDeployingId(message.id);
-    await deployToGithub(message, () => {
+    try {
+      const promptMsg = messages.find(
+        (m) =>
+          m.role === "user" &&
+          messages[messages.indexOf(m) + 1]?.id === message.id,
+      );
+
+      const res = await fetch("/api/vercel/deploy-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: promptMsg?.text ?? "generated agent",
+          code: message.text,
+          shareId: message.shareId,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.needsAuth && data.authorizeUrl) {
+        openAuthPopupAndRetry(data.authorizeUrl, message);
+        return;
+      }
+
+      if (!data.ok) {
+        toast.error(data.error ?? "couldn't prepare the deployment");
+        return;
+      }
+
+      setVercelLinks((prev) => ({ ...prev, [message.id]: data.deployUrl }));
+      window.open(data.deployUrl, "_blank");
+      toast.success("opening vercel, add your model key when it asks");
+    } catch {
+      toast.error("couldn't reach GitHub, check your connection");
+    } finally {
       setVercelDeployingId(null);
-      window.open("https://vercel.com/new", "_blank");
-    });
+    }
   }
 
   async function startChat(message: Message) {
@@ -1141,9 +1162,9 @@ function HomeInner() {
       <Button
         type="button"
         variant="outline"
-        onClick={() => {
-          if (latestAssistantMessage) deployToVercel(latestAssistantMessage);
-        }}
+        onClick={() =>
+          latestAssistantMessage && deployToVercel(latestAssistantMessage)
+        }
         disabled={vercelDeployingId === latestAssistantMessage?.id}
         className="w-full cursor-pointer"
       >
@@ -1155,7 +1176,9 @@ function HomeInner() {
         <span className="animate-in fade-in duration-300">
           {vercelDeployingId === latestAssistantMessage?.id
             ? "preparing..."
-            : "deploy to vercel"}
+            : vercelLinks[latestAssistantMessage?.id ?? ""]
+              ? "open vercel deploy"
+              : "deploy to vercel"}
         </span>
       </Button>
       <button
@@ -1219,12 +1242,7 @@ function HomeInner() {
                 const agentMessage = messages.find(
                   (m) => m.id === chatSession.agentMessageId,
                 );
-                if (!agentMessage) return;
-                if (agentMessage.claimUrl) {
-                  window.open(agentMessage.claimUrl, "_blank");
-                } else {
-                  deployToVercel(agentMessage);
-                }
+                if (agentMessage) deployToVercel(agentMessage);
               }}
               disabled={vercelDeployingId === chatSession.agentMessageId}
               className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
@@ -1232,14 +1250,11 @@ function HomeInner() {
               {vercelDeployingId === chatSession.agentMessageId ? (
                 <Spinner className="size-3" />
               ) : (
-                <VercelMark size={12} />
+                <VercelMark size={13} />
               )}
               {vercelDeployingId === chatSession.agentMessageId
-                ? "deploying..."
-                : messages.find((m) => m.id === chatSession.agentMessageId)
-                      ?.claimUrl
-                  ? "claim vercel"
-                  : "vercel"}
+                ? "preparing..."
+                : "vercel"}
             </button>
             <button
               type="button"
@@ -1853,10 +1868,7 @@ function HomeInner() {
                 </div>
               ) : (
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-4">
-                  <Streamdown
-                    plugins={{ code: codeHighlighter }}
-                    className="text-xs"
-                  >
+                  <Streamdown plugins={{ code }} className="text-xs">
                     {`\`\`\`${panelFile?.filename.endsWith(".md") ? "markdown" : "ts"}\n${panelFile?.content}\n\`\`\``}
                   </Streamdown>
                 </div>

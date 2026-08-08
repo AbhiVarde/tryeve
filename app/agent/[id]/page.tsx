@@ -78,12 +78,5 @@ export default async function AgentPage({
 
   const files = parseFiles(data.code);
 
-  return (
-    <AgentViewer
-      shareId={id}
-      prompt={data.prompt}
-      code={data.code}
-      files={files}
-    />
-  );
+  return <AgentViewer shareId={id} prompt={data.prompt} files={files} />;
 }

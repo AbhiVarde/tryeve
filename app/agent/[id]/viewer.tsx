@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Streamdown } from "streamdown";
-import { code as codeHighlighter } from "@streamdown/code";
+import { code } from "@streamdown/code";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -24,8 +24,6 @@ import {
   type ChevronRightIconHandle,
 } from "@/components/ui/chevron-right";
 import { XIcon, type XIconHandle } from "@/components/ui/x";
-import { GithubIcon } from "@/components/ui/github";
-import { VercelMark } from "@/components/vercel-mark";
 import { TopBar } from "@/components/topbar";
 import { PanelGlow } from "@/components/panel-glow";
 import {
@@ -44,12 +42,10 @@ const MAX_INPUT_LENGTH = 500;
 export function AgentViewer({
   shareId,
   prompt,
-  code,
   files,
 }: {
   shareId: string;
   prompt: string;
-  code: string;
   files: FileBlock[];
 }) {
   const fileChipIconRefs = useRef<Map<string, FileTextIconHandle>>(new Map());
@@ -71,11 +67,6 @@ export function AgentViewer({
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
     null,
   );
-
-  const [repoUrl, setRepoUrl] = useState<string | null>(null);
-  const [vercelUrl, setVercelUrl] = useState<string | null>(null);
-  const [claimUrl, setClaimUrl] = useState<string | null>(null);
-  const [deploying, setDeploying] = useState<"github" | "vercel" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,79 +159,6 @@ export function AgentViewer({
     sendMessage({ text: trimmed });
   }
 
-  function openAuthPopupAndRetry(url: string) {
-    const width = 520;
-    const height = 680;
-    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
-
-    const popupRef = window.open(
-      url,
-      "tryeve-github-auth",
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
-    );
-    if (!popupRef) {
-      setDeploying(null);
-      return;
-    }
-
-    const popup: Window = popupRef;
-
-    let fired = false;
-    const finish = () => {
-      if (fired) return;
-      fired = true;
-      clearInterval(closeTimer);
-      window.removeEventListener("focus", onFocus);
-      deployToGithub();
-    };
-
-    const closeTimer = setInterval(() => {
-      if (popup.closed) finish();
-    }, 500);
-
-    function onFocus() {
-      setTimeout(() => {
-        if (popup.closed || fired) finish();
-      }, 400);
-    }
-    window.addEventListener("focus", onFocus);
-  }
-
-  async function deployToGithub() {
-    setDeploying("github");
-    try {
-      const res = await fetch("/api/github/deploy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, code, shareId }),
-      });
-      const data = await res.json();
-
-      if (data.needsAuth && data.authorizeUrl) {
-        openAuthPopupAndRetry(data.authorizeUrl);
-        return;
-      }
-      if (data.ok) setRepoUrl(data.repoUrl);
-    } finally {
-      setDeploying(null);
-    }
-  }
-
-  async function deployToVercel() {
-    if (repoUrl) {
-      window.open("https://vercel.com/new", "_blank");
-      return;
-    }
-    setDeploying("vercel");
-    try {
-      await deployToGithub();
-      window.open("https://vercel.com/new", "_blank");
-    } finally {
-      setDeploying(null);
-    }
-  }
-
   function openFilesPanel() {
     setSelectedFileIndex(null);
     setFilesPanelOpen(true);
@@ -289,41 +207,6 @@ export function AgentViewer({
             <div className="w-full bg-black! px-3 py-1.5 font-mono text-sm text-white rounded-lg! shadow-sm">
               {prompt}
             </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() =>
-                repoUrl ? window.open(repoUrl, "_blank") : deployToGithub()
-              }
-              disabled={deploying === "github"}
-              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-            >
-              {deploying === "github" ? (
-                <Spinner className="size-3" />
-              ) : (
-                <GithubIcon size={13} />
-              )}
-              {deploying === "github"
-                ? "deploying..."
-                : repoUrl
-                  ? "view on github"
-                  : "deploy to github"}
-            </button>
-            <button
-              type="button"
-              onClick={deployToVercel}
-              disabled={deploying === "vercel"}
-              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-            >
-              {deploying === "vercel" ? (
-                <Spinner className="size-3" />
-              ) : (
-                <VercelMark size={12} />
-              )}
-              {deploying === "vercel" ? "preparing..." : "deploy to vercel"}
-            </button>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -452,10 +335,7 @@ export function AgentViewer({
 
               {selectedFile ? (
                 <div className="relative z-10 flex-1 overflow-auto px-6 py-4">
-                  <Streamdown
-                    plugins={{ code: codeHighlighter }}
-                    className="text-xs"
-                  >
+                  <Streamdown plugins={{ code }} className="text-xs">
                     {`\`\`\`${selectedFile.filename.endsWith(".md") ? "markdown" : "ts"}\n${selectedFile.content}\n\`\`\``}
                   </Streamdown>
                 </div>
