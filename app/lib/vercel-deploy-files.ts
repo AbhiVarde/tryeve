@@ -90,7 +90,7 @@ export default nextConfig;
 // on mount, same behavior as tryeve's own AgentViewer, minus the files panel.
 const CHAT_PAGE = `"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 
@@ -150,7 +150,7 @@ export default function Home() {
     };
   }, []);
 
-  const transport = new DefaultChatTransport({
+  const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/agent-chat",
     prepareSendMessagesRequest({ messages }) {
       const last = messages[messages.length - 1];
@@ -166,7 +166,7 @@ export default function Home() {
         },
       };
     },
-  });
+  }), []);
 
   const { messages, sendMessage, status } = useChat({
     transport,
