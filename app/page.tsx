@@ -1175,9 +1175,9 @@ function HomeInner() {
         )}
         <span className="animate-in fade-in duration-300">
           {vercelDeployingId === latestAssistantMessage?.id
-            ? "preparing..."
-            : vercelLinks[latestAssistantMessage?.id ?? ""]
-              ? "open vercel deploy"
+            ? "deploying..."
+            : latestAssistantMessage && vercelLinks[latestAssistantMessage.id]
+              ? "try live version"
               : "deploy to vercel"}
         </span>
       </Button>
@@ -1253,8 +1253,10 @@ function HomeInner() {
                 <VercelMark size={13} />
               )}
               {vercelDeployingId === chatSession.agentMessageId
-                ? "preparing..."
-                : "vercel"}
+                ? "deploying..."
+                : vercelLinks[chatSession.agentMessageId]
+                  ? "live"
+                  : "vercel"}
             </button>
             <button
               type="button"
