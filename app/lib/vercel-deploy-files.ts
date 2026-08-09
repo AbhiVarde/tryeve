@@ -683,7 +683,6 @@ export default function Home() {
           />
           <Button
             type="submit"
-            size="sm"
             disabled={!session || status === "streaming" || !input.trim()}
             className="absolute right-2 bottom-2.5 cursor-pointer"
           >
