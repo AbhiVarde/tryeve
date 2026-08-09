@@ -683,7 +683,7 @@ export default function Home() {
           />
           <Button
             type="submit"
-            disabled={!session || status === "streaming" || !input.trim()}
+            disabled={!session || status === "streaming" || status === "submitted" || !input.trim()}
             className="absolute right-2 bottom-2.5 cursor-pointer"
           >
             {status === "streaming" ? <Spinner className="size-4" /> : "send"}
