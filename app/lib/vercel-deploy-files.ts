@@ -55,21 +55,429 @@ export function parseFiles(raw: string): FileBlock[] {
   return blocks;
 }
 
-const LAYOUT = `export default function RootLayout({
+function escapeForJsTemplate(str: string) {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/`/g, "\\`")
+    .replace(/\$\{/g, "\\${");
+}
+
+// ---------- static files, identical every deploy ----------
+
+const GLOBALS_CSS = `@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body,
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+`;
+
+const POSTCSS_CONFIG = `const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+`;
+
+const LIB_UTILS = `import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+`;
+
+const UI_BUTTON = `import { Button as ButtonPrimitive } from "@base-ui/react/button";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const buttonVariants = cva(
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        outline:
+          "border-border bg-background hover:bg-muted hover:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        ghost: "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50",
+      },
+      size: {
+        default: "h-8 gap-1.5 px-2.5",
+        icon: "size-8",
+        "icon-sm": "size-7 rounded-[min(var(--radius-md),12px)]",
+      },
+    },
+    defaultVariants: { variant: "default", size: "default" },
+  },
+);
+
+function Button({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  );
+}
+
+export { Button, buttonVariants };
+`;
+
+const UI_TEXTAREA = `import * as React from "react";
+
+import { cn } from "@/lib/utils";
+
+function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+  return (
+    <textarea
+      data-slot="textarea"
+      className={cn(
+        "flex field-sizing-content min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export { Textarea };
+`;
+
+const UI_SPINNER = `import { cn } from "@/lib/utils";
+import { Loader2Icon } from "lucide-react";
+
+function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
+  return (
+    <Loader2Icon
+      data-slot="spinner"
+      role="status"
+      aria-label="Loading"
+      className={cn("size-4 animate-spin", className)}
+      {...props}
+    />
+  );
+}
+
+export { Spinner };
+`;
+
+const AI_ELEMENTS_SHIMMER = `"use client";
+
+import { cn } from "@/lib/utils";
+import type { MotionProps } from "motion/react";
+import { motion } from "motion/react";
+import type { CSSProperties, ElementType, JSX } from "react";
+import { memo, useMemo } from "react";
+
+type MotionHTMLProps = MotionProps & Record<string, unknown>;
+
+const motionComponentCache = new Map<
+  keyof JSX.IntrinsicElements,
+  React.ComponentType<MotionHTMLProps>
+>();
+
+const getMotionComponent = (element: keyof JSX.IntrinsicElements) => {
+  let component = motionComponentCache.get(element);
+  if (!component) {
+    component = motion.create(element);
+    motionComponentCache.set(element, component);
+  }
+  return component;
+};
+
+export interface TextShimmerProps {
+  children: string;
+  as?: ElementType;
+  className?: string;
+  duration?: number;
+  spread?: number;
+}
+
+const ShimmerComponent = ({
+  children,
+  as: Component = "p",
+  className,
+  duration = 2,
+  spread = 2,
+}: TextShimmerProps) => {
+  const MotionComponent = getMotionComponent(Component as keyof JSX.IntrinsicElements);
+  const dynamicSpread = useMemo(() => (children?.length ?? 0) * spread, [children, spread]);
+
+  return (
+    <MotionComponent
+      animate={{ backgroundPosition: "0% center" }}
+      className={cn(
+        "relative inline-block bg-size-[250%_100%,auto] bg-clip-text text-transparent",
+        "[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]",
+        className,
+      )}
+      initial={{ backgroundPosition: "100% center" }}
+      style={
+        {
+          "--spread": \`\${dynamicSpread}px\`,
+          backgroundImage:
+            "var(--bg), linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground))",
+        } as CSSProperties
+      }
+      transition={{ duration, ease: "linear", repeat: Number.POSITIVE_INFINITY }}
+    >
+      {children}
+    </MotionComponent>
+  );
+};
+
+export const Shimmer = memo(ShimmerComponent);
+`;
+
+// trimmed from your real message.tsx: only Message/MessageContent/MessageResponse
+// kept, since branch/action toolbar isn't used in a single-agent chat. plugin set
+// reduced to `code` only to avoid pulling in cjk/math/mermaid for a small deploy.
+const AI_ELEMENTS_MESSAGE = `"use client";
+
+import { cn } from "@/lib/utils";
+import { code } from "@streamdown/code";
+import type { UIMessage } from "ai";
+import type { ComponentProps, HTMLAttributes } from "react";
+import { memo } from "react";
+import { Streamdown } from "streamdown";
+
+export type MessageProps = HTMLAttributes<HTMLDivElement> & {
+  from: UIMessage["role"];
+};
+
+export const Message = ({ className, from, ...props }: MessageProps) => (
+  <div
+    className={cn(
+      "group flex w-full max-w-[95%] flex-col gap-2",
+      from === "user" ? "is-user ml-auto justify-end" : "is-assistant",
+      className,
+    )}
+    {...props}
+  />
+);
+
+export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
+
+export const MessageContent = ({ children, className, ...props }: MessageContentProps) => (
+  <div
+    className={cn(
+      "is-user:dark flex w-fit min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm",
+      "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
+      "group-[.is-assistant]:text-foreground",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+export type MessageResponseProps = ComponentProps<typeof Streamdown>;
+
+const streamdownPlugins = { code };
+
+export const MessageResponse = memo(
+  ({ className, ...props }: MessageResponseProps) => (
+    <Streamdown
+      className={cn("size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0", className)}
+      plugins={streamdownPlugins}
+      {...props}
+    />
+  ),
+  (prevProps, nextProps) => prevProps.children === nextProps.children,
+);
+
+MessageResponse.displayName = "MessageResponse";
+`;
+
+// your actual ai-elements conversation.tsx, trimmed to Conversation/
+// ConversationContent/ConversationScrollButton — ConversationEmptyState and
+// ConversationDownload aren't used by the deployed single-agent page
+const AI_ELEMENTS_CONVERSATION = `"use client";
+
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ArrowDownIcon } from "lucide-react";
+import type { ComponentProps } from "react";
+import { useCallback } from "react";
+import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+
+export type ConversationProps = ComponentProps<typeof StickToBottom>;
+
+export const Conversation = ({ className, ...props }: ConversationProps) => (
+  <StickToBottom
+    className={cn("relative flex-1 overflow-y-hidden", className)}
+    initial="smooth"
+    resize="smooth"
+    role="log"
+    {...props}
+  />
+);
+
+export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content>;
+
+export const ConversationContent = ({ className, ...props }: ConversationContentProps) => (
+  <StickToBottom.Content className={cn("flex flex-col gap-8 p-4", className)} {...props} />
+);
+
+export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
+
+export const ConversationScrollButton = ({
+  className,
+  ...props
+}: ConversationScrollButtonProps) => {
+  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+
+  const handleScrollToBottom = useCallback(() => {
+    scrollToBottom();
+  }, [scrollToBottom]);
+
+  return (
+    !isAtBottom && (
+      <Button
+        className={cn(
+          "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full dark:bg-background dark:hover:bg-muted",
+          className,
+        )}
+        onClick={handleScrollToBottom}
+        size="icon"
+        type="button"
+        variant="outline"
+        {...props}
+      >
+        <ArrowDownIcon className="size-4" />
+      </Button>
+    )
+  );
+};
+`;
+
+function buildLayout(prompt: string) {
+  const safePrompt = escapeForJsTemplate(prompt);
+  return `import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: \`${safePrompt}\`,
+  description: "an eve agent, built and deployed with tryeve",
+};
+
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={\`dark \${geistSans.variable} \${geistMono.variable} h-full antialiased\`}
+    >
       <body
-        style={{
-          margin: 0,
-          background: "#0a0a0a",
-          color: "#e5e5e5",
-          fontFamily:
-            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-        }}
+        className="min-h-full bg-background text-foreground"
+        style={{ fontFamily: "var(--font-geist-sans)" }}
       >
         {children}
       </body>
@@ -77,24 +485,28 @@ const LAYOUT = `export default function RootLayout({
   );
 }
 `;
+}
 
-const NEXT_CONFIG = `import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {};
-
-export default nextConfig;
-`;
-
-// fully self-contained: no local component imports, so the scaffolded
-// project has zero dependency on tryeve's own component tree. auto-connects
-// on mount, same behavior as tryeve's own AgentViewer, minus the files panel.
-const CHAT_PAGE = `"use client";
+function buildChatPage(prompt: string) {
+  const safePrompt = escapeForJsTemplate(prompt);
+  return `"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
 const MAX_INPUT_LENGTH = 500;
+const AGENT_NAME = \`${safePrompt}\`;
 
 type Session = {
   url: string;
@@ -150,23 +562,27 @@ export default function Home() {
     };
   }, []);
 
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: "/api/agent-chat",
-    prepareSendMessagesRequest({ messages }) {
-      const last = messages[messages.length - 1];
-      const text = last ? getText(last.parts as any) : "";
-      const s = sessionRef.current;
-      return {
-        body: {
-          url: s?.url,
-          message: text,
-          sessionId: s?.sessionId ?? null,
-          continuationToken: s?.continuationToken ?? null,
-          turnCount: s?.turnCount ?? 0,
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/agent-chat",
+        prepareSendMessagesRequest({ messages }) {
+          const last = messages[messages.length - 1];
+          const text = last ? getText(last.parts as any) : "";
+          const s = sessionRef.current;
+          return {
+            body: {
+              url: s?.url,
+              message: text,
+              sessionId: s?.sessionId ?? null,
+              continuationToken: s?.continuationToken ?? null,
+              turnCount: s?.turnCount ?? 0,
+            },
+          };
         },
-      };
-    },
-  }), []);
+      }),
+    [],
+  );
 
   const { messages, sendMessage, status } = useChat({
     transport,
@@ -194,102 +610,105 @@ export default function Home() {
     sendMessage({ text: trimmed });
   }
 
-  return (
-    <main
-      style={{
-        maxWidth: 640,
-        margin: "0 auto",
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        padding: "48px 24px 24px",
-      }}
-    >
-      <p style={{ fontSize: 12, color: "#737373", marginBottom: 24, textAlign: "center" }}>
-        built with tryeve
-      </p>
+  const lastMessage = messages[messages.length - 1];
+  const lastAssistantText =
+    lastMessage?.role === "assistant" ? getText(lastMessage.parts as any) : "";
+  const showThinking =
+    status === "submitted" ||
+    (status === "streaming" && lastMessage?.role === "assistant" && !lastAssistantText.trim());
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
-        {connecting && (
-          <p style={{ fontSize: 13, color: "#737373", textAlign: "center" }}>
-            waking up your agent...
-          </p>
-        )}
-        {connectError && (
-          <p style={{ fontSize: 13, color: "#f87171", textAlign: "center" }}>{connectError}</p>
-        )}
-        {messages.map((m) => {
-          const text = getText(m.parts as any);
-          if (!text) return null;
-          return (
-            <div
-              key={m.id}
-              style={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "85%",
-                padding: m.role === "user" ? "7px 12px" : "0",
-                borderRadius: 8,
-                background: m.role === "user" ? "#000" : "transparent",
-                color: m.role === "user" ? "#fff" : "#e5e5e5",
-                fontSize: 14,
-                lineHeight: 1.5,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {text}
-            </div>
-          );
-        })}
-        {status === "submitted" && (
-          <p style={{ fontSize: 13, color: "#737373" }}>thinking...</p>
-        )}
+  return (
+    <div className="flex h-full min-h-screen flex-col">
+      <header className="fixed top-0 left-0 z-30 w-full px-6 py-4">
+        <span className="font-mono text-sm font-medium tracking-tight text-foreground">
+          {AGENT_NAME}
+        </span>
+      </header>
+
+      <Conversation className="flex-1 pt-16">
+        <ConversationContent className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 pb-24">
+          {connecting && (
+            <p className="font-mono text-xs text-muted-foreground">waking up your agent...</p>
+          )}
+          {connectError && (
+            <p className="font-mono text-xs text-red-400/80">{connectError}</p>
+          )}
+
+          {messages.map((m) => {
+            const text = getText(m.parts as any);
+            if (!text && m.role === "assistant") return null;
+            return (
+              <Message from={m.role as "user" | "assistant"} key={m.id}>
+                <MessageContent
+                  className={
+                    m.role === "user"
+                      ? "bg-black! px-3! py-1.5! font-mono text-sm text-white rounded-lg! shadow-sm"
+                      : "bg-transparent p-0 text-sm"
+                  }
+                >
+                  {m.role === "assistant" ? <MessageResponse>{text}</MessageResponse> : text}
+                </MessageContent>
+              </Message>
+            );
+          })}
+
+          {showThinking && (
+            <Message from="assistant">
+              <MessageContent className="bg-transparent p-0 font-mono text-xs text-muted-foreground">
+                <Shimmer duration={1.2} className="font-mono text-sm">
+                  thinking...
+                </Shimmer>
+              </MessageContent>
+            </Message>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+
+      <div className="fixed bottom-0 left-0 w-full px-6 pb-6">
+        <form onSubmit={onSubmit} className="relative mx-auto w-full max-w-2xl">
+          <Textarea
+            placeholder={connecting ? "connecting..." : "message this agent..."}
+            value={input}
+            maxLength={MAX_INPUT_LENGTH}
+            disabled={!session}
+            onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+            className="min-h-14 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-16 font-mono text-sm shadow-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!session || status === "streaming" || !input.trim()}
+            className="absolute right-2 bottom-2.5 cursor-pointer"
+          >
+            {status === "streaming" ? <Spinner className="size-4" /> : "send"}
+          </Button>
+        </form>
       </div>
 
-      <form onSubmit={onSubmit} style={{ display: "flex", gap: 8, opacity: session ? 1 : 0.5 }}>
-        <input
-          placeholder="message this agent..."
-          value={input}
-          maxLength={MAX_INPUT_LENGTH}
-          disabled={!session}
-          onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
-          style={{
-            flex: 1,
-            background: "#141414",
-            border: "1px solid #262626",
-            borderRadius: 8,
-            padding: "10px 12px",
-            color: "#e5e5e5",
-            fontSize: 14,
-            fontFamily: "inherit",
-            outline: "none",
-          }}
-        />
-        <button
-          type="submit"
-          disabled={!session || status === "streaming" || !input.trim()}
-          style={{
-            background: "#fff",
-            color: "#000",
-            border: "none",
-            borderRadius: 8,
-            padding: "0 18px",
-            fontSize: 14,
-            fontFamily: "inherit",
-            cursor: !session || status === "streaming" ? "default" : "pointer",
-            opacity: !session || status === "streaming" ? 0.6 : 1,
-          }}
-        >
-          send
-        </button>
-      </form>
-    </main>
+      <a
+        href="https://tryeve.abhivarde.in"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed right-5 bottom-24 font-mono text-xs text-muted-foreground opacity-80 transition-opacity hover:opacity-100"
+      >
+        built with tryeve
+      </a>
+    </div>
   );
 }
 `;
+}
 
-// the deployed run-agent route: files are embedded as a constant at deploy
-// time rather than read off disk, avoids next.js file-tracing dropping
-// non-imported files from the function bundle
+// ---------- run-agent route: agent files embedded as a constant so next's ----------
+// ---------- bundler doesn't drop them from the function bundle             ----------
+
 function buildRunAgentRoute(agentFiles: FileBlock[]) {
   const filesLiteral = JSON.stringify(
     agentFiles.map((f) => ({ filename: f.filename, content: f.content })),
@@ -428,8 +847,6 @@ export async function POST() {
 `;
 }
 
-// identical proxy logic to tryeve's own agent-chat route, no changes needed,
-// it's already generic over any sandbox url
 const AGENT_CHAT_ROUTE = `import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 
 export const runtime = "nodejs";
@@ -614,12 +1031,25 @@ export function buildVercelDeployFiles(
             "@ai-sdk/react": "latest",
             ai: "latest",
             nanoid: "latest",
+            "@base-ui/react": "latest",
+            motion: "latest",
+            clsx: "latest",
+            "tailwind-merge": "latest",
+            "class-variance-authority": "latest",
+            "lucide-react": "latest",
+            streamdown: "latest",
+            "@streamdown/code": "latest",
+            "use-stick-to-bottom": "latest",
+            shadcn: "latest",
+            "tw-animate-css": "latest",
           },
           devDependencies: {
             typescript: "latest",
             "@types/node": "latest",
             "@types/react": "latest",
             "@types/react-dom": "latest",
+            "@tailwindcss/postcss": "latest",
+            tailwindcss: "latest",
           },
         },
         null,
@@ -659,18 +1089,35 @@ export function buildVercelDeployFiles(
         2,
       ),
     },
-    { filename: "next.config.ts", content: NEXT_CONFIG },
+    { filename: "postcss.config.mjs", content: POSTCSS_CONFIG },
     {
       filename: "next-env.d.ts",
       content: `/// <reference types="next" />\n/// <reference types="next/image-types/global" />\n`,
     },
-    { filename: "app/layout.tsx", content: LAYOUT },
-    { filename: "app/page.tsx", content: CHAT_PAGE },
+    { filename: "app/globals.css", content: GLOBALS_CSS },
+    { filename: "app/layout.tsx", content: buildLayout(prompt) },
+    { filename: "app/page.tsx", content: buildChatPage(prompt) },
     {
       filename: "app/api/run-agent/route.ts",
       content: buildRunAgentRoute(generated),
     },
     { filename: "app/api/agent-chat/route.ts", content: AGENT_CHAT_ROUTE },
+    { filename: "lib/utils.ts", content: LIB_UTILS },
+    { filename: "components/ui/button.tsx", content: UI_BUTTON },
+    { filename: "components/ui/textarea.tsx", content: UI_TEXTAREA },
+    { filename: "components/ui/spinner.tsx", content: UI_SPINNER },
+    {
+      filename: "components/ai-elements/shimmer.tsx",
+      content: AI_ELEMENTS_SHIMMER,
+    },
+    {
+      filename: "components/ai-elements/message.tsx",
+      content: AI_ELEMENTS_MESSAGE,
+    },
+    {
+      filename: "components/ai-elements/conversation.tsx",
+      content: AI_ELEMENTS_CONVERSATION,
+    },
     {
       filename: "README.md",
       content: `# ${slugify(prompt)}
@@ -679,23 +1126,15 @@ ${prompt}
 
 built and deployed with [tryeve](https://tryeve.abhivarde.in), an agent runtime for [eve](https://eve.dev).
 
-## works out of the box
+## before this works
 
-this agent runs through the Vercel AI Gateway, authenticated automatically via \`VERCEL_OIDC_TOKEN\` once deployed. nothing to configure, no key needed.
+add a model credential in this project's vercel settings, then redeploy:
 
-## using a different model or provider
-
-by default this uses eve's default model. to pick a specific one, add \`agent/agent.ts\`:
-
-\`\`\`ts
-import { defineAgent } from "eve";
-
-export default defineAgent({
-  model: "google/gemini-2.5-flash", // any AI Gateway model id: openai/gpt-5.4-mini, groq/llama-3.3-70b, etc.
-});
+\`\`\`
+AI_GATEWAY_API_KEY=
 \`\`\`
 
-gateway ids still authenticate via OIDC, no key needed. to call a provider directly instead (bypassing the gateway), install that provider's AI SDK package and pass it to \`model\`, then set that provider's own API key as an env var on this project. see [eve's agent config docs](https://eve.dev/docs/agent-config).
+or \`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\`. one AI Gateway key covers anthropic, openai, gemini, groq, and more.
 `,
     },
   ];
