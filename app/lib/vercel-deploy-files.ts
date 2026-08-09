@@ -260,6 +260,28 @@ function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
 export { Spinner };
 `;
 
+const VERCEL_MARK = `export function VercelMark({
+  size = 14,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 76 65"
+      width={size}
+      height={size}
+      fill="currentColor"
+      aria-hidden="true"
+      className={className ?? "text-foreground"}
+    >
+      <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+    </svg>
+  );
+}
+`;
+
 const AI_ELEMENTS_SHIMMER = `"use client";
 
 import { cn } from "@/lib/utils";
@@ -1119,6 +1141,7 @@ export function buildVercelDeployFiles(
     { filename: "components/ui/button.tsx", content: UI_BUTTON },
     { filename: "components/ui/textarea.tsx", content: UI_TEXTAREA },
     { filename: "components/ui/spinner.tsx", content: UI_SPINNER },
+    { filename: "components/vercel-mark.tsx", content: VERCEL_MARK },
     {
       filename: "components/ai-elements/shimmer.tsx",
       content: AI_ELEMENTS_SHIMMER,
