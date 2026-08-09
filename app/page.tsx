@@ -893,6 +893,11 @@ function HomeInner() {
       }
 
       setVercelLinks((prev) => ({ ...prev, [message.id]: data.liveUrl }));
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === message.id ? { ...m, repoUrl: data.repoUrl } : m,
+        ),
+      );
       window.open(data.liveUrl, "_blank");
       toast.success("deployed, your agent is live");
     } catch {

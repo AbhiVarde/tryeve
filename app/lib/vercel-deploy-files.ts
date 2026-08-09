@@ -345,6 +345,15 @@ function getDirectories(files: { filename: string }[]): string[] {
 export async function POST() {
   const modelEnv = getModelEnv();
 
+  if (Object.keys(modelEnv).length === 0) {
+    return Response.json({
+      ok: false,
+      needsCredentials: true,
+      error:
+        "no model credentials set on this project. add AI_GATEWAY_API_KEY (or ANTHROPIC_API_KEY / OPENAI_API_KEY) in this project's vercel settings, then redeploy",
+    });
+  }
+
   const sandboxName = \`eve-agent-\${nanoid(8)}\`;
   let sandbox;
 

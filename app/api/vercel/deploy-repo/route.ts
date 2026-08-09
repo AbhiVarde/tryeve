@@ -224,6 +224,18 @@ export async function POST(req: Request) {
 
   if (shareId && typeof shareId === "string") {
     try {
+      await put(`agents/${shareId}-repo.json`, JSON.stringify({ repoUrl }), {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        cacheControlMaxAge: 0,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+    } catch (err) {
+      console.error("vercel deploy: repo status write failed", err);
+    }
+
+    try {
       await put(
         `agents/${shareId}-vercel.json`,
         JSON.stringify({ repoUrl, liveUrl, deploymentId: deployData.id }),
