@@ -701,7 +701,7 @@ function HomeInner() {
   async function deleteHistoryEntry(id: string) {
     setHistory((prev) => prev.filter((entry) => entry.id !== id));
 
-    const isCurrentlyViewed = messages.some((m) => m.shareId === id);
+    const isCurrentlyViewed = searchParams.get("a") === id;
 
     if (isCurrentlyViewed) {
       if (chatSession) {
@@ -725,7 +725,7 @@ function HomeInner() {
   async function clearAllHistory() {
     setHistory([]);
 
-    if (messages.length > 0) {
+    if (searchParams.get("a")) {
       if (chatSession) {
         endChat();
         setChatKey(crypto.randomUUID());
