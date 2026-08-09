@@ -644,7 +644,7 @@ export function buildVercelDeployFiles(
             "**/*.tsx",
             ".next/types/**/*.ts",
           ],
-          exclude: ["node_modules"],
+          exclude: ["node_modules", "agent"],
         },
         null,
         2,
