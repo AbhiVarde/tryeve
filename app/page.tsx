@@ -1114,7 +1114,9 @@ function HomeInner() {
 
   const remaining = MAX_INPUT_LENGTH - input.length;
   const nearLimit = remaining <= 40;
-  const submitting = chatSession ? status === "streaming" : busy;
+  const submitting = chatSession
+    ? status === "streaming" || status === "submitted"
+    : busy;
 
   const latestAssistantMessage =
     [...messages].reverse().find((m) => m.role === "assistant") ?? null;
