@@ -463,6 +463,9 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: \`${safePrompt}\`,
   description: "an eve agent, built and deployed with tryeve",
+  icons: {
+    icon: "https://tryeve.abhivarde.in/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -504,6 +507,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { VercelMark } from "@/components/vercel-mark";
 
 const MAX_INPUT_LENGTH = 500;
 const AGENT_NAME = \`${safePrompt}\`;
@@ -602,10 +606,12 @@ export default function Home() {
     },
   });
 
+  const submitting = status === "streaming" || status === "submitted";
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed || !session) return;
+    if (!trimmed || !session || submitting) return;
     setInput("");
     sendMessage({ text: trimmed });
   }
@@ -620,13 +626,17 @@ export default function Home() {
   return (
     <div className="flex h-full min-h-screen flex-col">
       <header className="fixed top-0 left-0 z-30 w-full px-6 py-4">
-        <span className="font-mono text-sm font-medium tracking-tight text-foreground">
-          {AGENT_NAME}
+        <span className="flex items-center gap-2">
+          <VercelMark />
+          <span className="text-sm font-medium text-muted-foreground">/</span>
+          <span className="truncate font-mono text-sm font-medium tracking-tight">
+            {AGENT_NAME}
+          </span>
         </span>
       </header>
 
       <Conversation className="flex-1 pt-16">
-        <ConversationContent className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 pb-24">
+        <ConversationContent className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 pb-4">
           {connecting && (
             <p className="font-mono text-xs text-muted-foreground">waking up your agent...</p>
           )}
@@ -665,48 +675,52 @@ export default function Home() {
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="fixed bottom-0 left-0 w-full px-6 pb-6">
-        <form onSubmit={onSubmit} className="relative mx-auto w-full max-w-2xl">
-          <Textarea
-            placeholder={connecting ? "connecting..." : "message this agent..."}
-            value={input}
-            maxLength={MAX_INPUT_LENGTH}
-            disabled={!session}
-            onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                e.currentTarget.form?.requestSubmit();
-              }
-            }}
-            className="min-h-14 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-16 font-mono text-sm shadow-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
-          />
+      <div className="mx-auto w-full max-w-2xl p-4">
+        <form onSubmit={onSubmit} className="w-full space-y-2">
+          <div className="relative">
+            <Textarea
+              placeholder={connecting ? "connecting..." : "message this agent..."}
+              value={input}
+              maxLength={MAX_INPUT_LENGTH}
+              disabled={!session}
+              onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
+              className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <span className="pointer-events-none absolute right-3 bottom-2.5 font-mono text-[11px] tabular-nums text-muted-foreground/60">
+              {input.length}/{MAX_INPUT_LENGTH}
+            </span>
+          </div>
           <Button
             type="submit"
-            disabled={!session || status === "streaming" || status === "submitted" || !input.trim()}
-            className="absolute right-2 bottom-2.5 cursor-pointer"
+            disabled={!session || submitting || !input.trim()}
+            className="w-full cursor-pointer"
           >
-            {status === "streaming" ? <Spinner className="size-4" /> : "send"}
+            {submitting && <Spinner className="size-4" />}
+            <span className="animate-in fade-in duration-300">
+              {submitting ? "sending..." : "send"}
+            </span>
           </Button>
         </form>
+        <a
+          href="https://tryeve.abhivarde.in"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mx-auto mt-4 block w-fit cursor-pointer font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          built with tryeve
+        </a>
       </div>
-
-      <a
-        href="https://tryeve.abhivarde.in"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed right-5 bottom-24 font-mono text-xs text-muted-foreground opacity-80 transition-opacity hover:opacity-100"
-      >
-        built with tryeve
-      </a>
     </div>
   );
 }
 `;
 }
-
-// ---------- run-agent route: agent files embedded as a constant so next's ----------
-// ---------- bundler doesn't drop them from the function bundle             ----------
 
 function buildRunAgentRoute(agentFiles: FileBlock[]) {
   const filesLiteral = JSON.stringify(
