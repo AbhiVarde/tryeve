@@ -919,6 +919,7 @@ export async function POST(req: Request) {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
+    console.error("eve session request failed", res.status, errText);
     return Response.json({ error: errText || "the agent session is unavailable" }, { status: res.status || 502 });
   }
 
