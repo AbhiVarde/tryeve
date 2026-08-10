@@ -47,10 +47,41 @@ export function useAgentChat(
   chatId: string,
   initialMessages?: StoredMessage[] | null,
 ) {
+  async function reviveAndRetry(input: RequestInfo | URL, init?: RequestInit) {
+    const res = await fetch(input, init);
+    if (res.status !== 409) return res;
+
+    const reviveRes = await fetch("/api/run-agent", { method: "POST" });
+    const revived = await reviveRes.json().catch(() => null);
+    if (!revived?.ok) return res;
+
+    const freshSession: Session = {
+      url: revived.url,
+      sandboxName: revived.sandboxName,
+      sessionId: null,
+      continuationToken: null,
+      turnCount: 0,
+    };
+    sessionRef.current = freshSession;
+    setSession(freshSession);
+
+    if (!init?.body) return res;
+    const body = JSON.parse(init.body as string);
+    const retryBody = JSON.stringify({
+      ...body,
+      url: freshSession.url,
+      sessionId: null,
+      continuationToken: null,
+      turnCount: 0,
+    });
+    return fetch(input, { ...init, body: retryBody });
+  }
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/agent-chat",
+        fetch: reviveAndRetry,
         prepareSendMessagesRequest({ messages }) {
           const last = messages[messages.length - 1];
           const text = last ? getText(last.parts) : "";

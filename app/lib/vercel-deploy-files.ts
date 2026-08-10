@@ -588,10 +588,41 @@ export default function Home() {
     };
   }, []);
 
+  async function reviveAndRetry(input: RequestInfo | URL, init?: RequestInit) {
+    const res = await fetch(input, init);
+    if (res.status !== 409) return res;
+
+    const reviveRes = await fetch("/api/run-agent", { method: "POST" });
+    const revived = await reviveRes.json().catch(() => null);
+    if (!revived?.ok) return res;
+
+    const freshSession: Session = {
+      url: revived.url,
+      sandboxName: revived.sandboxName,
+      sessionId: null,
+      continuationToken: null,
+      turnCount: 0,
+    };
+    sessionRef.current = freshSession;
+    setSession(freshSession);
+
+    if (!init?.body) return res;
+    const body = JSON.parse(init.body as string);
+    const retryBody = JSON.stringify({
+      ...body,
+      url: freshSession.url,
+      sessionId: null,
+      continuationToken: null,
+      turnCount: 0,
+    });
+    return fetch(input, { ...init, body: retryBody });
+  }
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/agent-chat",
+        fetch: reviveAndRetry,
         prepareSendMessagesRequest({ messages }) {
           const last = messages[messages.length - 1];
           const text = last ? getText(last.parts as any) : "";
@@ -914,13 +945,13 @@ export async function POST(req: Request) {
       body: JSON.stringify(body),
     });
   } catch {
-    return Response.json({ error: "couldn't reach the agent sandbox" }, { status: 502 });
+    return Response.json({ error: "couldn't reach the agent sandbox", needsRevive: true }, { status: 409 });
   }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     console.error("eve session request failed", res.status, errText);
-    return Response.json({ error: errText || "the agent session is unavailable" }, { status: res.status || 502 });
+    return Response.json({ error: errText || "the agent session is unavailable", needsRevive: true }, { status: 409 });
   }
 
   const data = await res.json().catch(() => null);
