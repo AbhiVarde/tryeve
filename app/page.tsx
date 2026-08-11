@@ -773,7 +773,11 @@ function HomeInner() {
     setChatSession(null);
   }
 
-  function openAuthPopupAndRetry(url: string, message: Message) {
+  function openAuthPopupAndRetry(
+    url: string,
+    windowName: string,
+    onDone: () => void,
+  ) {
     const width = 520;
     const height = 680;
     const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
@@ -781,13 +785,14 @@ function HomeInner() {
 
     const popupRef = window.open(
       url,
-      "tryeve-github-auth",
+      windowName,
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
     );
 
     if (!popupRef) {
       toast.error("popup blocked, allow popups and try again");
       setDeployingId(null);
+      setVercelDeployingId(null);
       return;
     }
 
@@ -801,7 +806,7 @@ function HomeInner() {
       fired = true;
       clearInterval(closeTimer);
       window.removeEventListener("focus", onFocus);
-      deployToGithub(message);
+      onDone();
     };
 
     const closeTimer = setInterval(() => {
@@ -809,7 +814,6 @@ function HomeInner() {
     }, 500);
 
     function onFocus() {
-      // give the popup a moment to actually close or finish redirecting
       setTimeout(() => {
         if (popup.closed || fired) finish();
       }, 400);
@@ -838,7 +842,9 @@ function HomeInner() {
       const data = await res.json();
 
       if (data.needsAuth && data.authorizeUrl) {
-        openAuthPopupAndRetry(data.authorizeUrl, message);
+        openAuthPopupAndRetry(data.authorizeUrl, "tryeve-github-auth", () =>
+          deployToGithub(message),
+        );
         return;
       }
 
@@ -894,7 +900,9 @@ function HomeInner() {
       const data = await res.json();
 
       if (data.needsAuth && data.authorizeUrl) {
-        openAuthPopupAndRetry(data.authorizeUrl, message);
+        openAuthPopupAndRetry(data.authorizeUrl, "tryeve-vercel-auth", () =>
+          deployToVercel(message),
+        );
         return;
       }
 
