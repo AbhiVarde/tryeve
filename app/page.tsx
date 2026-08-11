@@ -867,6 +867,13 @@ function HomeInner() {
       return;
     }
 
+    if (!message.repoUrl) {
+      toast.error("deploy to github first", {
+        description: "vercel deploy pushes from your github repo",
+      });
+      return;
+    }
+
     setVercelDeployingId(message.id);
     try {
       const promptMsg = messages.find(

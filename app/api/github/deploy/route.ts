@@ -2,67 +2,13 @@ import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { put } from "@vercel/blob";
 import { getGithubToken } from "@/app/lib/github-connect";
+import {
+  parseFiles,
+  slugify,
+  buildVercelDeployFiles,
+} from "@/app/lib/vercel-deploy-files";
 
 export const runtime = "nodejs";
-
-type FileBlock = { filename: string; content: string };
-
-function parseFiles(raw: string): FileBlock[] {
-  const regex = /```[a-zA-Z]*\n([\s\S]*?)```/g;
-  const blocks: FileBlock[] = [];
-  let match;
-  let i = 0;
-
-  while ((match = regex.exec(raw)) !== null) {
-    i++;
-    const body = match[1];
-    const firstLine = body.split("\n")[0];
-    const filenameMatch = firstLine.match(/(?:\/\/|#)\s*filename:\s*(.+)/i);
-    const filename = filenameMatch
-      ? filenameMatch[1].trim()
-      : i === 1
-        ? "agent/instructions.md"
-        : `agent/tools/tool-${i}.ts`;
-    const content = filenameMatch
-      ? body.split("\n").slice(1).join("\n").trim()
-      : body.trim();
-    blocks.push({ filename, content });
-  }
-
-  return blocks;
-}
-
-const STOP_WORDS = new Set([
-  "a",
-  "an",
-  "the",
-  "that",
-  "which",
-  "with",
-  "for",
-  "and",
-  "or",
-  "to",
-  "of",
-  "in",
-  "on",
-  "is",
-  "it",
-  "this",
-  "agent",
-  "agents",
-]);
-
-function slugify(prompt: string) {
-  const words = prompt
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .split(/\s+/)
-    .filter((w) => w && !STOP_WORDS.has(w));
-
-  const base = words.slice(0, 4).join("-") || "generated";
-  return `${base}-agent`;
-}
 
 async function githubFetch(token: string, path: string, init?: RequestInit) {
   const res = await fetch(`https://api.github.com${path}`, {
@@ -134,7 +80,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const files = parseFiles(code);
+  const generatedFiles = parseFiles(code);
   const repoName = slugify(prompt);
 
   const userRes = await githubFetch(appAuth.token!, "/user");
@@ -166,46 +112,9 @@ export async function POST(req: Request) {
 
   const repo = await createRes.json();
 
-  const allFiles: FileBlock[] = [
-    ...files,
-    {
-      filename: "package.json",
-      content: JSON.stringify(
-        {
-          name: repoName,
-          private: true,
-          type: "module",
-          scripts: { dev: "eve dev" },
-          dependencies: { eve: "latest" },
-        },
-        null,
-        2,
-      ),
-    },
-    {
-      filename: "README.md",
-      content: `# ${repoName}
-
-${prompt}
-
-built and tested with [tryeve](https://tryeve.abhivarde.in), an agent runtime for [eve](https://eve.dev).
-
-## run it
-
-\`\`\`
-npm install
-npm run dev
-\`\`\`
-
-## structure
-
-- \`agent/instructions.md\` defines what this agent does
-- \`agent/tools/\` contains the typed tools it can call
-
-eve reads everything under \`agent/\` automatically, no registration needed.
-`,
-    },
-  ];
+  // pushes the full next.js scaffold + ui, not just the raw agent/ files,
+  // so github and vercel always deploy the exact same thing
+  const allFiles = buildVercelDeployFiles(prompt, generatedFiles);
 
   const failedFiles: string[] = [];
 
