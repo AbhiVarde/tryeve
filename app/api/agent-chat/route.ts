@@ -1,6 +1,8 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { checkRateLimit } from "@vercel/firewall";
+import { trace } from "@opentelemetry/api";
 
+const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -91,6 +93,7 @@ export async function POST(req: Request) {
 
   const uiStream = createUIMessageStream({
     execute: async ({ writer }) => {
+      const span = tracer.startSpan("agent-chat.stream");
       const reader = streamRes.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -196,6 +199,7 @@ export async function POST(req: Request) {
         }
       } finally {
         reader.cancel().catch(() => {});
+        span.end();
       }
 
       writer.write({

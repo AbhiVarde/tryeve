@@ -1,11 +1,14 @@
 import { start } from "workflow/api";
 import { put, head } from "@vercel/blob";
+import { trace } from "@opentelemetry/api";
 import { nanoid } from "nanoid";
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { buildAgentWorkflow } from "@/app/workflows/build-agent";
 import { checkBotId } from "botid/server";
 import { generationEnabled } from "@/flags";
+
+const tracer = trace.getTracer("tryeve");
 
 export async function POST(req: Request) {
   const botCheck = await checkBotId();
@@ -45,8 +48,19 @@ export async function POST(req: Request) {
 
   let result;
   try {
-    const run = await start(buildAgentWorkflow, [prompt, visitorId]);
-    result = await run.returnValue;
+    result = await tracer.startActiveSpan(
+      "build-agent.workflow",
+      async (span) => {
+        try {
+          const run = await start(buildAgentWorkflow, [prompt, visitorId]);
+          const value = await run.returnValue;
+          span.setAttribute("agent.passed", !!value.passed);
+          return value;
+        } finally {
+          span.end();
+        }
+      },
+    );
   } catch (err) {
     console.error("build-agent workflow failed:", err);
     return Response.json(

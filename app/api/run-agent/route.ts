@@ -1,11 +1,13 @@
 import { Sandbox } from "@vercel/sandbox";
 import { nanoid } from "nanoid";
+import { trace } from "@opentelemetry/api";
 import { checkRateLimit } from "@vercel/firewall";
 import { head, put } from "@vercel/blob";
 import { cookies } from "next/headers";
 import { canCreateSandbox, trackSandbox } from "@/app/lib/sandbox-quota";
 import { markPaused, markResumed } from "@/app/lib/system-status";
 
+const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
@@ -180,13 +182,19 @@ export async function POST(req: Request) {
   let sandbox: Awaited<ReturnType<typeof Sandbox.create>>;
 
   try {
-    sandbox = await Sandbox.create({
-      name: sandboxName,
-      runtime: "node24",
-      timeout: 600_000,
-      ports: [3000],
-      env: sandboxEnv,
-      persistent: false,
+    sandbox = await tracer.startActiveSpan("sandbox.create", async (span) => {
+      try {
+        return await Sandbox.create({
+          name: sandboxName,
+          runtime: "node24",
+          timeout: 600_000,
+          ports: [3000],
+          env: sandboxEnv,
+          persistent: false,
+        });
+      } finally {
+        span.end();
+      }
     });
   } catch (err) {
     console.error("sandbox create failed:", err);
@@ -234,10 +242,19 @@ export async function POST(req: Request) {
     },
   ]);
 
-  const install = await sandbox.runCommand({
-    cmd: "npm",
-    args: ["install", "--no-audit", "--no-fund"],
-  });
+  const install = await tracer.startActiveSpan(
+    "sandbox.install",
+    async (span) => {
+      try {
+        return await sandbox.runCommand({
+          cmd: "npm",
+          args: ["install", "--no-audit", "--no-fund"],
+        });
+      } finally {
+        span.end();
+      }
+    },
+  );
 
   if (install.exitCode !== 0) {
     const err = await install.stderr();
@@ -252,7 +269,13 @@ export async function POST(req: Request) {
   });
 
   const url = sandbox.domain(3000);
-  const ready = await waitForServer(url, 45_000);
+  const ready = await tracer.startActiveSpan("sandbox.boot", async (span) => {
+    try {
+      return await waitForServer(url, 45_000);
+    } finally {
+      span.end();
+    }
+  });
 
   if (!ready) {
     await sandbox.stop();

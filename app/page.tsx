@@ -150,6 +150,10 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   { name: "blob", description: "stores agents, sessions, and chat history" },
   { name: "cron", description: "sweeps stale sandbox sessions" },
   {
+    name: "observability",
+    description: "traces the sandbox pipeline for failures",
+  },
+  {
     name: "firewall",
     description: "rate limits generation, connect, and chat",
   },
