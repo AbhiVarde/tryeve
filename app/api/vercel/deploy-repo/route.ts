@@ -102,6 +102,15 @@ export async function POST(req: Request) {
     });
   }
 
+  const oauthToken = cookieStore.get("tryeve_gh_token")?.value;
+  if (!oauthToken) {
+    return Response.json({
+      ok: false,
+      needsAuth: true,
+      authorizeUrl: "https://tryeve.abhivarde.in/api/github/oauth/start",
+    });
+  }
+
   // same repo name github/deploy already uses, so this always lands in the
   // one repo for this agent instead of a separate copy
   const repoName = slugify(prompt);
@@ -117,30 +126,74 @@ export async function POST(req: Request) {
   }
   const user = await userRes.json();
 
-  // github is the source of truth now, this route only deploys from what's
-  // already there and links back to it, it never creates or pushes files
   const existingRepoRes = await githubFetch(
     appAuth.token!,
     `/repos/${user.login}/${repoName}`,
   );
+  let repoUrl: string;
 
   if (existingRepoRes.status === 404) {
-    return Response.json({
-      ok: false,
-      needsGithub: true,
-      error: "deploy to github first",
+    const createRes = await githubFetch(oauthToken, "/user/repos", {
+      method: "POST",
+      body: JSON.stringify({
+        name: repoName,
+        description: prompt.length > 100 ? `${prompt.slice(0, 97)}...` : prompt,
+        private: false,
+        auto_init: false,
+      }),
     });
-  }
-
-  if (!existingRepoRes.ok) {
+    if (!createRes.ok) {
+      const err = await createRes.json().catch(() => null);
+      return Response.json({
+        ok: false,
+        error: err?.message ?? "couldn't create the repository",
+      });
+    }
+    const repo = await createRes.json();
+    repoUrl = repo.html_url;
+  } else if (existingRepoRes.ok) {
+    const repo = await existingRepoRes.json();
+    repoUrl = repo.html_url;
+  } else {
     return Response.json({
       ok: false,
       error: "couldn't check for an existing repository",
     });
   }
 
-  const repo = await existingRepoRes.json();
-  const repoUrl = repo.html_url;
+  // push (or update) every scaffold file into that same repo, alongside
+  // whatever raw agent/ files already live there from a prior github deploy
+  const failedFiles: string[] = [];
+
+  for (const file of allFiles) {
+    const path = `/repos/${user.login}/${repoName}/contents/${file.filename}`;
+    let sha: string | undefined;
+
+    const existingFileRes = await githubFetch(appAuth.token!, path);
+    if (existingFileRes.ok) {
+      const existing = await existingFileRes.json();
+      sha = existing.sha;
+    }
+
+    const res = await githubFetch(appAuth.token!, path, {
+      method: "PUT",
+      body: JSON.stringify({
+        message: sha ? `update ${file.filename}` : `add ${file.filename}`,
+        content: Buffer.from(file.content).toString("base64"),
+        ...(sha ? { sha } : {}),
+      }),
+    });
+
+    if (!res.ok) failedFiles.push(file.filename);
+  }
+
+  if (failedFiles.length > 0) {
+    return Response.json({
+      ok: false,
+      error: `repo updated, but ${failedFiles.length} file(s) failed to push: ${failedFiles.join(", ")}`,
+      repoUrl,
+    });
+  }
 
   // deploy that exact content directly, no clone, no separate repo, no
   // manual picker on vercel's side
@@ -173,17 +226,19 @@ export async function POST(req: Request) {
 
   const liveUrl = `https://${deployData.url}`;
 
-  // point the repo's website field at the live deploy
-  try {
-    await githubFetch(appAuth.token!, `/repos/${user.login}/${repoName}`, {
-      method: "PATCH",
-      body: JSON.stringify({ homepage: liveUrl }),
-    });
-  } catch (err) {
-    console.error("vercel deploy: repo homepage patch failed", err);
-  }
-
   if (shareId && typeof shareId === "string") {
+    try {
+      await put(`agents/${shareId}-repo.json`, JSON.stringify({ repoUrl }), {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        cacheControlMaxAge: 0,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+    } catch (err) {
+      console.error("vercel deploy: repo status write failed", err);
+    }
+
     try {
       await put(
         `agents/${shareId}-vercel.json`,
