@@ -7,6 +7,7 @@ import {
   buildVercelDeployFiles,
   slugify,
 } from "@/app/lib/vercel-deploy-files";
+import { getVercelToken } from "@/app/lib/vercel-connect";
 
 export const runtime = "nodejs";
 
@@ -41,15 +42,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const vercelToken = process.env.VERCEL_TOKEN;
-  const vercelTeamId = process.env.VERCEL_TEAM_ID;
+  const vercelAuth = await getVercelToken();
 
-  if (!vercelToken) {
+  if (vercelAuth.needsAuth) {
     return Response.json({
       ok: false,
-      error: "vercel deploy isn't configured yet (missing VERCEL_TOKEN)",
+      needsAuth: true,
+      authorizeUrl: vercelAuth.authorizeUrl,
     });
   }
+
+  const vercelToken = vercelAuth.token!;
+  const vercelTeamId = vercelAuth.teamId;
 
   const { prompt, code, shareId } = await req.json();
 
