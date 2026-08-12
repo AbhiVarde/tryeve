@@ -36,7 +36,8 @@ a share link lets anyone view an agent's files and chat with it. it doesn't let 
 ↳ every agent is tagged with its creator's identity at generation time  
 ↳ overwriting a session or stopping a sandbox is checked against that identity, a stranger gets a 403  
 ↳ chatting and viewing files stay open to anyone with the link, that's the point of sharing  
-↳ github deploy only ever touches the deploying visitor's own account, never the creator's
+↳ github deploy only ever touches the deploying visitor's own account, never the creator's  
+↳ vercel deploy follows the same rule, checked against the same identity, before it ever touches the deploying visitor's own vercel account
 
 ## bugs found building this
 
@@ -86,6 +87,16 @@ a share link lets anyone view an agent's files and chat with it. it doesn't let 
 ↳ changing the model, or pausing generation during an incident, meant a redeploy either way  
 ↳ fix: flags sdk exposes both live from the dashboard, no redeploy needed
 
+**deploy to vercel retried the wrong deploy**  
+↳ deploy-to-github and deploy-to-vercel shared one popup window name and one hardcoded retry callback  
+↳ closing the vercel auth popup always retried the github deploy instead, showing "deploying..." on the wrong button  
+↳ fix: each flow gets its own window name and its own retry callback
+
+**a missing oauth client id failed silently as a 404**  
+↳ the github oauth start route built the authorize url even when `GITHUB_OAUTH_CLIENT_ID` was unset for an environment  
+↳ an empty `client_id` param sends github straight to its own 404, no error message, no clue why  
+↳ fix: the route checks for the client id first and returns a real error instead of a broken redirect
+
 ## what's deliberately not built
 
 hosting a generated agent as its own live service was built, then removed.
@@ -95,3 +106,5 @@ hosting a generated agent as its own live service was built, then removed.
 ↳ it stayed out
 
 deploying the generated code to the user's own github made the cut instead. it's not hosting, it's handing over files the person owns. pushing those files uses a short-lived scoped token from a github app, issued through connect. creating the repo itself uses a separate classic oauth token, because github apps cannot create repositories on personal accounts, only on organizations, so connect's github app can't do that one step. either way, one produces a repo they control, the other a process nobody asked for.
+
+deploying that same repo to a user's own vercel account was added the same way, later. it's still not tryeve hosting anything, it's handing the same files to an account the person controls, this time via a vercel marketplace integration oauth instead of a github app token. it depends on the github deploy step running first, since it deploys straight from that repo rather than a second copy of the files.

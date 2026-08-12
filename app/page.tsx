@@ -117,6 +117,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "inspect every file with syntax highlighting",
       "export the full agent as a zip",
       "deploy any agent straight to your own GitHub, one-time authorization",
+      "deploy that same agent to your own vercel account too, live in seconds",
       "share a live link, anyone with it can chat with your agent directly",
       "connect to your agent right after it's built, no install needed",
       "chat with it live, with markdown-formatted replies",
@@ -160,6 +161,11 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   {
     name: "connect",
     description: "issues scoped GitHub tokens to push generated files",
+  },
+  {
+    name: "vercel oauth",
+    description:
+      "deploys agents straight to a user's own vercel account, no token of mine involved",
   },
   {
     name: "botid",
