@@ -1,7 +1,7 @@
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { put } from "@vercel/blob";
-import { getGithubToken } from "@/app/lib/github-connect";
+import { getGithubToken, getGithubUserToken } from "@/app/lib/github-connect";
 import {
   parseFiles,
   slugify,
@@ -70,15 +70,26 @@ export async function POST(req: Request) {
     });
   }
 
-  const oauthToken = cookieStore.get("tryeve_gh_token")?.value;
+  let userAuth;
+  try {
+    userAuth = await getGithubUserToken(visitorId);
+  } catch (err) {
+    console.error("github user token request failed:", err);
+    return Response.json({
+      ok: false,
+      error: "couldn't reach GitHub right now, try again in a moment",
+    });
+  }
 
-  if (!oauthToken) {
+  if (userAuth.needsAuth) {
     return Response.json({
       ok: false,
       needsAuth: true,
-      authorizeUrl: "https://tryeve.abhivarde.in/api/github/oauth/start",
+      authorizeUrl: userAuth.authorizeUrl,
     });
   }
+
+  const oauthToken = userAuth.token!;
 
   const generatedFiles = parseFiles(code);
   const repoName = slugify(prompt);
