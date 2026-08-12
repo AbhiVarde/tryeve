@@ -112,15 +112,20 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     ],
   },
   {
-    label: "chat & share",
+    label: "deploy & own it",
     items: [
       "inspect every file with syntax highlighting",
       "export the full agent as a zip",
       "deploy any agent straight to your own GitHub, one-time authorization",
       "deploy that same agent to your own vercel account too, live in seconds",
-      "share a live link, anyone with it can chat with your agent directly",
+    ],
+  },
+  {
+    label: "chat & share",
+    items: [
       "connect to your agent right after it's built, no install needed",
       "chat with it live, with markdown-formatted replies",
+      "share a live link, anyone with it can chat with your agent directly",
       "your chat history is saved, reopening an agent restores the real conversation",
     ],
   },
@@ -129,11 +134,11 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     items: [
       "reload the page anytime, your agent and chat pick up right where you left off",
       "switching tabs never disconnects your agent, only real exits do",
-      "idle or closed sandboxes shut down automatically, nothing left running",
+      "dead share links reconnect automatically, no dead ends",
       "warned before disconnect, never cut off without notice",
+      "idle or closed sandboxes shut down automatically, nothing left running",
       "only you can overwrite or stop your own agent, others can still chat with it",
       "concurrent sandboxes are capped per visitor to keep usage fair for everyone",
-      "dead share links reconnect automatically, no dead ends",
       "your history is private, delete any entry or clear it all",
     ],
   },
