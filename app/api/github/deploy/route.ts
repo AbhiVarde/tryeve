@@ -1,7 +1,6 @@
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { put } from "@vercel/blob";
-import { getGithubToken, getGithubUserToken } from "@/app/lib/github-connect";
 import {
   parseFiles,
   slugify,
@@ -33,13 +32,14 @@ export async function POST(req: Request) {
   }
 
   const cookieStore = await cookies();
-  const visitorId = cookieStore.get("tryeve_vid")?.value;
+  const token = cookieStore.get("tryeve_gh_token")?.value;
 
-  if (!visitorId) {
-    return Response.json(
-      { ok: false, error: "no session found, reload and try again" },
-      { status: 401 },
-    );
+  if (!token) {
+    return Response.json({
+      ok: false,
+      needsAuth: true,
+      authorizeUrl: "/api/github/oauth/start",
+    });
   }
 
   const { prompt, code, shareId } = await req.json();
@@ -51,50 +51,17 @@ export async function POST(req: Request) {
     );
   }
 
-  let appAuth;
-  try {
-    appAuth = await getGithubToken(visitorId);
-  } catch (err) {
-    console.error("github app token request failed:", err);
-    return Response.json({
-      ok: false,
-      error: "couldn't reach GitHub right now, try again in a moment",
-    });
-  }
+  const userRes = await githubFetch(token, "/user");
 
-  if (appAuth.needsAuth) {
+  if (userRes.status === 401) {
+    cookieStore.delete("tryeve_gh_token");
     return Response.json({
       ok: false,
       needsAuth: true,
-      authorizeUrl: appAuth.authorizeUrl,
+      authorizeUrl: "/api/github/oauth/start",
     });
   }
 
-  let userAuth;
-  try {
-    userAuth = await getGithubUserToken(visitorId);
-  } catch (err) {
-    console.error("github user token request failed:", err);
-    return Response.json({
-      ok: false,
-      error: "couldn't reach GitHub right now, try again in a moment",
-    });
-  }
-
-  if (userAuth.needsAuth) {
-    return Response.json({
-      ok: false,
-      needsAuth: true,
-      authorizeUrl: userAuth.authorizeUrl,
-    });
-  }
-
-  const oauthToken = userAuth.token!;
-
-  const generatedFiles = parseFiles(code);
-  const repoName = slugify(prompt);
-
-  const userRes = await githubFetch(appAuth.token!, "/user");
   if (!userRes.ok) {
     return Response.json({
       ok: false,
@@ -103,7 +70,10 @@ export async function POST(req: Request) {
   }
   const user = await userRes.json();
 
-  const createRes = await githubFetch(oauthToken, "/user/repos", {
+  const generatedFiles = parseFiles(code);
+  const repoName = slugify(prompt);
+
+  const createRes = await githubFetch(token, "/user/repos", {
     method: "POST",
     body: JSON.stringify({
       name: repoName,
@@ -131,7 +101,7 @@ export async function POST(req: Request) {
 
   for (const file of allFiles) {
     const res = await githubFetch(
-      appAuth.token!,
+      token,
       `/repos/${user.login}/${repoName}/contents/${file.filename}`,
       {
         method: "PUT",
