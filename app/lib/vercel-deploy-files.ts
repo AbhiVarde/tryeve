@@ -851,24 +851,27 @@ function getDirectories(files: { filename: string }[]): string[] {
 
 export async function POST() {
   const modelEnv = getModelEnv();
-
-  if (Object.keys(modelEnv).length === 0) {
-    return Response.json({
-      ok: false,
-      needsCredentials: true,
-      error:
-        "no model credentials set on this project. add AI_GATEWAY_API_KEY (or ANTHROPIC_API_KEY / OPENAI_API_KEY) in this project's vercel settings, then redeploy",
-    });
-  }
-
   const connectionVars = getConnectionEnvVars(AGENT_FILES);
   const missingConnectionEnv = connectionVars.filter((v) => !process.env[v]);
+  const missingModelEnv = Object.keys(modelEnv).length === 0;
 
-  if (missingConnectionEnv.length > 0) {
+  if (missingModelEnv || missingConnectionEnv.length > 0) {
+    const parts: string[] = [];
+    if (missingModelEnv) {
+      parts.push(
+        "a model credential (AI_GATEWAY_API_KEY, or ANTHROPIC_API_KEY / OPENAI_API_KEY)",
+      );
+    }
+    if (missingConnectionEnv.length > 0) {
+      parts.push(
+        \`this agent's connection needs \${missingConnectionEnv.join(", ")}\`,
+      );
+    }
+
     return Response.json({
       ok: false,
       needsCredentials: true,
-      error: \`this agent connects to a real service and needs \${missingConnectionEnv.join(", ")} set on this project, then redeploy\`,
+      error: \`add \${parts.join(" and ")} in this project's vercel settings, then redeploy\`,
     });
   }
 
