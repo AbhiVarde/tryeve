@@ -7,6 +7,7 @@ import {
   untrackSandbox,
 } from "@/app/lib/sandbox-quota";
 import { markPaused, markResumed } from "@/app/lib/system-status";
+import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
@@ -47,18 +48,6 @@ function getDirectories(files: FileBlock[]): string[] {
     if (parts.length > 0) dirs.add(parts.join("/"));
   }
   return [...dirs];
-}
-
-function getMissingConnectionEnvVars(files: FileBlock[]): string[] {
-  const missing = new Set<string>();
-  for (const f of files) {
-    if (!f.filename.startsWith("agent/connections/")) continue;
-    const matches = f.content.matchAll(/process\.env\.([A-Z0-9_]+)/g);
-    for (const m of matches) {
-      if (!process.env[m[1]]) missing.add(m[1]);
-    }
-  }
-  return [...missing];
 }
 
 const OPEN_CHANNEL_AUTH = `import { eveChannel } from "eve/channels/eve";
@@ -143,7 +132,9 @@ export async function POST(req: Request) {
   if (missingConnectionEnv.length > 0) {
     return Response.json({
       passed: false,
-      error: `this agent connects to a real service and needs ${missingConnectionEnv.join(", ")} configured before testing can run`,
+      skipped: true,
+      missingConnectionEnv,
+      output: `${files.length} file(s) generated, connects to a real service and needs ${missingConnectionEnv.join(", ")} to test or chat here, deploy to add it`,
     });
   }
 

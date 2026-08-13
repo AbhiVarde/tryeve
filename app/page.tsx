@@ -73,10 +73,15 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ClockIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { getConnectionEnvVars } from "@/app/lib/eve-connections";
 
 type FileBlock = { filename: string; content: string };
-type TestState = "testing" | "passed" | "failed" | null;
-type TestResult = { state: TestState; error?: string };
+type TestState = "testing" | "passed" | "failed" | "skipped" | null;
+type TestResult = {
+  state: TestState;
+  error?: string;
+  missingConnectionEnv?: string[];
+};
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -243,6 +248,8 @@ async function downloadZip(files: FileBlock[]) {
     ),
   );
 
+  const connectionEnvVars = getConnectionEnvVars(files);
+
   zip.file(
     "README.md",
     `# your eve agent
@@ -255,7 +262,19 @@ built and tested with [tryeve](https://tryeve.abhivarde.in), an agent runtime fo
 npm install
 npm run dev
 \`\`\`
+${
+  connectionEnvVars.length > 0
+    ? `
+## before this works
 
+this agent connects to a real external service, set these first:
+
+\`\`\`
+${connectionEnvVars.map((v) => `${v}=`).join("\n")}
+\`\`\`
+`
+    : ""
+}
 ## structure
 
 - \`agent/instructions.md\` defines what this agent does
@@ -1061,8 +1080,13 @@ function HomeInner() {
       setTestStatus((prev) => ({
         ...prev,
         [assistantId]: {
-          state: result.passed ? "passed" : "failed",
+          state: result.skipped
+            ? "skipped"
+            : result.passed
+              ? "passed"
+              : "failed",
           error: result.error,
+          missingConnectionEnv: result.missingConnectionEnv ?? undefined,
         },
       }));
 
@@ -1155,226 +1179,244 @@ function HomeInner() {
 
   const latestAssistantMessage =
     [...messages].reverse().find((m) => m.role === "assistant") ?? null;
-  const latestPassed =
-    !!latestAssistantMessage &&
-    testStatus[latestAssistantMessage.id]?.state === "passed";
+  const latestState = latestAssistantMessage
+    ? testStatus[latestAssistantMessage.id]?.state
+    : null;
+  const latestPassed = latestState === "passed";
+  const latestSkipped = latestState === "skipped";
   const showConnectPrompt =
     latestPassed && !chatSession && !showGenerateForm && !busy;
+  const showDeployOnlyPrompt =
+    latestSkipped && !chatSession && !showGenerateForm && !busy;
 
-  const inputBar = showConnectPrompt ? (
-    <div className="w-full space-y-2">
-      <Button
-        type="button"
-        onClick={() =>
-          latestAssistantMessage && startChat(latestAssistantMessage)
-        }
-        disabled={chatLoadingId === latestAssistantMessage?.id}
-        onMouseEnter={() => connectPromptIconRef.current?.startAnimation()}
-        onMouseLeave={() => connectPromptIconRef.current?.stopAnimation()}
-        className="w-full cursor-pointer"
-      >
-        {chatLoadingId === latestAssistantMessage?.id ? (
-          <Spinner className="size-4" />
-        ) : (
-          <BotMessageSquareIcon ref={connectPromptIconRef} size={15} />
+  const inputBar =
+    showConnectPrompt || showDeployOnlyPrompt ? (
+      <div className="w-full space-y-2">
+        {showDeployOnlyPrompt && (
+          <p className="rounded-md bg-primary/5 px-3 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
+            connects to a real service, needs{" "}
+            {testStatus[
+              latestAssistantMessage?.id ?? ""
+            ]?.missingConnectionEnv?.join(", ")}{" "}
+            to chat here, deploy it below to add credentials and talk to it live
+          </p>
         )}
-        <span className="animate-in fade-in duration-300">
-          {chatLoadingId === latestAssistantMessage?.id
-            ? "connecting..."
-            : "connect to your agent"}
-        </span>
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => {
-          if (latestAssistantMessage?.repoUrl) {
-            window.open(latestAssistantMessage.repoUrl, "_blank");
-          } else if (latestAssistantMessage) {
-            deployToGithub(latestAssistantMessage);
-          }
-        }}
-        disabled={deployingId === latestAssistantMessage?.id}
-        onMouseEnter={() => deployIconRef.current?.startAnimation()}
-        onMouseLeave={() => deployIconRef.current?.stopAnimation()}
-        className="w-full cursor-pointer"
-      >
-        {deployingId === latestAssistantMessage?.id ? (
-          <Spinner className="size-4" />
-        ) : (
-          <GithubIcon ref={deployIconRef} size={15} />
+        {showConnectPrompt && (
+          <Button
+            type="button"
+            onClick={() =>
+              latestAssistantMessage && startChat(latestAssistantMessage)
+            }
+            disabled={chatLoadingId === latestAssistantMessage?.id}
+            onMouseEnter={() => connectPromptIconRef.current?.startAnimation()}
+            onMouseLeave={() => connectPromptIconRef.current?.stopAnimation()}
+            className="w-full cursor-pointer"
+          >
+            {chatLoadingId === latestAssistantMessage?.id ? (
+              <Spinner className="size-4" />
+            ) : (
+              <BotMessageSquareIcon ref={connectPromptIconRef} size={15} />
+            )}
+            <span className="animate-in fade-in duration-300">
+              {chatLoadingId === latestAssistantMessage?.id
+                ? "connecting..."
+                : "connect to your agent"}
+            </span>
+          </Button>
         )}
-        <span className="animate-in fade-in duration-300">
-          {deployingId === latestAssistantMessage?.id
-            ? "deploying..."
-            : latestAssistantMessage?.repoUrl
-              ? "view on github"
-              : "deploy to github"}
-        </span>
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() =>
-          latestAssistantMessage && deployToVercel(latestAssistantMessage)
-        }
-        disabled={vercelDeployingId === latestAssistantMessage?.id}
-        className="w-full cursor-pointer"
-      >
-        {vercelDeployingId === latestAssistantMessage?.id ? (
-          <Spinner className="size-4" />
-        ) : (
-          <VercelMark size={14} />
-        )}
-        <span className="animate-in fade-in duration-300">
-          {vercelDeployingId === latestAssistantMessage?.id
-            ? "deploying..."
-            : latestAssistantMessage && vercelLinks[latestAssistantMessage.id]
-              ? "try live version"
-              : "deploy to vercel"}
-        </span>
-      </Button>
-      <button
-        type="button"
-        onClick={startNewAgent}
-        className="mx-auto block cursor-pointer font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-      >
-        or describe a new agent
-      </button>
-    </div>
-  ) : (
-    <form onSubmit={onSubmit} className="w-full space-y-2">
-      {systemPaused && !chatSession && (
-        <Alert className="border-border/60 bg-black/20 py-2.5">
-          <ClockIcon className="size-3.5 text-muted-foreground" />
-          <AlertDescription className="font-mono text-xs leading-relaxed text-muted-foreground">
-            {formatPauseMessage(pauseReason)}
-          </AlertDescription>
-        </Alert>
-      )}
-      {chatSession && (
-        <div className="flex items-center justify-between rounded-md bg-primary/5 px-3 py-2 font-mono text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            agent connected
-          </span>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                const agentMessage = messages.find(
-                  (m) => m.id === chatSession.agentMessageId,
-                );
-                if (!agentMessage) return;
-                if (agentMessage.repoUrl) {
-                  window.open(agentMessage.repoUrl, "_blank");
-                } else {
-                  deployToGithub(agentMessage);
-                }
-              }}
-              disabled={deployingId === chatSession.agentMessageId}
-              onMouseEnter={() => deployIconRef.current?.startAnimation()}
-              onMouseLeave={() => deployIconRef.current?.stopAnimation()}
-              className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-            >
-              {deployingId === chatSession.agentMessageId ? (
-                <Spinner className="size-3" />
-              ) : (
-                <GithubIcon ref={deployIconRef} size={13} />
-              )}
-              {deployingId === chatSession.agentMessageId
-                ? "deploying..."
-                : messages.find((m) => m.id === chatSession.agentMessageId)
-                      ?.repoUrl
-                  ? "view on github"
-                  : "deploy"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const agentMessage = messages.find(
-                  (m) => m.id === chatSession.agentMessageId,
-                );
-                if (agentMessage) deployToVercel(agentMessage);
-              }}
-              disabled={vercelDeployingId === chatSession.agentMessageId}
-              className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-            >
-              {vercelDeployingId === chatSession.agentMessageId ? (
-                <Spinner className="size-3" />
-              ) : (
-                <VercelMark size={13} />
-              )}
-              {vercelDeployingId === chatSession.agentMessageId
-                ? "deploying..."
-                : vercelLinks[chatSession.agentMessageId]
-                  ? "live"
-                  : "vercel"}
-            </button>
-            <button
-              type="button"
-              onClick={endChat}
-              onMouseEnter={() => logoutIconRef.current?.startAnimation()}
-              onMouseLeave={() => logoutIconRef.current?.stopAnimation()}
-              className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <LogoutIcon ref={logoutIconRef} size={13} />
-              disconnect
-            </button>
-          </div>
-        </div>
-      )}
-      <div className="relative">
-        <Textarea
-          placeholder={
-            systemPaused && !chatSession
-              ? "generation is temporarily unavailable..."
-              : chatSession
-                ? "message your agent..."
-                : "an agent that summarizes github issues..."
-          }
-          value={input}
-          maxLength={MAX_INPUT_LENGTH}
-          disabled={systemPaused && !chatSession}
-          onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            if (latestAssistantMessage?.repoUrl) {
+              window.open(latestAssistantMessage.repoUrl, "_blank");
+            } else if (latestAssistantMessage) {
+              deployToGithub(latestAssistantMessage);
             }
           }}
-          className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
-        />
-        <span
-          className={`pointer-events-none absolute right-3 bottom-2.5 font-mono text-[11px] tabular-nums transition-colors ${
-            nearLimit ? "text-red-400" : "text-muted-foreground/60"
-          }`}
+          disabled={deployingId === latestAssistantMessage?.id}
+          onMouseEnter={() => deployIconRef.current?.startAnimation()}
+          onMouseLeave={() => deployIconRef.current?.stopAnimation()}
+          className="w-full cursor-pointer"
         >
-          {input.length}/{MAX_INPUT_LENGTH}
-        </span>
+          {deployingId === latestAssistantMessage?.id ? (
+            <Spinner className="size-4" />
+          ) : (
+            <GithubIcon ref={deployIconRef} size={15} />
+          )}
+          <span className="animate-in fade-in duration-300">
+            {deployingId === latestAssistantMessage?.id
+              ? "deploying..."
+              : latestAssistantMessage?.repoUrl
+                ? "view on github"
+                : "deploy to github"}
+          </span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() =>
+            latestAssistantMessage && deployToVercel(latestAssistantMessage)
+          }
+          disabled={vercelDeployingId === latestAssistantMessage?.id}
+          className="w-full cursor-pointer"
+        >
+          {vercelDeployingId === latestAssistantMessage?.id ? (
+            <Spinner className="size-4" />
+          ) : (
+            <VercelMark size={14} />
+          )}
+          <span className="animate-in fade-in duration-300">
+            {vercelDeployingId === latestAssistantMessage?.id
+              ? "deploying..."
+              : latestAssistantMessage && vercelLinks[latestAssistantMessage.id]
+                ? "try live version"
+                : "deploy to vercel"}
+          </span>
+        </Button>
+        <button
+          type="button"
+          onClick={startNewAgent}
+          className="mx-auto block cursor-pointer font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          or describe a new agent
+        </button>
       </div>
-      <Button
-        type="submit"
-        disabled={
-          submitting ||
-          input.trim().length === 0 ||
-          (systemPaused && !chatSession)
-        }
-        className="w-full cursor-pointer"
-      >
-        {submitting && <Spinner className="size-4" />}
-        <span className="animate-in fade-in duration-300">
-          {chatSession
-            ? status === "streaming"
-              ? "sending..."
-              : "send"
-            : busy
-              ? "generating agent..."
-              : "generate agent"}
-        </span>
-      </Button>
-    </form>
-  );
+    ) : (
+      <form onSubmit={onSubmit} className="w-full space-y-2">
+        {systemPaused && !chatSession && (
+          <Alert className="border-border/60 bg-black/20 py-2.5">
+            <ClockIcon className="size-3.5 text-muted-foreground" />
+            <AlertDescription className="font-mono text-xs leading-relaxed text-muted-foreground">
+              {formatPauseMessage(pauseReason)}
+            </AlertDescription>
+          </Alert>
+        )}
+        {chatSession && (
+          <div className="flex items-center justify-between rounded-md bg-primary/5 px-3 py-2 font-mono text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              agent connected
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const agentMessage = messages.find(
+                    (m) => m.id === chatSession.agentMessageId,
+                  );
+                  if (!agentMessage) return;
+                  if (agentMessage.repoUrl) {
+                    window.open(agentMessage.repoUrl, "_blank");
+                  } else {
+                    deployToGithub(agentMessage);
+                  }
+                }}
+                disabled={deployingId === chatSession.agentMessageId}
+                onMouseEnter={() => deployIconRef.current?.startAnimation()}
+                onMouseLeave={() => deployIconRef.current?.stopAnimation()}
+                className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                {deployingId === chatSession.agentMessageId ? (
+                  <Spinner className="size-3" />
+                ) : (
+                  <GithubIcon ref={deployIconRef} size={13} />
+                )}
+                {deployingId === chatSession.agentMessageId
+                  ? "deploying..."
+                  : messages.find((m) => m.id === chatSession.agentMessageId)
+                        ?.repoUrl
+                    ? "view on github"
+                    : "deploy"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const agentMessage = messages.find(
+                    (m) => m.id === chatSession.agentMessageId,
+                  );
+                  if (agentMessage) deployToVercel(agentMessage);
+                }}
+                disabled={vercelDeployingId === chatSession.agentMessageId}
+                className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                {vercelDeployingId === chatSession.agentMessageId ? (
+                  <Spinner className="size-3" />
+                ) : (
+                  <VercelMark size={13} />
+                )}
+                {vercelDeployingId === chatSession.agentMessageId
+                  ? "deploying..."
+                  : vercelLinks[chatSession.agentMessageId]
+                    ? "live"
+                    : "vercel"}
+              </button>
+              <button
+                type="button"
+                onClick={endChat}
+                onMouseEnter={() => logoutIconRef.current?.startAnimation()}
+                onMouseLeave={() => logoutIconRef.current?.stopAnimation()}
+                className="flex cursor-pointer items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <LogoutIcon ref={logoutIconRef} size={13} />
+                disconnect
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="relative">
+          <Textarea
+            placeholder={
+              systemPaused && !chatSession
+                ? "generation is temporarily unavailable..."
+                : chatSession
+                  ? "message your agent..."
+                  : "an agent that summarizes github issues..."
+            }
+            value={input}
+            maxLength={MAX_INPUT_LENGTH}
+            disabled={systemPaused && !chatSession}
+            onChange={(e) =>
+              setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+            className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <span
+            className={`pointer-events-none absolute right-3 bottom-2.5 font-mono text-[11px] tabular-nums transition-colors ${
+              nearLimit ? "text-red-400" : "text-muted-foreground/60"
+            }`}
+          >
+            {input.length}/{MAX_INPUT_LENGTH}
+          </span>
+        </div>
+        <Button
+          type="submit"
+          disabled={
+            submitting ||
+            input.trim().length === 0 ||
+            (systemPaused && !chatSession)
+          }
+          className="w-full cursor-pointer"
+        >
+          {submitting && <Spinner className="size-4" />}
+          <span className="animate-in fade-in duration-300">
+            {chatSession
+              ? status === "streaming"
+                ? "sending..."
+                : "send"
+              : busy
+                ? "generating agent..."
+                : "generate agent"}
+          </span>
+        </Button>
+      </form>
+    );
 
   return (
     <AppShell>
@@ -1468,7 +1510,9 @@ function HomeInner() {
                   const result = testStatus[message.id];
                   const state = result?.state;
                   const finishedTesting =
-                    state === "passed" || state === "failed";
+                    state === "passed" ||
+                    state === "failed" ||
+                    state === "skipped";
 
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
@@ -1483,16 +1527,27 @@ function HomeInner() {
                                 className={
                                   state === "passed"
                                     ? "text-emerald-500"
-                                    : "text-red-400"
+                                    : state === "skipped"
+                                      ? "text-amber-400"
+                                      : "text-red-400"
                                 }
                               >
                                 ·{" "}
                                 {state === "passed"
                                   ? "tests passed"
-                                  : "tests failed"}
+                                  : state === "skipped"
+                                    ? "connects to a real service"
+                                    : "tests failed"}
                               </span>
                             )}
                           </p>
+                          {state === "skipped" &&
+                            result?.missingConnectionEnv && (
+                              <p className="font-mono text-xs text-amber-400/80">
+                                needs {result.missingConnectionEnv.join(", ")}{" "}
+                                to test or chat here, deploy below to add it
+                              </p>
+                            )}
                           {state === "failed" && result?.error && (
                             <div className="flex flex-col gap-2">
                               <p className="font-mono text-xs text-red-400/80">

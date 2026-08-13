@@ -859,6 +859,23 @@ export async function POST() {
     });
   }
 
+  const connectionVars = getConnectionEnvVars(AGENT_FILES);
+  const missingConnectionEnv = connectionVars.filter((v) => !process.env[v]);
+
+  if (missingConnectionEnv.length > 0) {
+    return Response.json({
+      ok: false,
+      needsCredentials: true,
+      error: \`this agent connects to a real service and needs \${missingConnectionEnv.join(", ")} set on this project, then redeploy\`,
+    });
+  }
+
+  const connectionEnv = Object.fromEntries(
+    connectionVars
+      .filter((v) => process.env[v])
+      .map((v) => [v, process.env[v]!]),
+  );
+
   const sandboxName = \`eve-agent-\${nanoid(8)}\`;
   let sandbox;
 
@@ -868,7 +885,7 @@ export async function POST() {
       runtime: "node24",
       timeout: 600_000,
       ports: [3000],
-      env: modelEnv,
+      env: { ...modelEnv, ...connectionEnv },
       persistent: false,
     });
   } catch (err) {

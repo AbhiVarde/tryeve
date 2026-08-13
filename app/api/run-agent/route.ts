@@ -6,6 +6,7 @@ import { head, put } from "@vercel/blob";
 import { cookies } from "next/headers";
 import { canCreateSandbox, trackSandbox } from "@/app/lib/sandbox-quota";
 import { markPaused, markResumed } from "@/app/lib/system-status";
+import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
@@ -176,6 +177,16 @@ export async function POST(req: Request) {
       ok: false,
       error:
         "no model credentials found in the environment (AI_GATEWAY_API_KEY, VERCEL_OIDC_TOKEN, ANTHROPIC_API_KEY, or OPENAI_API_KEY)",
+    });
+  }
+
+  const missingConnectionEnv = getMissingConnectionEnvVars(files);
+  if (missingConnectionEnv.length > 0) {
+    return Response.json({
+      ok: false,
+      needsConnectionCredentials: true,
+      missingConnectionEnv,
+      error: `this agent connects to a real service and needs ${missingConnectionEnv.join(", ")} configured, deploy it to add credentials and chat with it there`,
     });
   }
 

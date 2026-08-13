@@ -2,6 +2,7 @@ import { head } from "@vercel/blob";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AgentViewer } from "./viewer";
+import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
 type FileBlock = { filename: string; content: string };
 
@@ -77,6 +78,14 @@ export default async function AgentPage({
   }
 
   const files = parseFiles(data.code);
+  const missingConnectionEnv = getMissingConnectionEnvVars(files);
 
-  return <AgentViewer shareId={id} prompt={data.prompt} files={files} />;
+  return (
+    <AgentViewer
+      shareId={id}
+      prompt={data.prompt}
+      files={files}
+      missingConnectionEnv={missingConnectionEnv}
+    />
+  );
 }

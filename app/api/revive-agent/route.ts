@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { nanoid } from "nanoid";
 import { canCreateSandbox, trackSandbox } from "@/app/lib/sandbox-quota";
 import { markPaused, markResumed } from "@/app/lib/system-status";
+import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -132,6 +133,16 @@ export async function POST(req: Request) {
     return Response.json({
       ok: false,
       error: "no model credentials configured",
+    });
+  }
+
+  const missingConnectionEnv = getMissingConnectionEnvVars(files);
+  if (missingConnectionEnv.length > 0) {
+    return Response.json({
+      ok: false,
+      needsConnectionCredentials: true,
+      missingConnectionEnv,
+      error: `this agent connects to a real service and needs ${missingConnectionEnv.join(", ")} configured, deploy it to add credentials and chat with it there`,
     });
   }
 

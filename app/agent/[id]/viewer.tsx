@@ -44,10 +44,12 @@ export function AgentViewer({
   shareId,
   prompt,
   files,
+  missingConnectionEnv = [],
 }: {
   shareId: string;
   prompt: string;
   files: FileBlock[];
+  missingConnectionEnv?: string[];
 }) {
   const fileChipIconRefs = useRef<Map<string, FileTextIconHandle>>(new Map());
   const arrowIconRef = useRef<ArrowRightIconHandle>(null);
@@ -99,6 +101,13 @@ export function AgentViewer({
           })
           .catch(() => {});
 
+        if (missingConnectionEnv.length > 0) {
+          // tryeve never holds the connection credential, so it can't boot
+          // a live session here — deploying elsewhere with the token set
+          // is the only path to live chat, transcript/live link still shown
+          return;
+        }
+
         const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
         let alive = false;
         let sessionData: { sandboxName: string; url: string } | null = null;
@@ -145,7 +154,7 @@ export function AgentViewer({
     return () => {
       cancelled = true;
     };
-  }, [shareId]);
+  }, [shareId, missingConnectionEnv.length]);
 
   const {
     messages: agentMessages,
@@ -231,13 +240,15 @@ export function AgentViewer({
 
           <div className="flex flex-col gap-3">
             <p className="font-mono text-xs text-muted-foreground">
-              {reviving
-                ? "waking this agent back up..."
-                : connecting
-                  ? "connecting to this agent..."
-                  : session
-                    ? "chat with this agent"
-                    : "couldn't reconnect right now, files are still viewable below"}
+              {missingConnectionEnv.length > 0
+                ? `connects to a real service, needs ${missingConnectionEnv.join(", ")} to chat here, deploy this agent to add it and talk to it live`
+                : reviving
+                  ? "waking this agent back up..."
+                  : connecting
+                    ? "connecting to this agent..."
+                    : session
+                      ? "chat with this agent"
+                      : "couldn't reconnect right now, files are still viewable below"}
             </p>
 
             {session && (

@@ -124,6 +124,21 @@ export default defineMcpClientConnection({
 
 always declare auth with getToken pulling from a named environment variable, formatted <SERVICE>_API_TOKEN. never omit auth for a real third-party service, even if the user didn't mention credentials, since an unauthenticated connection to a sensitive service is unsafe by default. only omit auth entirely for a connection the user explicitly describes as local or public, like a localhost mcp server.
 
+a schedule runs the agent on its own cron cadence instead of waiting for a message, for things like daily digests, weekly reports, or recurring sweeps. only add one when the request explicitly implies recurring or automatic behavior, like "daily", "every morning", or "weekly". schedules are root-only, never inside a subagent.
+
+if the agent has a connection, instructions.md must include a line telling the model to report a connection tool failure plainly and in plain language, never show a raw error code or stack trace to the user.
+
+a schedule lives at agent/schedules/<name>.ts:
+
+\`\`\`
+// filename: agent/schedules/weekly_recap.ts
+import { defineSchedule } from "eve/schedules";
+export default defineSchedule({
+  cron: "0 9 * * 1",
+  markdown: "Summarize last week's activity and prepare a short recap.",
+});
+\`\`\`
+
 rules:
 every file must start with // filename: <real path under agent/>
 every filename after // filename: must be the actual name, never a placeholder
@@ -131,10 +146,13 @@ tool filenames must be descriptive snake_case matching the tool's purpose, since
 only include agent.ts if the request specifies or clearly implies a particular model or runtime need, otherwise omit it
 only include a subagent if the request genuinely needs a distinct specialist, parallel work, or a narrower toolset, most requests do not need one
 only include a connection if the request names a specific real external service, never a guessed or invented one
+only include a schedule if the request explicitly implies recurring or automatic behavior, most requests do not need one
+if both the root agent and a subagent need the same connection, duplicate the connection file under the subagent's own agent/subagents/<id>/connections/, a subagent inherits nothing from root
 never output shell commands, npm commands, or .env files as their own code block
 every tool file must import defineTool from eve/tools and use a zod inputSchema
 every subagent file must import defineAgent from eve and include a description
 every connection file must import defineMcpClientConnection from eve/connections and declare auth unless the service is explicitly local or public
+every schedule file must import defineSchedule from eve/schedules and declare a cron expression
 no comments explaining the obvious, no em dashes, no filler text
 generate 2 to 4 tool files maximum, keep each one small and realistic
 now generate a complete agent for the user's request, following this exact format`;
@@ -155,6 +173,8 @@ export async function buildAgentWorkflow(prompt: string, visitorId?: string) {
   return {
     code,
     passed: result.passed,
+    skipped: result.skipped ?? false,
+    missingConnectionEnv: result.missingConnectionEnv ?? null,
     error: result.error ?? null,
     sandboxName: result.sandboxName ?? null,
     url: result.url ?? null,
@@ -205,6 +225,8 @@ async function testAgent(
   visitorId?: string,
 ): Promise<{
   passed: boolean;
+  skipped?: boolean;
+  missingConnectionEnv?: string[];
   error?: string;
   sandboxName?: string;
   url?: string;
