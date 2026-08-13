@@ -19,6 +19,8 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - describe an agent in plain english
 - generates real, working eve files
 - connects to real third-party services over MCP when you name one, like "connect to linear" or "search notion", never a guessed or invented connection
+- a connection agent can't be tested or chatted with inside tryeve, since tryeve never holds your service credential, files and deploy still work either way, chat opens once you deploy it with your own credential set
+- runs on a schedule instead of waiting for a message, for daily digests or recurring jobs, when you ask for one
 - generation requests are screened by botid before they reach the ai gateway, bots never touch a sandbox
 - the model used for generation and a kill-switch can be flipped live from the dashboard, no redeploy
 - every agent is tested against a live eve runtime before you see it
@@ -48,7 +50,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 2. a botid check runs first, bot traffic is rejected before it costs anything
 3. the ai gateway routes the request to a model (switchable live via flags sdk), which writes real eve files, including a connection to a real third-party service if you named one
 4. a vercel sandbox installs eve for real and boots it, no stubs
-5. tryeve sends a live test message and confirms the agent actually responds, if a connection is missing a credential, the failure names the exact variable needed instead of a generic error
+5. tryeve sends a live test message and confirms the agent actually responds, if the agent connects to a real service, tryeve can't hold that credential, so this step is marked skipped instead of failed, and names the exact variable needed
 6. if it passes, the sandbox is kept alive rather than thrown away, so connecting afterward is instant
 7. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
 8. it's also added to your own history, tracked by a private cookie, not visible to anyone else
@@ -56,6 +58,8 @@ reload the page anytime. your agent, your chat, your files, all still there.
 10. optionally, deploy that same repo straight to your own vercel account via a vercel oauth authorization, no token of mine ever touches it, this deploys the whole app, agent and chat ui together, not the agent alone
 
 steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
+
+if step 5 is skipped because of a missing connection credential, steps 9 and 10 still work, deploying doesn't need the credential, only live chat does.
 
 for the full technical breakdown, including real bugs hit building this, see [HOW_IT_WORKS.md](https://github.com/AbhiVarde/tryeve/blob/main/HOW_IT_WORKS.md).
 
@@ -182,6 +186,7 @@ lib/
 - GitHub deploy only ever touches the deploying visitor's own GitHub account, never the original agent owner's data
 - vercel deploy only ever touches the deploying visitor's own vercel account, never the original agent owner's data
 - an MCP connection is only ever generated when you name a real service, never guessed, and its credential is never stored by tryeve, only referenced by an environment variable name
+- a connection agent can't open a live chat session inside tryeve, only a deployed copy with your own credential set can
 - chat, generation, and connect requests are all rate limited per visitor
 
 ## limits

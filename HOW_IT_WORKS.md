@@ -26,7 +26,18 @@ if you name a real service, the model also writes a connection file, eve's nativ
 
 ↳ only added when the request names a specific real service, never guessed  
 ↳ auth is declared on the connection, pulled from an env var at call time  
-↳ if that env var isn't set, testing fails with the exact variable name needed, not a generic timeout
+↳ tryeve never holds that credential, so a connection agent can't be tested or chatted with here, that's marked skipped, not failed, and names the exact variable needed  
+↳ deploy to github and deploy to vercel stay available regardless, since pushing files doesn't need the credential, only live chat does  
+↳ a subagent inherits no connection from root, if both need the same service the connection file is duplicated under the subagent's own directory  
+↳ once deployed with the real credential set, the connection works like any other tool
+
+## schedules
+
+a schedule runs the agent on its own cron cadence instead of waiting for a message, for daily digests, weekly reports, or recurring sweeps.
+
+↳ only added when the request explicitly implies recurring or automatic behavior  
+↳ lives at agent/schedules/, root only, a subagent can't have one  
+↳ eve dev never fires a schedule on its real cadence, only a deployed app does, so tryeve's own sandbox test doesn't exercise it directly, only confirms the agent still responds to a normal message
 
 ## why real testing instead of stubs
 
