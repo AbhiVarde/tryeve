@@ -2,13 +2,15 @@
 
 **Agent Runtime for eve.**
 
-tested against a live eve runtime, ready to talk before you ever see it. no install, no terminal.
+tested against a live eve runtime, ready to talk before you ever see it. connects to real services over MCP when you name one, deploys straight to your own github and vercel. no install, no terminal.
 
 [live demo](https://tryeve.abhivarde.in) · built with ▲ [vercel](https://vercel.com)
 
 ## what it does
 
-you type a description. tryeve generates real eve files, boots them in an isolated sandbox against the actual eve runtime, and only shows you the result once it has confirmed the agent responds. if it passes, you can chat with it live, download it as a working project, deploy it straight to your own GitHub or your own vercel account, or share a link that lets anyone else talk to it too.
+you type a description. tryeve generates real eve files, connecting to a real third-party service over MCP if you name one, and boots them in an isolated sandbox against the actual eve runtime. nothing is shown until it has confirmed the agent responds to a live message.
+
+once it passes, you can chat with it live, download it as a working project, deploy it straight to your own github, or take that same repo straight to your own vercel account as a fully working, live app. share a link and anyone can talk to it too.
 
 reload the page anytime. your agent, your chat, your files, all still there.
 
@@ -16,7 +18,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 
 - describe an agent in plain english
 - generates real, working eve files
-- connects to real third-party services over mcp when you name one, like "connect to linear" or "search notion"
+- connects to real third-party services over MCP when you name one, like "connect to linear" or "search notion", never a guessed or invented connection
 - generation requests are screened by botid before they reach the ai gateway, bots never touch a sandbox
 - the model used for generation and a kill-switch can be flipped live from the dashboard, no redeploy
 - every agent is tested against a live eve runtime before you see it
@@ -44,9 +46,9 @@ reload the page anytime. your agent, your chat, your files, all still there.
 
 1. you describe an agent
 2. a botid check runs first, bot traffic is rejected before it costs anything
-3. the ai gateway routes the request to a model (switchable live via flags sdk), which writes real eve files
+3. the ai gateway routes the request to a model (switchable live via flags sdk), which writes real eve files, including a connection to a real third-party service if you named one
 4. a vercel sandbox installs eve for real and boots it, no stubs
-5. tryeve sends a live test message and confirms the agent actually responds
+5. tryeve sends a live test message and confirms the agent actually responds, if a connection is missing a credential, the failure names the exact variable needed instead of a generic error
 6. if it passes, the sandbox is kept alive rather than thrown away, so connecting afterward is instant
 7. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
 8. it's also added to your own history, tracked by a private cookie, not visible to anyone else
@@ -60,7 +62,7 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 ## built with ▲
 
 | product                                                | role                                                                                         |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- | --- |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | [eve](https://eve.dev)                                 | the agent framework every generated agent runs on, tested and deployed for real, not stubbed |
 | [next.js](https://nextjs.org)                          | the app itself                                                                               |
 | [ai gateway](https://vercel.com/docs/ai-gateway)       | routes the generation request to a model                                                     |
@@ -79,7 +81,7 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 | [streamdown](https://streamdown.ai)                    | renders code and markdown cleanly                                                            |
 | [shadcn/ui](https://ui.shadcn.com)                     | every ui component                                                                           |
 | [vercel](https://vercel.com)                           | hosts and deploys the app                                                                    |
-| [analytics](https://vercel.com/docs/analytics)         | tracks real usage without slowing anything down                                              |     |
+| [analytics](https://vercel.com/docs/analytics)         | tracks real usage without slowing anything down                                              |
 
 icons animated by [lucide-animated](https://lucide-animated.com).
 
@@ -140,6 +142,8 @@ VERCEL_INTEGRATION_SLUG=
 
 `VERCEL_OAUTH_CLIENT_ID`, `VERCEL_OAUTH_CLIENT_SECRET`, and `VERCEL_INTEGRATION_SLUG` come from a Vercel Marketplace Integration, used to let a visitor authorize deploy-to-vercel on their own account. deploy-to-vercel reads from the repo created by GitHub deploy, so GitHub deploy must run first.
 
+if a generated agent connects to a real third-party service over MCP, that service's own credential (e.g. `LINEAR_API_TOKEN`) is never tryeve's to hold, it's requested from you at test time and added to the exported project's own environment, not this one.
+
 ## project structure
 
 ```
@@ -166,6 +170,7 @@ lib/
   sandbox-quota.ts       per-visitor concurrent sandbox cap
   github-connect.ts       Vercel Connect token handling for GitHub deploy
   vercel-connect.ts       vercel OAuth token handling for vercel deploy
+  vercel-deploy-files.ts  builds the full app exported to github and vercel
 ```
 
 ## security
@@ -176,6 +181,7 @@ lib/
 - only the original creator can overwrite or stop that agent's session, share-link visitors cannot
 - GitHub deploy only ever touches the deploying visitor's own GitHub account, never the original agent owner's data
 - vercel deploy only ever touches the deploying visitor's own vercel account, never the original agent owner's data
+- an MCP connection is only ever generated when you name a real service, never guessed, and its credential is never stored by tryeve, only referenced by an environment variable name
 - chat, generation, and connect requests are all rate limited per visitor
 
 ## limits
