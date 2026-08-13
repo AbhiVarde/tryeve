@@ -55,6 +55,16 @@ export function parseFiles(raw: string): FileBlock[] {
   return blocks;
 }
 
+export function getConnectionEnvVars(files: FileBlock[]): string[] {
+  const vars = new Set<string>();
+  for (const f of files) {
+    if (!f.filename.startsWith("agent/connections/")) continue;
+    const matches = f.content.matchAll(/process\.env\.([A-Z0-9_]+)/g);
+    for (const m of matches) vars.add(m[1]);
+  }
+  return [...vars];
+}
+
 function escapeForJsTemplate(str: string) {
   return str
     .replace(/\\/g, "\\\\")
