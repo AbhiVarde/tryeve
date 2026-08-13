@@ -544,106 +544,118 @@ function HomeInner() {
 
     fetch(`/agent/${shareId}/raw`)
       .then((res) => (res.ok ? res.json() : null))
-      .then(async (data: { prompt: string; code: string } | null) => {
-        if (cancelled || !data) return;
-        const assistantId = crypto.randomUUID();
-        setMessages([
-          {
-            id: crypto.randomUUID(),
-            role: "user",
-            text: data.prompt,
-            kind: "generate",
-          },
-          {
-            id: assistantId,
-            role: "assistant",
-            text: data.code,
-            kind: "generate",
-            shareId,
-          },
-        ]);
-        setTestStatus((prev) => ({
-          ...prev,
-          [assistantId]: { state: "passed" },
-        }));
+      .then(
+        async (
+          data: {
+            prompt: string;
+            code: string;
+            missingConnectionEnv?: string[];
+          } | null,
+        ) => {
+          if (cancelled || !data) return;
+          const assistantId = crypto.randomUUID();
+          setMessages([
+            {
+              id: crypto.randomUUID(),
+              role: "user",
+              text: data.prompt,
+              kind: "generate",
+            },
+            {
+              id: assistantId,
+              role: "assistant",
+              text: data.code,
+              kind: "generate",
+              shareId,
+            },
+          ]);
+          const missingConnectionEnv = data.missingConnectionEnv ?? [];
+          setTestStatus((prev) => ({
+            ...prev,
+            [assistantId]:
+              missingConnectionEnv.length > 0
+                ? { state: "skipped", missingConnectionEnv }
+                : { state: "passed" },
+          }));
 
-        fetch(`/agent/${shareId}/raw?repo=1`)
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data: { repoUrl?: string } | null) => {
-            if (cancelled || !data?.repoUrl) return;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, repoUrl: data.repoUrl } : m,
-              ),
-            );
-          })
-          .catch(() => {});
-
-        fetch(`/agent/${shareId}/raw?vercel=1`)
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data: { liveUrl?: string } | null) => {
-            if (cancelled || !data?.liveUrl) return;
-            setVercelLinks((prev) => ({
-              ...prev,
-              [assistantId]: data.liveUrl!,
-            }));
-          })
-          .catch(() => {});
-
-        try {
-          const transcriptRes = await fetch(
-            `/agent/${shareId}/raw?transcript=1`,
-          );
-          const transcript: StoredMessage[] = transcriptRes.ok
-            ? await transcriptRes.json()
-            : [];
-          if (!cancelled) setInitialMessages(transcript);
-
-          const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
-          let session: { sandboxName: string; url: string } | null = null;
-          let alive = false;
-
-          if (sessionRes.ok) {
-            const parsed = (await sessionRes.json()) as {
-              sandboxName: string;
-              url: string;
-            };
-            session = parsed;
-            alive = await fetch("/api/ping-agent", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ url: parsed.url }),
+          fetch(`/agent/${shareId}/raw?repo=1`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data: { repoUrl?: string } | null) => {
+              if (cancelled || !data?.repoUrl) return;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, repoUrl: data.repoUrl } : m,
+                ),
+              );
             })
-              .then((r) => r.json())
-              .then((d) => d.alive)
-              .catch(() => false);
-          }
+            .catch(() => {});
 
-          if (!alive) {
-            const reviveRes = await fetch("/api/revive-agent", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ shareId }),
+          fetch(`/agent/${shareId}/raw?vercel=1`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data: { liveUrl?: string } | null) => {
+              if (cancelled || !data?.liveUrl) return;
+              setVercelLinks((prev) => ({
+                ...prev,
+                [assistantId]: data.liveUrl!,
+              }));
+            })
+            .catch(() => {});
+
+          try {
+            const transcriptRes = await fetch(
+              `/agent/${shareId}/raw?transcript=1`,
+            );
+            const transcript: StoredMessage[] = transcriptRes.ok
+              ? await transcriptRes.json()
+              : [];
+            if (!cancelled) setInitialMessages(transcript);
+
+            const sessionRes = await fetch(`/agent/${shareId}/raw?session=1`);
+            let session: { sandboxName: string; url: string } | null = null;
+            let alive = false;
+
+            if (sessionRes.ok) {
+              const parsed = (await sessionRes.json()) as {
+                sandboxName: string;
+                url: string;
+              };
+              session = parsed;
+              alive = await fetch("/api/ping-agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: parsed.url }),
+              })
+                .then((r) => r.json())
+                .then((d) => d.alive)
+                .catch(() => false);
+            }
+
+            if (!alive) {
+              const reviveRes = await fetch("/api/revive-agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ shareId }),
+              });
+              const revived = await reviveRes.json().catch(() => null);
+              if (!revived?.ok) return;
+              session = { sandboxName: revived.sandboxName, url: revived.url };
+            }
+
+            if (cancelled || !session) return;
+            const finalSession = session;
+            setChatSession({
+              agentMessageId: assistantId,
+              url: finalSession.url,
+              sandboxName: finalSession.sandboxName,
+              sessionId: null,
+              continuationToken: null,
+              turnCount: 0,
             });
-            const revived = await reviveRes.json().catch(() => null);
-            if (!revived?.ok) return;
-            session = { sandboxName: revived.sandboxName, url: revived.url };
+          } catch {
+            setChatSession((prev) => prev);
           }
-
-          if (cancelled || !session) return;
-          const finalSession = session;
-          setChatSession({
-            agentMessageId: assistantId,
-            url: finalSession.url,
-            sandboxName: finalSession.sandboxName,
-            sessionId: null,
-            continuationToken: null,
-            turnCount: 0,
-          });
-        } catch {
-          setChatSession((prev) => prev);
-        }
-      })
+        },
+      )
       .finally(() => {
         if (!cancelled) setRestoring(false);
       });
@@ -1541,13 +1553,6 @@ function HomeInner() {
                               </span>
                             )}
                           </p>
-                          {state === "skipped" &&
-                            result?.missingConnectionEnv && (
-                              <p className="font-mono text-xs text-amber-400/80">
-                                needs {result.missingConnectionEnv.join(", ")}{" "}
-                                to test or chat here, deploy below to add it
-                              </p>
-                            )}
                           {state === "failed" && result?.error && (
                             <div className="flex flex-col gap-2">
                               <p className="font-mono text-xs text-red-400/80">

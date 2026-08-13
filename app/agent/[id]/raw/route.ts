@@ -1,4 +1,32 @@
 import { head } from "@vercel/blob";
+import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
+
+type FileBlock = { filename: string; content: string };
+
+function parseFiles(raw: string): FileBlock[] {
+  const regex = /```[a-zA-Z]*\n([\s\S]*?)```/g;
+  const blocks: FileBlock[] = [];
+  let match;
+  let i = 0;
+
+  while ((match = regex.exec(raw)) !== null) {
+    i++;
+    const body = match[1];
+    const firstLine = body.split("\n")[0];
+    const filenameMatch = firstLine.match(/(?:\/\/|#)\s*filename:\s*(.+)/i);
+    const filename = filenameMatch
+      ? filenameMatch[1].trim()
+      : i === 1
+        ? "agent/instructions.md"
+        : `agent/tools/tool-${i}.ts`;
+    const content = filenameMatch
+      ? body.split("\n").slice(1).join("\n").trim()
+      : body.trim();
+    blocks.push({ filename, content });
+  }
+
+  return blocks;
+}
 
 export async function GET(
   req: Request,
@@ -26,6 +54,12 @@ export async function GET(
     });
     const res = await fetch(blob.url, { cache: "no-store" });
     const data = await res.json();
+
+    if (!isSession && !isTranscript && !isRepo && !isVercel && data.code) {
+      const files = parseFiles(data.code);
+      data.missingConnectionEnv = getMissingConnectionEnvVars(files);
+    }
+
     return Response.json(data);
   } catch {
     return isTranscript
