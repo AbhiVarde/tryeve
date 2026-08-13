@@ -796,7 +796,9 @@ import { nanoid } from "nanoid";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const AGENT_FILES: { filename: string; content: string }[] = ${filesLiteral};
+type FileBlock = { filename: string; content: string };
+
+const AGENT_FILES: FileBlock[] = ${filesLiteral};
 
 const OPEN_CHANNEL_AUTH = \`import { eveChannel } from "eve/channels/eve";
 import { none } from "eve/channels/auth";
