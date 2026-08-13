@@ -24,7 +24,8 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - inspect every file with syntax highlighting
 - export the full agent as a zip
 - deploy any generated agent straight to your own GitHub, no OAuth app to set up yourself
-- deploy that same agent to your own vercel account too, one-time authorization, live in seconds
+- deploy that same agent to your own vercel account too, one-time authorization, full app included, not just the agent's api, chat ui ships in the same repo
+- one manual step remains after vercel deploy, add a model credential in your new project's settings and redeploy, no key of mine ships with your copy
 - share a live link to any agent you build, anyone with the link can chat with it directly
 - connect to your agent right after it's built, no install needed
 - chat with it live, with markdown formatted replies
@@ -49,7 +50,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 7. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
 8. it's also added to your own history, tracked by a private cookie, not visible to anyone else
 9. optionally, deploy the generated files straight to your own GitHub via Vercel Connect, no long-lived secret ever stored
-10. optionally, deploy that same repo straight to your own vercel account via a vercel oauth authorization, no token of mine ever touches it
+10. optionally, deploy that same repo straight to your own vercel account via a vercel oauth authorization, no token of mine ever touches it, this deploys the whole app, agent and chat ui together, not the agent alone
 
 steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
 
@@ -57,26 +58,26 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 
 ## built with ▲
 
-| product                                             | role                                                                                        |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [next.js](https://nextjs.org)                       | the app itself                                                                              |
-| [ai gateway](https://vercel.com/docs/ai-gateway)    | routes the generation request to a model                                                    |
-| [ai sdk](https://sdk.vercel.ai)                     | streams the model's response                                                                |
-| [sandbox](https://vercel.com/docs/sandbox)          | tests every agent against a real eve runtime, then runs it live so you can talk to it       |
-| [workflow sdk](https://vercel.com/docs/workflow)    | runs generate and test as one durable step                                                  |
-| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent, its live session, chat transcript, and per-visitor history               |
-| [cron](https://vercel.com/docs/cron-jobs)           | sweeps stale sandbox sessions on a schedule                                                 |
-| [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation, connect, and chat requests                                          |
-| [observability](https://vercel.com/docs/observability) | traces the sandbox pipeline for failures                                                 |
-| [connect](https://vercel.com/docs/connect)          | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
-| [vercel oauth](https://vercel.com/docs/integrations)| lets a visitor authorize deploy-to-vercel on their own account, no token of mine involved   |
-| [botid](https://vercel.com/docs/botid)              | blocks bot traffic on generation, invisible to real users                                   |
-| [flags sdk](https://vercel.com/docs/feature-flags)  | flips the model or pauses generation live, no redeploy                                      |
-| [ai elements](https://ai-sdk.dev/elements)          | chat interface, task progress ui, loading states                                            |
-| [streamdown](https://streamdown.ai)                 | renders code and markdown cleanly                                                           |
-| [shadcn/ui](https://ui.shadcn.com)                  | every ui component                                                                          |
-| [vercel](https://vercel.com)                        | hosts and deploys the app                                                                   |
-| [analytics](https://vercel.com/docs/analytics)      | tracks real usage without slowing anything down                                             |            |
+| product                                                | role                                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | --- |
+| [next.js](https://nextjs.org)                          | the app itself                                                                              |
+| [ai gateway](https://vercel.com/docs/ai-gateway)       | routes the generation request to a model                                                    |
+| [ai sdk](https://sdk.vercel.ai)                        | streams the model's response                                                                |
+| [sandbox](https://vercel.com/docs/sandbox)             | tests every agent against a real eve runtime, then runs it live so you can talk to it       |
+| [workflow sdk](https://vercel.com/docs/workflow)       | runs generate and test as one durable step                                                  |
+| [blob](https://vercel.com/docs/storage/vercel-blob)    | stores each agent, its live session, chat transcript, and per-visitor history               |
+| [cron](https://vercel.com/docs/cron-jobs)              | sweeps stale sandbox sessions on a schedule                                                 |
+| [firewall](https://vercel.com/docs/vercel-firewall)    | rate limits generation, connect, and chat requests                                          |
+| [observability](https://vercel.com/docs/observability) | traces the sandbox pipeline for failures                                                    |
+| [connect](https://vercel.com/docs/connect)             | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
+| [vercel oauth](https://vercel.com/docs/integrations)   | lets a visitor authorize deploy-to-vercel on their own account, no token of mine involved   |
+| [botid](https://vercel.com/docs/botid)                 | blocks bot traffic on generation, invisible to real users                                   |
+| [flags sdk](https://vercel.com/docs/feature-flags)     | flips the model or pauses generation live, no redeploy                                      |
+| [ai elements](https://ai-sdk.dev/elements)             | chat interface, task progress ui, loading states                                            |
+| [streamdown](https://streamdown.ai)                    | renders code and markdown cleanly                                                           |
+| [shadcn/ui](https://ui.shadcn.com)                     | every ui component                                                                          |
+| [vercel](https://vercel.com)                           | hosts and deploys the app                                                                   |
+| [analytics](https://vercel.com/docs/analytics)         | tracks real usage without slowing anything down                                             |     |
 
 icons animated by [lucide-animated](https://lucide-animated.com).
 

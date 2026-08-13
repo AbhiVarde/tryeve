@@ -99,12 +99,11 @@ a share link lets anyone view an agent's files and chat with it. it doesn't let 
 
 ## what's deliberately not built
 
-hosting a generated agent as its own live service was built, then removed.
+hosting a generated agent on tryeve's own infrastructure as a permanent live service was built, then removed.
 
-↳ an eve agent is an api, not a page, it describes behavior, not content  
-↳ a deployed agent with no channel or frontend is a live endpoint with nothing to show  
-↳ it stayed out
+↳ that would mean tryeve running someone else's agent indefinitely, on my account, at my cost, forever  
+↳ it stayed out for that reason, not because a deployed agent has nothing to show
 
-deploying the generated code to the user's own github made the cut instead. it's not hosting, it's handing over files the person owns. pushing those files uses a short-lived scoped token from a github app, issued through connect. creating the repo itself uses a separate classic oauth token, because github apps cannot create repositories on personal accounts, only on organizations, so connect's github app can't do that one step. either way, one produces a repo they control, the other a process nobody asked for.
+deploying the generated code to the user's own github made the cut instead. it's not hosting, it's handing over files the person owns, the full app, agent and chat ui both, not the agent's api alone. pushing those files uses a short-lived scoped token from a github app, issued through connect. creating the repo itself uses a separate classic oauth token, because github apps cannot create repositories on personal accounts, only on organizations, so connect's github app can't do that one step. either way, one produces a repo they control, the other a process nobody asked for.
 
-deploying that same repo to a user's own vercel account was added the same way, later. it's still not tryeve hosting anything, it's handing the same files to an account the person controls, this time via a vercel marketplace integration oauth instead of a github app token. it depends on the github deploy step running first, since it deploys straight from that repo rather than a second copy of the files.
+deploying that same repo to a user's own vercel account was added the same way, later. it's still not tryeve hosting anything, it's handing the same working app to an account the person controls, this time via a vercel marketplace integration oauth instead of a github app token. it depends on the github deploy step running first, since it deploys straight from that repo rather than a second copy of the files. one manual step remains before it responds, a model credential has to be added in the new project's vercel settings and redeployed, since no key of mine is included.

@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: "%s · tryeve",
   },
   description:
-    "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
+    "Agent Runtime for eve, tested against a live eve runtime, then deployed as a live app to your own GitHub and Vercel.",
   keywords: [
     "eve",
     "ai agent builder",
@@ -34,6 +34,8 @@ export const metadata: Metadata = {
     "eve runtime",
     "ai agent generator",
     "no code agent builder",
+    "deploy ai agent to vercel",
+    "deploy ai agent to github",
   ],
   authors: [{ name: "abhi varde", url: "https://abhivarde.in" }],
   alternates: {
