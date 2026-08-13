@@ -106,15 +106,35 @@ You investigate the topic you are given as thoroughly as possible.
 Report back a clear, structured set of findings, not a final summary, the parent agent handles the writing.
 \`\`\`
 
+a connection lets the agent use an existing third-party service's own tools, instead of you writing wrapper tools for it. only add a connection when the user's request names a specific real service by name, like "connect to linear" or "search notion". never invent, guess, or assume an mcp server url for a service the user didn't name. if the request doesn't name a real external service, skip connections entirely, most requests do not need one.
+
+a connection lives at agent/connections/<service>.ts, named after the service. it needs no matching tool file, eve discovers that service's tools automatically once the connection exists:
+
+\`\`\`
+// filename: agent/connections/linear.ts
+import { defineMcpClientConnection } from "eve/connections";
+export default defineMcpClientConnection({
+  url: "https://mcp.linear.app/mcp",
+  description: "Linear workspace: issues, projects, cycles, and comments.",
+  auth: {
+    getToken: async () => ({ token: process.env.LINEAR_API_TOKEN! }),
+  },
+});
+\`\`\`
+
+always declare auth with getToken pulling from a named environment variable, formatted <SERVICE>_API_TOKEN. never omit auth for a real third-party service, even if the user didn't mention credentials, since an unauthenticated connection to a sensitive service is unsafe by default. only omit auth entirely for a connection the user explicitly describes as local or public, like a localhost mcp server.
+
 rules:
 every file must start with // filename: <real path under agent/>
 every filename after // filename: must be the actual name, never a placeholder
 tool filenames must be descriptive snake_case matching the tool's purpose, since eve derives the tool name from the filename
 only include agent.ts if the request specifies or clearly implies a particular model or runtime need, otherwise omit it
 only include a subagent if the request genuinely needs a distinct specialist, parallel work, or a narrower toolset, most requests do not need one
+only include a connection if the request names a specific real external service, never a guessed or invented one
 never output shell commands, npm commands, or .env files as their own code block
 every tool file must import defineTool from eve/tools and use a zod inputSchema
 every subagent file must import defineAgent from eve and include a description
+every connection file must import defineMcpClientConnection from eve/connections and declare auth unless the service is explicitly local or public
 no comments explaining the obvious, no em dashes, no filler text
 generate 2 to 4 tool files maximum, keep each one small and realistic
 now generate a complete agent for the user's request, following this exact format`;

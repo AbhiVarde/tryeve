@@ -817,6 +817,16 @@ function getModelEnv() {
   return env;
 }
 
+function getConnectionEnvVars(files: FileBlock[]): string[] {
+  const vars = new Set<string>();
+  for (const f of files) {
+    if (!f.filename.startsWith("agent/connections/")) continue;
+    const matches = f.content.matchAll(/process\.env\.([A-Z0-9_]+)/g);
+    for (const m of matches) vars.add(m[1]);
+  }
+  return [...vars];
+}
+
 function getDirectories(files: { filename: string }[]): string[] {
   const dirs = new Set<string>();
   for (const f of files) {
@@ -1203,7 +1213,19 @@ AI_GATEWAY_API_KEY=
 \`\`\`
 
 or \`ANTHROPIC_API_KEY\` / \`OPENAI_API_KEY\`. one AI Gateway key covers anthropic, openai, gemini, groq, and more.
-`,
+${
+  getConnectionEnvVars(generated).length > 0
+    ? `
+this agent also connects to a real external service, so it needs these too:
+
+\`\`\`
+${getConnectionEnvVars(generated)
+  .map((v) => `${v}=`)
+  .join("\n")}
+\`\`\`
+`
+    : ""
+}`,
     },
   ];
 }

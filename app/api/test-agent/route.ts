@@ -49,6 +49,18 @@ function getDirectories(files: FileBlock[]): string[] {
   return [...dirs];
 }
 
+function getMissingConnectionEnvVars(files: FileBlock[]): string[] {
+  const missing = new Set<string>();
+  for (const f of files) {
+    if (!f.filename.startsWith("agent/connections/")) continue;
+    const matches = f.content.matchAll(/process\.env\.([A-Z0-9_]+)/g);
+    for (const m of matches) {
+      if (!process.env[m[1]]) missing.add(m[1]);
+    }
+  }
+  return [...missing];
+}
+
 const OPEN_CHANNEL_AUTH = `import { eveChannel } from "eve/channels/eve";
 import { none } from "eve/channels/auth";
 
@@ -127,6 +139,14 @@ export async function POST(req: Request) {
     });
   }
 
+  const missingConnectionEnv = getMissingConnectionEnvVars(files);
+  if (missingConnectionEnv.length > 0) {
+    return Response.json({
+      passed: false,
+      error: `this agent connects to a real service and needs ${missingConnectionEnv.join(", ")} configured before testing can run`,
+    });
+  }
+
   const sandboxName = `eve-agent-test-${nanoid(8)}`;
   let sandbox: Awaited<ReturnType<typeof Sandbox.create>>;
 
@@ -138,7 +158,14 @@ export async function POST(req: Request) {
           runtime: "node24",
           timeout: 600_000,
           ports: [3000],
-          env: sandboxEnv,
+          env: {
+            ...sandboxEnv,
+            ...Object.fromEntries(
+              getMissingConnectionEnvVars(files)
+                .filter((k) => process.env[k])
+                .map((k) => [k, process.env[k]!]),
+            ),
+          },
           persistent: false,
         });
       } finally {

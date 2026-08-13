@@ -106,6 +106,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     items: [
       "describe an agent in plain english",
       "generates real, working eve files",
+      "connects to real services over mcp when you name one, like linear or notion",
       "tested against a live eve runtime before you see it",
       "generation and testing run as one durable step, survives crashes",
       "if a build fails, the reason is shown and you can retry with one click",
@@ -145,6 +146,10 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
 ];
 
 const VERCEL_PRODUCTS: { name: string; description: string }[] = [
+  {
+    name: "eve",
+    description: "the agent framework every generated agent runs on",
+  },
   { name: "next.js", description: "the app itself" },
   { name: "ai gateway", description: "routes generation to a model" },
   { name: "ai sdk", description: "streams the model's response" },

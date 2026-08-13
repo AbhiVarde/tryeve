@@ -20,6 +20,14 @@ a model can write eve files without much trouble. what it can't guarantee is tha
 the first five steps run as one durable workflow step.  
 ↳ a crash mid generation resumes instead of losing the request
 
+## connections
+
+if you name a real service, the model also writes a connection file, eve's native way to give an agent another app's own tools without hand-writing wrappers for them.
+
+↳ only added when the request names a specific real service, never guessed  
+↳ auth is declared on the connection, pulled from an env var at call time  
+↳ if that env var isn't set, testing fails with the exact variable name needed, not a generic timeout
+
 ## why real testing instead of stubs
 
 the first version stubbed `eve`, `eve/tools`, and `zod` to catch syntax errors cheaply.
