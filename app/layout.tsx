@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "tryeve, describe an agent, get a working one",
     description:
-      "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
+      "Agent Runtime for eve, tested against a live eve runtime, then deployed as a live app to your own GitHub and Vercel.",
     url: "https://tryeve.abhivarde.in",
     siteName: "tryeve",
     type: "website",
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     creator: "@varde_abhi",
     title: "tryeve, describe an agent, get a working one",
     description:
-      "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
+      "Agent Runtime for eve, tested against a live eve runtime, then deployed as a live app to your own GitHub and Vercel.",
     images: ["/og-image.png"],
   },
   robots: {
@@ -90,7 +90,7 @@ const jsonLd = {
     priceCurrency: "USD",
   },
   description:
-    "Agent Runtime for eve, tested against a live eve runtime, ready to talk before you ever see it.",
+    "Agent Runtime for eve, tested against a live eve runtime, then deployed as a live app to your own GitHub and Vercel.",
   author: {
     "@type": "Person",
     name: "abhi varde",

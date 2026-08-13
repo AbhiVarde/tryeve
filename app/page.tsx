@@ -1441,8 +1441,8 @@ function HomeInner() {
                 </h1>
 
                 <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-                  tested against a live eve runtime, ready to talk before you
-                  ever see it.
+                  tested against a live eve runtime, then deployed to your own
+                  github and vercel.
                 </p>
               </div>
 
