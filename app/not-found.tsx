@@ -30,7 +30,6 @@ export default function NotFound() {
           the page or agent you&apos;re looking for couldn&apos;t be found. it
           may have been moved, removed, or the link is no longer valid.
         </p>
-
         <Button
           variant="outline"
           className="relative z-10 mt-8 h-8 rounded-md px-4 font-mono"
@@ -42,6 +41,22 @@ export default function NotFound() {
             <ArrowRightIcon ref={arrowRef} size={14} />
           </Link>
         </Button>
+
+        <div className="relative z-10 mt-3 flex items-center gap-3 font-mono text-[11px] text-muted-foreground/60">
+          <Link
+            href="/sitemap.xml"
+            className="hover:text-foreground transition-colors"
+          >
+            sitemap
+          </Link>
+          <span>.</span>
+          <Link
+            href="/llms.txt"
+            className="hover:text-foreground transition-colors"
+          >
+            llms.txt
+          </Link>
+        </div>
       </section>
     </AppShell>
   );

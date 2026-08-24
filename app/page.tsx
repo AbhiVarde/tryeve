@@ -1473,13 +1473,7 @@ function HomeInner() {
           panelOpen ? "w-full md:w-1/2" : "w-full"
         }`}
       >
-        {restoring ? (
-          <div className="flex flex-1 items-center justify-center">
-            <div className="font-mono text-sm text-muted-foreground">
-              <Shimmer duration={1.5}>loading your agent...</Shimmer>
-            </div>
-          </div>
-        ) : messages.length === 0 ? (
+        {restoring || messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-14 sm:px-6 sm:py-20">
             <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-5 text-center sm:gap-6">
               <Badge
@@ -1488,19 +1482,24 @@ function HomeInner() {
               >
                 Agent Runtime
               </Badge>
-
               <div className="flex flex-col gap-2.5 sm:gap-3">
                 <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                   describe an agent. get a working one.
                 </h1>
-
                 <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
                   tested against a live eve runtime, then deployed to your own
                   github and vercel.
                 </p>
               </div>
-
-              <div className="mt-3 w-full sm:mt-4">{inputBar}</div>
+              <div className="mt-3 w-full sm:mt-4">
+                {restoring ? (
+                  <div className="font-mono text-sm text-muted-foreground">
+                    <Shimmer duration={1.5}>loading your agent...</Shimmer>
+                  </div>
+                ) : (
+                  inputBar
+                )}
+              </div>
             </div>
           </div>
         ) : (
