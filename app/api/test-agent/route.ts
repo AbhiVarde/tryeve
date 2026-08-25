@@ -158,6 +158,14 @@ export async function POST(req: Request) {
             ),
           },
           persistent: false,
+          networkPolicy: {
+            allow: [
+              "registry.npmjs.org",
+              ...(sandboxEnv.AI_GATEWAY_API_KEY || sandboxEnv.VERCEL_OIDC_TOKEN
+                ? ["ai-gateway.vercel.sh"]
+                : []),
+            ],
+          },
         });
       } finally {
         span.end();
