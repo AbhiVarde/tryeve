@@ -92,7 +92,7 @@ function getSandboxEnv() {
 }
 
 export async function POST(req: Request) {
-  const { code, visitorId } = await req.json();
+  const { code, prompt, visitorId } = await req.json();
 
   if (!code || typeof code !== "string") {
     return Response.json(
@@ -268,10 +268,15 @@ export async function POST(req: Request) {
 
     let res: Response;
     try {
+      const testMessage =
+        typeof prompt === "string" && prompt.trim()
+          ? `you were just built for this: "${prompt.trim()}". confirm you're working and briefly say how you'd help with it.`
+          : "hello, are you working?";
+
       res = await fetch(`${url}/eve/v1/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "hello, are you working?" }),
+        body: JSON.stringify({ message: testMessage }),
       });
     } catch {
       await sandbox.stop();

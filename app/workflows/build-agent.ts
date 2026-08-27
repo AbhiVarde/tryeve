@@ -168,7 +168,7 @@ export async function buildAgentWorkflow(prompt: string, visitorId?: string) {
   "use workflow";
 
   const code = await generateAgent(prompt);
-  const result = await testAgent(code, visitorId);
+  const result = await testAgent(code, prompt, visitorId);
 
   return {
     code,
@@ -222,6 +222,7 @@ async function generateAgent(prompt: string): Promise<string> {
 
 async function testAgent(
   code: string,
+  prompt: string,
   visitorId?: string,
 ): Promise<{
   passed: boolean;
@@ -238,7 +239,7 @@ async function testAgent(
     res = await fetch(`${getBaseUrl()}/api/test-agent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, visitorId }),
+      body: JSON.stringify({ code, prompt, visitorId }),
     });
   } catch (err) {
     console.error("testAgent: fetch failed", err);
