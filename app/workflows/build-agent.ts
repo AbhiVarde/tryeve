@@ -139,6 +139,16 @@ export default defineSchedule({
 });
 \`\`\`
 
+a skill is a markdown playbook the agent loads only when it's relevant, instead of carrying procedural detail inside instructions.md on every turn. only add a skill when the request implies a specific, non-obvious procedure the agent must follow exactly, like a formatting standard, a fixed step-by-step process, or a house style. most requests do not need one, do not add a skill just to seem thorough. a skill lives at agent/skills/<name>.md, named after what it teaches:
+
+\`\`\`
+// filename: agent/skills/invoice_format.md
+# Invoice Formatting
+Every invoice must list: date, client name, line items with quantity and unit price, subtotal, tax, and total.
+Amounts are always shown with two decimal places and a currency symbol.
+Never omit the tax line, even if it is zero.
+\`\`\`
+
 rules:
 every file must start with // filename: <real path under agent/>
 every filename after // filename: must be the actual name, never a placeholder
@@ -147,6 +157,8 @@ only include agent.ts if the request specifies or clearly implies a particular m
 only include a subagent if the request genuinely needs a distinct specialist, parallel work, or a narrower toolset, most requests do not need one
 only include a connection if the request names a specific real external service, never a guessed or invented one
 only include a schedule if the request explicitly implies recurring or automatic behavior, most requests do not need one
+only include a skill if the request implies a specific procedure, formatting standard, or house style the agent must follow, most requests do not need one
+every skill file is plain markdown under agent/skills/, no imports, no code fences inside it
 if both the root agent and a subagent need the same connection, duplicate the connection file under the subagent's own agent/subagents/<id>/connections/, a subagent inherits nothing from root
 never output shell commands, npm commands, or .env files as their own code block
 every tool file must import defineTool from eve/tools and use a zod inputSchema
