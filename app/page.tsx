@@ -393,6 +393,7 @@ function HomeInner() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [hoveredHistoryId, setHoveredHistoryId] = useState<string | null>(null);
 
+  const [refineInput, setRefineInput] = useState("");
   const [testStatus, setTestStatus] = useState<Record<string, TestResult>>({});
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
@@ -1029,7 +1030,7 @@ function HomeInner() {
     }
   }
 
-  async function generateAgent(prompt: string) {
+  async function generateAgent(prompt: string, previousCode?: string) {
     setBusy(true);
     setPhase("generating");
     setGenMsgIndex(0);
@@ -1066,7 +1067,7 @@ function HomeInner() {
       const res = await fetch("/api/build-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, previousCode }),
       });
 
       const result = await res.json().catch(() => null);
@@ -1286,6 +1287,38 @@ function HomeInner() {
                 : "deploy to vercel"}
           </span>
         </Button>
+        <div className="flex gap-2">
+          <Textarea
+            placeholder="add a slack notification tool..."
+            value={refineInput}
+            maxLength={MAX_INPUT_LENGTH}
+            onChange={(e) => setRefineInput(e.target.value)}
+            className="min-h-10 resize-none rounded-md border-0 bg-black/20 px-3 py-2 font-mono text-sm shadow-none focus-visible:ring-1"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || refineInput.trim().length === 0}
+            onClick={() => {
+              const trimmed = refineInput.trim();
+              if (!trimmed || !latestAssistantMessage) return;
+              setRefineInput("");
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: crypto.randomUUID(),
+                  role: "user",
+                  text: trimmed,
+                  kind: "generate",
+                },
+              ]);
+              generateAgent(trimmed, latestAssistantMessage.text);
+            }}
+            className="shrink-0 cursor-pointer"
+          >
+            refine
+          </Button>
+        </div>
         <button
           type="button"
           onClick={startNewAgent}

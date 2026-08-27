@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const { prompt } = await req.json();
+  const { prompt, previousCode } = await req.json();
 
   let result;
   try {
@@ -52,7 +52,11 @@ export async function POST(req: Request) {
       "build-agent.workflow",
       async (span) => {
         try {
-          const run = await start(buildAgentWorkflow, [prompt, visitorId]);
+          const run = await start(buildAgentWorkflow, [
+            prompt,
+            visitorId,
+            previousCode,
+          ]);
           const value = await run.returnValue;
           span.setAttribute("agent.passed", !!value.passed);
           return value;

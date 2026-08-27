@@ -195,10 +195,14 @@ function getBaseUrl() {
   return "http://localhost:3000";
 }
 
-export async function buildAgentWorkflow(prompt: string, visitorId?: string) {
+export async function buildAgentWorkflow(
+  prompt: string,
+  visitorId?: string,
+  previousCode?: string,
+) {
   "use workflow";
 
-  const code = await generateAgent(prompt);
+  const code = await generateAgent(prompt, previousCode);
   const result = await testAgent(code, prompt, visitorId);
 
   return {
@@ -212,13 +216,20 @@ export async function buildAgentWorkflow(prompt: string, visitorId?: string) {
   };
 }
 
-async function generateAgent(prompt: string): Promise<string> {
+async function generateAgent(
+  prompt: string,
+  previousCode?: string,
+): Promise<string> {
   "use step";
 
   const { streamText } = await import("ai");
 
   const primary = await primaryModel();
   const models = [primary, ...FALLBACK_MODELS];
+
+  const effectivePrompt = previousCode
+    ? `here is the existing agent's files:\n\n${previousCode}\n\nthe user now wants this change: "${prompt}"\n\napply only what's needed for this change and output the complete updated set of files in the same format, keep everything else the same.`
+    : prompt;
 
   let text = "";
   let lastError: unknown = null;
@@ -228,7 +239,7 @@ async function generateAgent(prompt: string): Promise<string> {
       const result = streamText({
         model,
         system: SYSTEM_PROMPT,
-        prompt,
+        prompt: effectivePrompt,
       });
 
       text = "";
