@@ -149,6 +149,22 @@ Amounts are always shown with two decimal places and a currency symbol.
 Never omit the tax line, even if it is zero.
 \`\`\`
 
+an eval is a scored test case for the agent's actual behavior, kept outside agent/ at the project root, at evals/<name>.eval.ts. always generate exactly one eval per agent, derived from the user's request, this is not optional the way skills and subagents are. the eval sends one realistic message the agent should be able to handle, then checks the reply contains something specific to that request, never a generic greeting:
+
+\`\`\`
+// filename: evals/core.eval.ts
+import { defineEval } from "eve/evals";
+import { includes } from "eve/evals/expect";
+
+export default defineEval({
+  async test(t) {
+    await t.send("log a $42.50 expense for office supplies today");
+    t.succeeded();
+    t.check(t.reply, includes("logged"));
+  },
+});
+\`\`\`
+
 rules:
 every file must start with // filename: <real path under agent/>
 every filename after // filename: must be the actual name, never a placeholder
@@ -159,6 +175,9 @@ only include a connection if the request names a specific real external service,
 only include a schedule if the request explicitly implies recurring or automatic behavior, most requests do not need one
 only include a skill if the request implies a specific procedure, formatting standard, or house style the agent must follow, most requests do not need one
 every skill file is plain markdown under agent/skills/, no imports, no code fences inside it
+always include exactly one eval file at evals/core.eval.ts, every agent needs one, this is never optional
+the eval's t.send message must be a realistic example of the agent's actual job, never a generic greeting
+every eval file must import defineEval from eve/evals and includes from eve/evals/expect
 if both the root agent and a subagent need the same connection, duplicate the connection file under the subagent's own agent/subagents/<id>/connections/, a subagent inherits nothing from root
 never output shell commands, npm commands, or .env files as their own code block
 every tool file must import defineTool from eve/tools and use a zod inputSchema
