@@ -74,6 +74,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ClockIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { getConnectionEnvVars } from "@/app/lib/eve-connections";
+import { SparklesIcon } from "@/components/ui/sparkles";
+import { ArrowUpIcon } from "@/components/ui/arrow-up";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | "skipped" | null;
@@ -1305,17 +1307,19 @@ function HomeInner() {
                 : "deploy to vercel"}
           </span>
         </Button>
-        <div className="flex gap-2">
+        <div className="relative">
+          <SparklesIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Textarea
             placeholder="add a slack notification tool..."
             value={refineInput}
             maxLength={MAX_INPUT_LENGTH}
             onChange={(e) => setRefineInput(e.target.value)}
-            className="min-h-10 resize-none rounded-md border-0 bg-black/20 px-3 py-2 font-mono text-sm shadow-none focus-visible:ring-1"
+            className="min-h-11 resize-none rounded-full border-0 bg-black/20 py-2.5 pl-9 pr-11 font-mono text-sm shadow-none focus-visible:ring-1"
           />
           <Button
             type="button"
-            variant="outline"
+            size="icon"
+            variant="ghost"
             disabled={busy || refineInput.trim().length === 0}
             onClick={() => {
               const trimmed = refineInput.trim();
@@ -1332,9 +1336,9 @@ function HomeInner() {
               ]);
               generateAgent(trimmed, latestAssistantMessage.text);
             }}
-            className="shrink-0 cursor-pointer"
+            className="absolute right-1.5 top-1/2 size-8 -translate-y-1/2 cursor-pointer rounded-full hover:bg-white/10 disabled:opacity-40"
           >
-            refine
+            <ArrowUpIcon className="size-4" />
           </Button>
         </div>
         <button
