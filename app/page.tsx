@@ -114,9 +114,11 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "describe an agent in plain english",
       "generates real, working eve files",
       "connects to real services over mcp when you name one, like linear or notion",
-      "tested against a live eve runtime before you see it",
+      "adds a skills file and an eval file when the request calls for it",
+      "tested live against your actual request before you see it",
       "generation and testing run as one durable step, survives crashes",
       "if a build fails, the reason is shown and you can retry with one click",
+      "refine an existing agent with a follow-up instead of starting over",
     ],
   },
   {
@@ -140,6 +142,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
   {
     label: "reliability & privacy",
     items: [
+      "generated code runs sandboxed, network access locked to only what it needs",
       "reload the page anytime, your agent and chat pick up right where you left off",
       "switching tabs never disconnects your agent, only real exits do",
       "dead share links reconnect automatically, no dead ends",
@@ -160,7 +163,11 @@ const VERCEL_PRODUCTS: { name: string; description: string }[] = [
   { name: "next.js", description: "the app itself" },
   { name: "ai gateway", description: "routes generation to a model" },
   { name: "ai sdk", description: "streams the model's response" },
-  { name: "sandbox", description: "tests and runs each agent live" },
+  {
+    name: "sandbox",
+    description:
+      "tests and runs each agent live, network-locked to only what it needs",
+  },
   {
     name: "workflow sdk",
     description: "runs generate + test as one durable step",

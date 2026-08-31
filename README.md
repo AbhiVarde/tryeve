@@ -21,9 +21,13 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - connects to real third-party services over MCP when you name one, like "connect to linear" or "search notion", never a guessed or invented connection
 - a connection agent can't be tested or chatted with inside tryeve, since tryeve never holds your service credential, files and deploy still work either way, chat opens once you deploy it with your own credential set
 - runs on a schedule instead of waiting for a message, for daily digests or recurring jobs, when you ask for one
+- adds a skills file when your request implies a specific procedure or house style
+- ships an eval file with every agent, ready to run in your own pipeline
+- refine an already-built agent with a follow-up instead of starting from scratch
 - generation requests are screened by botid before they reach the ai gateway, bots never touch a sandbox
+- generated code runs in a sandbox network-locked to only the hosts it needs
 - the model used for generation and a kill-switch can be flipped live from the dashboard, no redeploy
-- every agent is tested against a live eve runtime before you see it
+- every agent is tested live against your actual prompt before you see it
 - generation and testing run as one durable step, survives crashes
 - if a build fails, the reason is shown and you can retry with one click
 - inspect every file with syntax highlighting
@@ -65,27 +69,27 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 
 ## built with ▲
 
-| product                                                | role                                                                                         |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| [eve](https://eve.dev)                                 | the agent framework every generated agent runs on, tested and deployed for real, not stubbed |
-| [next.js](https://nextjs.org)                          | the app itself                                                                               |
-| [ai gateway](https://vercel.com/docs/ai-gateway)       | routes the generation request to a model                                                     |
-| [ai sdk](https://sdk.vercel.ai)                        | streams the model's response                                                                 |
-| [sandbox](https://vercel.com/docs/sandbox)             | tests every agent against a real eve runtime, then runs it live so you can talk to it        |
-| [workflow sdk](https://vercel.com/docs/workflow)       | runs generate and test as one durable step                                                   |
-| [blob](https://vercel.com/docs/storage/vercel-blob)    | stores each agent, its live session, chat transcript, and per-visitor history                |
-| [cron](https://vercel.com/docs/cron-jobs)              | sweeps stale sandbox sessions on a schedule                                                  |
-| [firewall](https://vercel.com/docs/vercel-firewall)    | rate limits generation, connect, and chat requests                                           |
-| [observability](https://vercel.com/docs/observability) | traces the sandbox pipeline for failures                                                     |
-| [connect](https://vercel.com/docs/connect)             | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets  |
-| [vercel oauth](https://vercel.com/docs/integrations)   | lets a visitor authorize deploy-to-vercel on their own account, no token of mine involved    |
-| [botid](https://vercel.com/docs/botid)                 | blocks bot traffic on generation, invisible to real users                                    |
-| [flags sdk](https://vercel.com/docs/feature-flags)     | flips the model or pauses generation live, no redeploy                                       |
-| [ai elements](https://ai-sdk.dev/elements)             | chat interface, task progress ui, loading states                                             |
-| [streamdown](https://streamdown.ai)                    | renders code and markdown cleanly                                                            |
-| [shadcn/ui](https://ui.shadcn.com)                     | every ui component                                                                           |
-| [vercel](https://vercel.com)                           | hosts and deploys the app                                                                    |
-| [analytics](https://vercel.com/docs/analytics)         | tracks real usage without slowing anything down                                              |
+| product                                                | role                                                                                                       |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| [eve](https://eve.dev)                                 | the agent framework every generated agent runs on, tested and deployed for real, not stubbed               |
+| [next.js](https://nextjs.org)                          | the app itself                                                                                             |
+| [ai gateway](https://vercel.com/docs/ai-gateway)       | routes the generation request to a model                                                                   |
+| [ai sdk](https://sdk.vercel.ai)                        | streams the model's response                                                                               |
+| [sandbox](https://vercel.com/docs/sandbox)             | tests every agent against a real eve runtime, then runs it live, network-locked to only the hosts it needs |
+| [workflow sdk](https://vercel.com/docs/workflow)       | runs generate and test as one durable step                                                                 |
+| [blob](https://vercel.com/docs/storage/vercel-blob)    | stores each agent, its live session, chat transcript, and per-visitor history                              |
+| [cron](https://vercel.com/docs/cron-jobs)              | sweeps stale sandbox sessions on a schedule                                                                |
+| [firewall](https://vercel.com/docs/vercel-firewall)    | rate limits generation, connect, and chat requests                                                         |
+| [observability](https://vercel.com/docs/observability) | traces the sandbox pipeline for failures                                                                   |
+| [connect](https://vercel.com/docs/connect)             | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets                |
+| [vercel oauth](https://vercel.com/docs/integrations)   | lets a visitor authorize deploy-to-vercel on their own account, no token of mine involved                  |
+| [botid](https://vercel.com/docs/botid)                 | blocks bot traffic on generation, invisible to real users                                                  |
+| [flags sdk](https://vercel.com/docs/feature-flags)     | flips the model or pauses generation live, no redeploy                                                     |
+| [ai elements](https://ai-sdk.dev/elements)             | chat interface, task progress ui, loading states                                                           |
+| [streamdown](https://streamdown.ai)                    | renders code and markdown cleanly                                                                          |
+| [shadcn/ui](https://ui.shadcn.com)                     | every ui component                                                                                         |
+| [vercel](https://vercel.com)                           | hosts and deploys the app                                                                                  |
+| [analytics](https://vercel.com/docs/analytics)         | tracks real usage without slowing anything down                                                            |
 
 icons animated by [lucide-animated](https://lucide-animated.com).
 
@@ -188,6 +192,7 @@ lib/
 - an MCP connection is only ever generated when you name a real service, never guessed, and its credential is never stored by tryeve, only referenced by an environment variable name
 - a connection agent can't open a live chat session inside tryeve, only a deployed copy with your own credential set can
 - chat, generation, and connect requests are all rate limited per visitor
+- generated code runs sandboxed with outbound network access locked to only the hosts it needs, closing off unrestricted access to any injected credential
 
 ## limits
 
