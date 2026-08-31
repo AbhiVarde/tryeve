@@ -74,7 +74,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ClockIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { getConnectionEnvVars } from "@/app/lib/eve-connections";
-import { SparklesIcon } from "@/components/ui/sparkles";
 import { ArrowUpIcon } from "@/components/ui/arrow-up";
 
 type FileBlock = { filename: string; content: string };
@@ -1315,13 +1314,12 @@ function HomeInner() {
           </span>
         </Button>
         <div className="relative">
-          <SparklesIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Textarea
             placeholder="add a slack notification tool..."
             value={refineInput}
             maxLength={MAX_INPUT_LENGTH}
             onChange={(e) => setRefineInput(e.target.value)}
-            className="min-h-11 resize-none rounded-full border-0 bg-black/20 py-2.5 pl-9 pr-11 font-mono text-sm shadow-none focus-visible:ring-1"
+            className="min-h-11 resize-none rounded-full border-0 bg-black/20 py-2.5 pl-4 pr-11 font-mono text-sm shadow-none focus-visible:ring-1"
           />
           <Button
             type="button"
