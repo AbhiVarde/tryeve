@@ -247,7 +247,6 @@ async function generateAgent(
         text += chunk;
       }
 
-      // console.log("RAW MODEL OUTPUT:", text);
       if (text.trim()) {
         return text;
       }

@@ -1,6 +1,6 @@
 # ▲ tryeve
 
-**Agent Runtime for eve.**
+**Agent builder for eve.**
 
 tested against a live eve runtime, ready to talk before you ever see it. connects to real services over MCP when you name one, deploys straight to your own github and vercel. no install, no terminal.
 

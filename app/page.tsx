@@ -280,7 +280,7 @@ async function downloadZip(files: FileBlock[]) {
     "README.md",
     `# your eve agent
 
-built and tested with [tryeve](https://tryeve.abhivarde.in), an agent runtime for [eve](https://eve.dev).
+built and tested with [tryeve](https://tryeve.abhivarde.in), an agent builder for [eve](https://eve.dev).
 
 ## run it
 
@@ -1540,7 +1540,7 @@ function HomeInner() {
                 variant="outline"
                 className="rounded-full px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
               >
-                Agent Runtime
+                Agent Builder
               </Badge>
               <div className="flex flex-col gap-2.5 sm:gap-3">
                 <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
