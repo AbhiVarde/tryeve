@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     ? `${url}/eve/v1/session/${sessionId}`
     : `${url}/eve/v1/session`;
 
-  const body = sessionId ? { continuationToken, message } : { message };
+  const body = { message };
   const skipTurns = typeof turnCount === "number" ? turnCount : 0;
 
   let res: Response;

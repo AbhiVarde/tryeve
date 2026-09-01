@@ -1946,7 +1946,7 @@ function HomeInner() {
                       <p className="font-mono text-sm font-medium">
                         tryeve{" "}
                         <span className="text-xs font-medium tracking-wide text-muted-foreground/70">
-                          · Agent Runtime
+                          · Agent Builder
                         </span>
                       </p>
                       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">

@@ -52,6 +52,24 @@ export function parseFiles(raw: string): FileBlock[] {
     blocks.push({ filename, content });
   }
 
+  if (blocks.length > 0) return blocks;
+
+  const markerRegex = /(?:\/\/|#)\s*filename:\s*(.+)/g;
+  const markers: { filename: string; index: number }[] = [];
+  let m;
+  while ((m = markerRegex.exec(raw)) !== null) {
+    markers.push({ filename: m[1].trim(), index: m.index });
+  }
+
+  for (let j = 0; j < markers.length; j++) {
+    const start = raw.indexOf("\n", markers[j].index) + 1;
+    const end = j + 1 < markers.length ? markers[j + 1].index : raw.length;
+    blocks.push({
+      filename: markers[j].filename,
+      content: raw.slice(start, end).trim(),
+    });
+  }
+
   return blocks;
 }
 
@@ -976,7 +994,7 @@ export async function POST(req: Request) {
   }
 
   const target = sessionId ? \`\${url}/eve/v1/session/\${sessionId}\` : \`\${url}/eve/v1/session\`;
-  const body = sessionId ? { continuationToken, message } : { message };
+  const body = { message };
   const skipTurns = typeof turnCount === "number" ? turnCount : 0;
 
   let res: Response;
