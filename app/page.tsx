@@ -1210,6 +1210,22 @@ function HomeInner() {
     await generateAgent(trimmed);
   }
 
+  function submitRefine() {
+    const trimmed = refineInput.trim();
+    if (!trimmed || !latestAssistantMessage || busy) return;
+    setRefineInput("");
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        text: trimmed,
+        kind: "generate",
+      },
+    ]);
+    generateAgent(trimmed, latestAssistantMessage.text);
+  }
+
   const remaining = MAX_INPUT_LENGTH - input.length;
   const nearLimit = remaining <= 40;
   const submitting = chatSession
@@ -1240,85 +1256,96 @@ function HomeInner() {
             to chat here, deploy it below to add credentials and talk to it live
           </p>
         )}
-        {showConnectPrompt && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {showConnectPrompt && (
+            <Button
+              type="button"
+              onClick={() =>
+                latestAssistantMessage && startChat(latestAssistantMessage)
+              }
+              disabled={chatLoadingId === latestAssistantMessage?.id}
+              onMouseEnter={() =>
+                connectPromptIconRef.current?.startAnimation()
+              }
+              onMouseLeave={() => connectPromptIconRef.current?.stopAnimation()}
+              className="w-full cursor-pointer sm:flex-1"
+            >
+              {chatLoadingId === latestAssistantMessage?.id ? (
+                <Spinner className="size-4" />
+              ) : (
+                <BotMessageSquareIcon ref={connectPromptIconRef} size={15} />
+              )}
+              <span className="animate-in fade-in duration-300">
+                {chatLoadingId === latestAssistantMessage?.id
+                  ? "connecting..."
+                  : "connect to your agent"}
+              </span>
+            </Button>
+          )}
           <Button
             type="button"
-            onClick={() =>
-              latestAssistantMessage && startChat(latestAssistantMessage)
-            }
-            disabled={chatLoadingId === latestAssistantMessage?.id}
-            onMouseEnter={() => connectPromptIconRef.current?.startAnimation()}
-            onMouseLeave={() => connectPromptIconRef.current?.stopAnimation()}
-            className="w-full cursor-pointer"
+            variant="outline"
+            onClick={() => {
+              if (latestAssistantMessage?.repoUrl) {
+                window.open(latestAssistantMessage.repoUrl, "_blank");
+              } else if (latestAssistantMessage) {
+                deployToGithub(latestAssistantMessage);
+              }
+            }}
+            disabled={deployingId === latestAssistantMessage?.id}
+            onMouseEnter={() => deployIconRef.current?.startAnimation()}
+            onMouseLeave={() => deployIconRef.current?.stopAnimation()}
+            className="w-full cursor-pointer sm:flex-1"
           >
-            {chatLoadingId === latestAssistantMessage?.id ? (
+            {deployingId === latestAssistantMessage?.id ? (
               <Spinner className="size-4" />
             ) : (
-              <BotMessageSquareIcon ref={connectPromptIconRef} size={15} />
+              <GithubIcon ref={deployIconRef} size={15} />
             )}
             <span className="animate-in fade-in duration-300">
-              {chatLoadingId === latestAssistantMessage?.id
-                ? "connecting..."
-                : "connect to your agent"}
+              {deployingId === latestAssistantMessage?.id
+                ? "deploying..."
+                : latestAssistantMessage?.repoUrl
+                  ? "view on github"
+                  : "deploy to github"}
             </span>
           </Button>
-        )}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            if (latestAssistantMessage?.repoUrl) {
-              window.open(latestAssistantMessage.repoUrl, "_blank");
-            } else if (latestAssistantMessage) {
-              deployToGithub(latestAssistantMessage);
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              latestAssistantMessage && deployToVercel(latestAssistantMessage)
             }
-          }}
-          disabled={deployingId === latestAssistantMessage?.id}
-          onMouseEnter={() => deployIconRef.current?.startAnimation()}
-          onMouseLeave={() => deployIconRef.current?.stopAnimation()}
-          className="w-full cursor-pointer"
-        >
-          {deployingId === latestAssistantMessage?.id ? (
-            <Spinner className="size-4" />
-          ) : (
-            <GithubIcon ref={deployIconRef} size={15} />
-          )}
-          <span className="animate-in fade-in duration-300">
-            {deployingId === latestAssistantMessage?.id
-              ? "deploying..."
-              : latestAssistantMessage?.repoUrl
-                ? "view on github"
-                : "deploy to github"}
-          </span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            latestAssistantMessage && deployToVercel(latestAssistantMessage)
-          }
-          disabled={vercelDeployingId === latestAssistantMessage?.id}
-          className="w-full cursor-pointer"
-        >
-          {vercelDeployingId === latestAssistantMessage?.id ? (
-            <Spinner className="size-4" />
-          ) : (
-            <VercelMark size={14} />
-          )}
-          <span className="animate-in fade-in duration-300">
-            {vercelDeployingId === latestAssistantMessage?.id
-              ? "deploying..."
-              : latestAssistantMessage && vercelLinks[latestAssistantMessage.id]
-                ? "try live version"
-                : "deploy to vercel"}
-          </span>
-        </Button>
+            disabled={vercelDeployingId === latestAssistantMessage?.id}
+            className="w-full cursor-pointer sm:flex-1"
+          >
+            {vercelDeployingId === latestAssistantMessage?.id ? (
+              <Spinner className="size-4" />
+            ) : (
+              <VercelMark size={14} />
+            )}
+            <span className="animate-in fade-in duration-300">
+              {vercelDeployingId === latestAssistantMessage?.id
+                ? "deploying..."
+                : latestAssistantMessage &&
+                    vercelLinks[latestAssistantMessage.id]
+                  ? "try live version"
+                  : "deploy to vercel"}
+            </span>
+          </Button>
+        </div>
         <div className="relative">
           <Textarea
             placeholder="add a slack notification tool..."
             value={refineInput}
             maxLength={MAX_INPUT_LENGTH}
             onChange={(e) => setRefineInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submitRefine();
+              }
+            }}
             className="min-h-11 resize-none rounded-full border-0 bg-black/20 py-2.5 pl-4 pr-11 font-mono text-sm shadow-none focus-visible:ring-1"
           />
           <Button
@@ -1326,21 +1353,7 @@ function HomeInner() {
             size="icon"
             variant="ghost"
             disabled={busy || refineInput.trim().length === 0}
-            onClick={() => {
-              const trimmed = refineInput.trim();
-              if (!trimmed || !latestAssistantMessage) return;
-              setRefineInput("");
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: crypto.randomUUID(),
-                  role: "user",
-                  text: trimmed,
-                  kind: "generate",
-                },
-              ]);
-              generateAgent(trimmed, latestAssistantMessage.text);
-            }}
+            onClick={submitRefine}
             className="absolute right-1.5 top-1/2 size-8 -translate-y-1/2 cursor-pointer rounded-full hover:bg-white/10 disabled:opacity-40"
           >
             <ArrowUpIcon className="size-4" />
