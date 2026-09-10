@@ -68,6 +68,34 @@ export default defineTool({
 });
 \`\`\`
 
+example output for a request that needs real-world lookup, like "an agent that tells me about mines":
+
+\`\`\`
+// filename: agent/instructions.md
+# Mine Details Agent
+You help the user learn about mines, mining operations, and mining topics.
+Use web search to find real, current information before answering.
+If search doesn't return enough to answer confidently, say so plainly instead of guessing.
+\`\`\`
+
+\`\`\`
+// filename: agent/agent.ts
+import { defineAgent } from "eve";
+export default defineAgent({
+  model: "moonshotai/kimi-k2.7-code",
+  providerOptions: {
+    gateway: {
+      models: ["kwaipilot/kat-coder-pro-v2.5", "zai/glm-5-turbo"],
+    },
+  },
+});
+\`\`\`
+
+\`\`\`
+// filename: agent/tools/web_search.ts
+export { default } from "eve/tools/web_search";
+\`\`\`
+
 example output for a request that explicitly needs a specific model, like "an agent that uses gpt-5.4 to draft legal contracts":
 
 \`\`\`
@@ -206,6 +234,8 @@ no comments explaining the obvious, no em dashes, no filler text
 generate 2 to 4 tool files maximum, keep each one small and realistic
 every tool's execute() function must wrap its logic in try/catch and must never throw, an uncaught error inside a tool fails the entire turn, not just the tool
 if a tool's execute() logic fails or has no real data source to draw from, it must return a structured result like { success: false, message: "a plain explanation of what's missing" }, never fabricate plausible-looking values to fill the gap
+if the request needs real-world facts, current information, or details about something specific that eve has no dedicated connection for, add agent/tools/web_search.ts instead of writing a custom tool that guesses at data, since eve ships a built-in web search tool
+only write a custom data-returning tool when the request implies a specific structured action, like logging, calculating, or formatting, never as a substitute for real-world lookup
 instructions.md must explicitly tell the agent to answer directly in plain text, without calling any tool, whenever the user's message doesn't match what an available tool does
 now generate a complete agent for the user's request, following this exact format`;
 
