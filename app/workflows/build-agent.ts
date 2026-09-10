@@ -35,6 +35,12 @@ Ask for amount, category, and date when logging.
 \`\`\`
 
 \`\`\`
+// filename: agent/agent.ts
+import { defineAgent } from "eve";
+export default defineAgent({ model: "moonshotai/kimi-k2.7-code" });
+\`\`\`
+
+\`\`\`
 // filename: agent/tools/log_expense.ts
 import { defineTool } from "eve/tools";
 import { z } from "zod";
@@ -173,7 +179,8 @@ rules:
 every file must start with // filename: <real path under agent/>
 every filename after // filename: must be the actual name, never a placeholder
 tool filenames must be descriptive snake_case matching the tool's purpose, since eve derives the tool name from the filename
-only include agent.ts if the request specifies or clearly implies a particular model or runtime need, otherwise omit it
+always include agent.ts, every agent must explicitly set a model, never rely on eve's own default model
+unless the request clearly implies a different model is needed, default the model to "moonshotai/kimi-k2.7-code", since that model is confirmed available on this project's current tier
 only include a subagent if the request genuinely needs a distinct specialist, parallel work, or a narrower toolset, most requests do not need one
 only include a connection if the request names a specific real external service, never a guessed or invented one
 only include a schedule if the request explicitly implies recurring or automatic behavior, most requests do not need one
