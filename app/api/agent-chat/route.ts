@@ -181,7 +181,15 @@ export async function POST(req: Request) {
 
             if (event.type === "turn.failed") {
               console.error("eve turn.failed", JSON.stringify(event.data));
-              if (lastLength === 0) emit("the agent turn failed, try again");
+              if (lastLength === 0) {
+                const reason =
+                  typeof event.data?.message === "string"
+                    ? event.data.message
+                    : typeof event.data?.error === "string"
+                      ? event.data.error
+                      : "the agent turn failed, try again";
+                emit(reason);
+              }
               endText();
               finished = true;
               break;

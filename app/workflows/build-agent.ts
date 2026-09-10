@@ -46,7 +46,11 @@ export default defineTool({
     date: z.string(),
   }),
   async execute(input) {
-    return { logged: true, expense: input };
+    try {
+      return { success: true, logged: true, expense: input };
+    } catch {
+      return { success: false, message: "couldn't log the expense" };
+    }
   },
 });
 \`\`\`
@@ -186,6 +190,9 @@ every connection file must import defineMcpClientConnection from eve/connections
 every schedule file must import defineSchedule from eve/schedules and declare a cron expression
 no comments explaining the obvious, no em dashes, no filler text
 generate 2 to 4 tool files maximum, keep each one small and realistic
+every tool's execute() function must wrap its logic in try/catch and must never throw, an uncaught error inside a tool fails the entire turn, not just the tool
+if a tool's execute() logic fails or has no real data source to draw from, it must return a structured result like { success: false, message: "a plain explanation of what's missing" }, never fabricate plausible-looking values to fill the gap
+instructions.md must explicitly tell the agent to answer directly in plain text, without calling any tool, whenever the user's message doesn't match what an available tool does
 now generate a complete agent for the user's request, following this exact format`;
 
 function getBaseUrl() {
