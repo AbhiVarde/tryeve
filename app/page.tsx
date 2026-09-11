@@ -118,6 +118,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "generation and testing run as one durable step, survives crashes",
       "if a build fails, the reason is shown and you can retry with one click",
       "refine an existing agent with a follow-up instead of starting over",
+      "uses real web search when a request needs facts, never invents data",
     ],
   },
   {
@@ -142,6 +143,7 @@ const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     label: "reliability & privacy",
     items: [
       "generated code runs sandboxed, network access locked to only what it needs",
+      "tool failures and rate limits are handled gracefully, never crash the chat",
       "reload the page anytime, your agent and chat pick up right where you left off",
       "switching tabs never disconnects your agent, only real exits do",
       "dead share links reconnect automatically, no dead ends",
