@@ -260,7 +260,7 @@ export async function POST(req: Request) {
       });
     }
 
-    await sandbox.runCommand({
+    const eveProcess = await sandbox.runCommand({
       cmd: "npx",
       args: ["eve", "dev", "--no-ui", "--port", "3000", "--host", "0.0.0.0"],
       detached: true,
@@ -276,6 +276,8 @@ export async function POST(req: Request) {
     });
 
     if (!ready) {
+      const bootLog = await eveProcess.output("both").catch(() => "");
+      console.error("eve dev never became reachable:", bootLog.slice(-4000));
       await sandbox.stop();
       await untrackSandbox(visitorId, sandboxName);
       return Response.json({
