@@ -7,7 +7,7 @@ export async function POST(req: Request) {
 
   try {
     const res = await fetch(url, { method: "GET" });
-    return Response.json({ alive: res.ok });
+    return Response.json({ alive: res.status < 500 });
   } catch {
     return Response.json({ alive: false });
   }

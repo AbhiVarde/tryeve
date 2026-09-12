@@ -3,7 +3,11 @@ import { head, put } from "@vercel/blob";
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { nanoid } from "nanoid";
-import { canCreateSandbox, trackSandbox } from "@/app/lib/sandbox-quota";
+import {
+  canCreateSandbox,
+  trackSandbox,
+  untrackSandbox,
+} from "@/app/lib/sandbox-quota";
 import { markPaused, markResumed } from "@/app/lib/system-status";
 import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
@@ -220,6 +224,7 @@ export async function POST(req: Request) {
   });
   if (install.exitCode !== 0) {
     await sandbox.stop();
+    await untrackSandbox(visitorId, sandboxName);
     return Response.json({
       ok: false,
       error: "couldn't restart this agent, try again",
@@ -228,7 +233,7 @@ export async function POST(req: Request) {
 
   await sandbox.runCommand({
     cmd: "npx",
-    args: ["eve", "dev", "--no-ui", "--port", "3000"],
+    args: ["eve", "dev", "--no-ui", "--port", "3000", "--host", "0.0.0.0"],
     detached: true,
   });
 
@@ -237,6 +242,7 @@ export async function POST(req: Request) {
 
   if (!ready) {
     await sandbox.stop();
+    await untrackSandbox(visitorId, sandboxName);
     return Response.json({ ok: false, error: "agent didn't start in time" });
   }
 

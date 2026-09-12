@@ -262,7 +262,7 @@ export async function POST(req: Request) {
 
     await sandbox.runCommand({
       cmd: "npx",
-      args: ["eve", "dev", "--no-ui", "--port", "3000"],
+      args: ["eve", "dev", "--no-ui", "--port", "3000", "--host", "0.0.0.0"],
       detached: true,
     });
 
@@ -277,6 +277,7 @@ export async function POST(req: Request) {
 
     if (!ready) {
       await sandbox.stop();
+      await untrackSandbox(visitorId, sandboxName);
       return Response.json({
         passed: false,
         error:
@@ -298,6 +299,7 @@ export async function POST(req: Request) {
       });
     } catch {
       await sandbox.stop();
+      await untrackSandbox(visitorId, sandboxName);
       return Response.json({
         passed: false,
         error: "agent started but didn't respond to a test message",
@@ -307,6 +309,7 @@ export async function POST(req: Request) {
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
       await sandbox.stop();
+      await untrackSandbox(visitorId, sandboxName);
       return Response.json({
         passed: false,
         error: errText || "agent rejected the test message",
@@ -321,6 +324,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     await sandbox.stop().catch(() => {});
+    await untrackSandbox(visitorId, sandboxName).catch(() => {});
     throw err;
   }
 }

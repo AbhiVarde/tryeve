@@ -4,7 +4,11 @@ import { trace } from "@opentelemetry/api";
 import { checkRateLimit } from "@vercel/firewall";
 import { head, put } from "@vercel/blob";
 import { cookies } from "next/headers";
-import { canCreateSandbox, trackSandbox } from "@/app/lib/sandbox-quota";
+import {
+  canCreateSandbox,
+  trackSandbox,
+  untrackSandbox,
+} from "@/app/lib/sandbox-quota";
 import { markPaused, markResumed } from "@/app/lib/system-status";
 import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
@@ -159,7 +163,7 @@ export async function POST(req: Request) {
       ).json();
 
       const alive = await fetch(session.url, { method: "GET" })
-        .then((r) => r.ok)
+        .then((r) => r.status < 500)
         .catch(() => false);
 
       if (alive) {
@@ -287,12 +291,13 @@ export async function POST(req: Request) {
   if (install.exitCode !== 0) {
     const err = await install.stderr();
     await sandbox.stop();
+    await untrackSandbox(runVisitorId, sandboxName);
     return Response.json({ ok: false, error: `install failed: ${err}` });
   }
 
   await sandbox.runCommand({
     cmd: "npx",
-    args: ["eve", "dev", "--no-ui", "--port", "3000"],
+    args: ["eve", "dev", "--no-ui", "--port", "3000", "--host", "0.0.0.0"],
     detached: true,
   });
 
@@ -307,6 +312,7 @@ export async function POST(req: Request) {
 
   if (!ready) {
     await sandbox.stop();
+    await untrackSandbox(runVisitorId, sandboxName);
     return Response.json({
       ok: false,
       error: "agent sandbox didn't start in time",
