@@ -1,42 +1,35 @@
-import { head, put } from "@vercel/blob";
+import { list, put, del } from "@vercel/blob";
 
-const MAX_CONCURRENT_SANDBOXES = 2;
+const MAX_CONCURRENT_SANDBOXES = 3;
 const STALE_MS = 3 * 60 * 1000;
 
-type ActiveEntry = { sandboxName: string; createdAt: string };
-
-function key(visitorId: string) {
-  return `agents/active/${visitorId}.json`;
+function prefix(visitorId: string) {
+  return `agents/active/${visitorId}/`;
 }
 
-async function readActive(visitorId: string): Promise<ActiveEntry[]> {
-  try {
-    const blob = await head(key(visitorId), {
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
-    const res = await fetch(blob.url, { cache: "no-store" });
-    return await res.json();
-  } catch {
-    return [];
-  }
+function key(visitorId: string, sandboxName: string) {
+  return `${prefix(visitorId)}${sandboxName}.json`;
 }
 
-async function writeActive(visitorId: string, entries: ActiveEntry[]) {
-  await put(key(visitorId), JSON.stringify(entries), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 0,
+async function listFresh(visitorId: string) {
+  const { blobs } = await list({
+    prefix: prefix(visitorId),
     token: process.env.BLOB_READ_WRITE_TOKEN,
   });
+  const cutoff = Date.now() - STALE_MS;
+  return blobs.filter((b) => new Date(b.uploadedAt).getTime() > cutoff);
 }
 
 export async function canCreateSandbox(visitorId?: string) {
   if (!visitorId) return true;
-  const active = await readActive(visitorId);
-  const cutoff = Date.now() - STALE_MS;
-  const fresh = active.filter((e) => new Date(e.createdAt).getTime() > cutoff);
-  return fresh.length < MAX_CONCURRENT_SANDBOXES;
+  try {
+    const fresh = await listFresh(visitorId);
+    return fresh.length < MAX_CONCURRENT_SANDBOXES;
+  } catch (err) {
+    // if the quota store itself is down, don't block real users over it
+    console.error("canCreateSandbox: quota check failed, failing open", err);
+    return true;
+  }
 }
 
 export async function trackSandbox(
@@ -44,9 +37,17 @@ export async function trackSandbox(
   sandboxName: string,
 ) {
   if (!visitorId) return;
-  const active = await readActive(visitorId);
-  active.push({ sandboxName, createdAt: new Date().toISOString() });
-  await writeActive(visitorId, active).catch(() => {});
+  await put(
+    key(visitorId, sandboxName),
+    JSON.stringify({ createdAt: new Date().toISOString() }),
+    {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 0,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    },
+  ).catch((err) => console.error("trackSandbox failed:", err));
 }
 
 export async function untrackSandbox(
@@ -54,7 +55,7 @@ export async function untrackSandbox(
   sandboxName: string,
 ) {
   if (!visitorId) return;
-  const active = await readActive(visitorId);
-  const filtered = active.filter((e) => e.sandboxName !== sandboxName);
-  await writeActive(visitorId, filtered).catch(() => {});
+  await del(key(visitorId, sandboxName), {
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  }).catch((err) => console.error("untrackSandbox failed:", err));
 }

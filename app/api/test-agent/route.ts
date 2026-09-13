@@ -13,6 +13,7 @@ const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
+const DEADLINE_MS = 150_000;
 const EVAL_TIMEOUT_MS = 60_000;
 const MAX_ERROR_MSG_LEN = 200;
 
@@ -150,6 +151,9 @@ type EvalReport = {
 };
 
 export async function POST(req: Request) {
+  const startedAt = Date.now();
+  const remaining = () => DEADLINE_MS - (Date.now() - startedAt);
+
   const { code, prompt, visitorId } = await req.json();
 
   if (!code || typeof code !== "string") {
@@ -197,38 +201,56 @@ export async function POST(req: Request) {
   }
 
   const sandboxName = `eve-agent-test-${nanoid(8)}`;
-  let sandbox: Awaited<ReturnType<typeof Sandbox.create>>;
+  let sandbox: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
+  let tracked = false;
+
+  async function cleanupOnFailure() {
+    if (sandbox) {
+      await withTimeout(sandbox.stop(), 10_000, "sandbox stop").catch((err) =>
+        console.error("sandbox stop failed:", err),
+      );
+    }
+    if (tracked) {
+      await untrackSandbox(visitorId, sandboxName).catch(() => {});
+      tracked = false;
+    }
+  }
 
   try {
-    sandbox = await tracer.startActiveSpan("sandbox.create", async (span) => {
-      try {
-        return await Sandbox.create({
-          name: sandboxName,
-          runtime: "node24",
-          timeout: 600_000,
-          ports: [3000],
-          env: {
-            ...sandboxEnv,
-            ...Object.fromEntries(
-              getMissingConnectionEnvVars(files)
-                .filter((k) => process.env[k])
-                .map((k) => [k, process.env[k]!]),
-            ),
-          },
-          persistent: false,
-          networkPolicy: {
-            allow: [
-              "registry.npmjs.org",
-              ...(sandboxEnv.AI_GATEWAY_API_KEY || sandboxEnv.VERCEL_OIDC_TOKEN
-                ? ["ai-gateway.vercel.sh"]
-                : []),
-            ],
-          },
-        });
-      } finally {
-        span.end();
-      }
-    });
+    sandbox = await withTimeout(
+      tracer.startActiveSpan("sandbox.create", async (span) => {
+        try {
+          return await Sandbox.create({
+            name: sandboxName,
+            runtime: "node24",
+            timeout: 600_000,
+            ports: [3000],
+            env: {
+              ...sandboxEnv,
+              ...Object.fromEntries(
+                getMissingConnectionEnvVars(files)
+                  .filter((k) => process.env[k])
+                  .map((k) => [k, process.env[k]!]),
+              ),
+            },
+            persistent: false,
+            networkPolicy: {
+              allow: [
+                "registry.npmjs.org",
+                ...(sandboxEnv.AI_GATEWAY_API_KEY ||
+                sandboxEnv.VERCEL_OIDC_TOKEN
+                  ? ["ai-gateway.vercel.sh"]
+                  : []),
+              ],
+            },
+          });
+        } finally {
+          span.end();
+        }
+      }),
+      30_000,
+      "sandbox create",
+    );
   } catch (err) {
     console.error("sandbox create failed:", err);
     const apiMessage = (err as any)?.json?.error?.message;
@@ -246,11 +268,20 @@ export async function POST(req: Request) {
 
   await markResumed();
   await trackSandbox(visitorId, sandboxName);
+  tracked = true;
 
   try {
+    if (remaining() < 20_000) {
+      await cleanupOnFailure();
+      return Response.json({
+        passed: false,
+        error: "ran out of time preparing the sandbox, please try again",
+      });
+    }
+
     await Promise.all(
       [...getDirectories(files), "agent/channels"].map((dir) =>
-        sandbox.fs.mkdir(dir, { recursive: true }),
+        sandbox!.fs.mkdir(dir, { recursive: true }),
       ),
     );
 
@@ -280,27 +311,49 @@ export async function POST(req: Request) {
       },
     ]);
 
-    const install = await tracer.startActiveSpan(
-      "sandbox.install",
-      async (span) => {
-        try {
-          return await sandbox.runCommand({
-            cmd: "npm",
-            args: ["install", "--no-audit", "--no-fund"],
-          });
-        } finally {
-          span.end();
-        }
-      },
-    );
-
-    if (install.exitCode !== 0) {
-      const err = await install.stderr();
-      await sandbox.stop();
-      await untrackSandbox(visitorId, sandboxName);
+    let install: Awaited<ReturnType<typeof sandbox.runCommand>>;
+    try {
+      const installBudget = Math.max(
+        Math.min(remaining() - 20_000, 90_000),
+        10_000,
+      );
+      install = await withTimeout(
+        tracer.startActiveSpan("sandbox.install", async (span) => {
+          try {
+            return await sandbox!.runCommand({
+              cmd: "npm",
+              args: ["install", "--no-audit", "--no-fund"],
+            });
+          } finally {
+            span.end();
+          }
+        }),
+        installBudget,
+        "install",
+      );
+    } catch (err) {
+      console.error("install failed or timed out:", err);
+      await cleanupOnFailure();
       return Response.json({
         passed: false,
-        error: `install failed: ${err.trim().split("\n")[0]}`,
+        error: "dependency install took too long, please try again",
+      });
+    }
+
+    if (install.exitCode !== 0) {
+      const errOut = await install.stderr();
+      await cleanupOnFailure();
+      return Response.json({
+        passed: false,
+        error: `install failed: ${errOut.trim().split("\n")[0]}`,
+      });
+    }
+
+    if (remaining() < 15_000) {
+      await cleanupOnFailure();
+      return Response.json({
+        passed: false,
+        error: "ran out of time after install, please try again",
       });
     }
 
@@ -311,9 +364,10 @@ export async function POST(req: Request) {
     });
 
     const url = sandbox.domain(3000);
+    const bootBudget = Math.max(Math.min(remaining() - 15_000, 45_000), 5_000);
     const ready = await tracer.startActiveSpan("sandbox.boot", async (span) => {
       try {
-        return await waitForServer(url, 45_000);
+        return await waitForServer(url, bootBudget);
       } finally {
         span.end();
       }
@@ -322,8 +376,7 @@ export async function POST(req: Request) {
     if (!ready) {
       const bootLog = await eveProcess.output("both").catch(() => "");
       console.error("eve dev never became reachable:", bootLog.slice(-4000));
-      await sandbox.stop();
-      await untrackSandbox(visitorId, sandboxName);
+      await cleanupOnFailure();
       return Response.json({
         passed: false,
         error:
@@ -333,10 +386,14 @@ export async function POST(req: Request) {
 
     let evalRun: Awaited<ReturnType<typeof sandbox.runCommand>>;
     try {
+      const evalBudget = Math.max(
+        Math.min(remaining() - 10_000, EVAL_TIMEOUT_MS),
+        5_000,
+      );
       evalRun = await withTimeout(
         tracer.startActiveSpan("sandbox.eval", async (span) => {
           try {
-            return await sandbox.runCommand({
+            return await sandbox!.runCommand({
               cmd: "npx",
               args: ["eve", "eval", "--url", url, "--json"],
             });
@@ -344,13 +401,12 @@ export async function POST(req: Request) {
             span.end();
           }
         }),
-        EVAL_TIMEOUT_MS,
+        evalBudget,
         "eval run",
       );
     } catch (err) {
       console.error("eval run failed or timed out:", err);
-      await sandbox.stop().catch(() => {});
-      await untrackSandbox(visitorId, sandboxName).catch(() => {});
+      await cleanupOnFailure();
       return Response.json({
         passed: false,
         error:
@@ -377,8 +433,7 @@ export async function POST(req: Request) {
       console.error("stdout:", evalStdout.slice(0, 2000));
       console.error("stderr:", evalStderr.slice(0, 2000));
 
-      await sandbox.stop();
-      await untrackSandbox(visitorId, sandboxName);
+      await cleanupOnFailure();
       return Response.json({
         passed: false,
         error: "couldn't read the eval results, please try again",
@@ -396,8 +451,7 @@ export async function POST(req: Request) {
         ?.assertions?.find((a) => a.message)?.message;
       const firstAssertion = rawAssertion?.slice(0, MAX_ERROR_MSG_LEN);
 
-      await sandbox.stop();
-      await untrackSandbox(visitorId, sandboxName);
+      await cleanupOnFailure();
       return Response.json({
         passed: false,
         error: firstAssertion
@@ -415,8 +469,7 @@ export async function POST(req: Request) {
       url,
     });
   } catch (err) {
-    await sandbox.stop().catch(() => {});
-    await untrackSandbox(visitorId, sandboxName).catch(() => {});
+    await cleanupOnFailure();
     throw err;
   }
 }
