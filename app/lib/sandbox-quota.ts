@@ -1,7 +1,7 @@
 import { head, put } from "@vercel/blob";
 
 const MAX_CONCURRENT_SANDBOXES = 2;
-const STALE_MS = 15 * 60 * 1000;
+const STALE_MS = 3 * 60 * 1000;
 
 type ActiveEntry = { sandboxName: string; createdAt: string };
 

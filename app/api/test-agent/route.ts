@@ -11,9 +11,9 @@ import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
-const EVAL_TIMEOUT_MS = 20_000;
+const EVAL_TIMEOUT_MS = 60_000;
 const MAX_ERROR_MSG_LEN = 200;
 
 type FileBlock = { filename: string; content: string };
