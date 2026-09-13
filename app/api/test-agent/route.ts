@@ -350,21 +350,39 @@ export async function POST(req: Request) {
     }
 
     const evalStdout = await evalRun.stdout();
+    const evalStderr = await evalRun.stderr().catch(() => "");
     let evalReport: EvalReport | null = null;
 
     try {
       evalReport = JSON.parse(extractJson(evalStdout));
     } catch {
-      evalReport = null;
+      try {
+        evalReport = JSON.parse(extractJson(evalStderr));
+      } catch {
+        evalReport = null;
+      }
     }
 
-    if (evalRun.exitCode !== 0 || !evalReport) {
+    if (!evalReport) {
+      console.error("eval output unparseable, exit code:", evalRun.exitCode);
+      console.error("stdout:", evalStdout.slice(0, 2000));
+      console.error("stderr:", evalStderr.slice(0, 2000));
+
+      await sandbox.stop();
+      await untrackSandbox(visitorId, sandboxName);
+      return Response.json({
+        passed: false,
+        error: "couldn't read the eval results, please try again",
+      });
+    }
+
+    if (evalRun.exitCode !== 0 || (evalReport.summary?.failed ?? 0) > 0) {
       const failedIds =
-        evalReport?.results
+        evalReport.results
           ?.filter((r) => r.status === "failed")
           .map((r) => r.id)
           .join(", ") || "unknown";
-      const rawAssertion = evalReport?.results
+      const rawAssertion = evalReport.results
         ?.find((r) => r.status === "failed")
         ?.assertions?.find((a) => a.message)?.message;
       const firstAssertion = rawAssertion?.slice(0, MAX_ERROR_MSG_LEN);
