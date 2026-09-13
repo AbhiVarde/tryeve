@@ -2,8 +2,8 @@ import { FatalError } from "workflow";
 import { primaryModel } from "@/flags";
 
 const FALLBACK_MODELS = [
-  "kwaipilot/kat-coder-pro-v2.5",
-  "zai/glm-5-turbo",
+  "inclusional/qing-3.0-flash-fin",
+  "alibaba/qwen3.8-flash",
 ] as const;
 
 const SYSTEM_PROMPT = `you generate eve agent projects. eve is vercel's filesystem-first agent framework. output ONLY eve files in this exact format, nothing else. no setup instructions, no npm commands, no shell commands, no .env templates as separate files.
