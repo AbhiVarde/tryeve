@@ -364,6 +364,7 @@ export async function POST(req: Request) {
     });
 
     const url = sandbox.domain(3000);
+    const evalUrl = "http://localhost:3000";
     const bootBudget = Math.max(Math.min(remaining() - 15_000, 45_000), 5_000);
     const ready = await tracer.startActiveSpan("sandbox.boot", async (span) => {
       try {
@@ -395,7 +396,7 @@ export async function POST(req: Request) {
           try {
             return await sandbox!.runCommand({
               cmd: "npx",
-              args: ["eve", "eval", "--url", url, "--json"],
+              args: ["eve", "eval", "--url", evalUrl, "--json"],
             });
           } finally {
             span.end();
