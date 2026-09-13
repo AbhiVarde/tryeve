@@ -100,6 +100,11 @@ import { none } from "eve/channels/auth";
 export default eveChannel({ auth: [none()] });
 `;
 
+const EVAL_CONFIG = `import { defineEvalConfig } from "eve/evals";
+
+export default defineEvalConfig({});
+`;
+
 async function waitForServer(url: string, timeoutMs: number) {
   const start = Date.now();
 
@@ -268,6 +273,10 @@ export async function POST(req: Request) {
       {
         path: "agent/channels/eve.ts",
         content: Buffer.from(OPEN_CHANNEL_AUTH),
+      },
+      {
+        path: "evals/evals.config.ts",
+        content: Buffer.from(EVAL_CONFIG),
       },
     ]);
 
