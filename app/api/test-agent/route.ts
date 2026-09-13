@@ -11,7 +11,10 @@ import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+const EVAL_TIMEOUT_MS = 20_000;
+const MAX_ERROR_MSG_LEN = 200;
 
 type FileBlock = { filename: string; content: string };
 
@@ -68,6 +71,29 @@ function getDirectories(files: FileBlock[]): string[] {
   return [...dirs];
 }
 
+function extractJson(raw: string): string {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return raw;
+  return raw.slice(start, end + 1);
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      ),
+    ),
+  ]);
+}
+
 const OPEN_CHANNEL_AUTH = `import { eveChannel } from "eve/channels/eve";
 import { none } from "eve/channels/auth";
 
@@ -108,6 +134,15 @@ function getSandboxEnv() {
 
   return env;
 }
+
+type EvalReport = {
+  summary?: { total: number; passed: number; failed: number; skipped: number };
+  results?: {
+    id: string;
+    status: "passed" | "failed" | "skipped";
+    assertions?: { message?: string }[];
+  }[];
+};
 
 export async function POST(req: Request) {
   const { code, prompt, visitorId } = await req.json();
@@ -287,40 +322,68 @@ export async function POST(req: Request) {
       });
     }
 
-    let res: Response;
+    let evalRun: Awaited<ReturnType<typeof sandbox.runCommand>>;
     try {
-      const testMessage =
-        typeof prompt === "string" && prompt.trim()
-          ? `you were just built for this: "${prompt.trim()}". confirm you're working and briefly say how you'd help with it.`
-          : "hello, are you working?";
-
-      res = await fetch(`${url}/eve/v1/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: testMessage }),
+      evalRun = await withTimeout(
+        tracer.startActiveSpan("sandbox.eval", async (span) => {
+          try {
+            return await sandbox.runCommand({
+              cmd: "npx",
+              args: ["eve", "eval", "--url", url, "--json"],
+            });
+          } finally {
+            span.end();
+          }
+        }),
+        EVAL_TIMEOUT_MS,
+        "eval run",
+      );
+    } catch (err) {
+      console.error("eval run failed or timed out:", err);
+      await sandbox.stop().catch(() => {});
+      await untrackSandbox(visitorId, sandboxName).catch(() => {});
+      return Response.json({
+        passed: false,
+        error:
+          "agent's eval didn't complete in time, check for slow or hanging tool calls",
       });
+    }
+
+    const evalStdout = await evalRun.stdout();
+    let evalReport: EvalReport | null = null;
+
+    try {
+      evalReport = JSON.parse(extractJson(evalStdout));
     } catch {
+      evalReport = null;
+    }
+
+    if (evalRun.exitCode !== 0 || !evalReport) {
+      const failedIds =
+        evalReport?.results
+          ?.filter((r) => r.status === "failed")
+          .map((r) => r.id)
+          .join(", ") || "unknown";
+      const rawAssertion = evalReport?.results
+        ?.find((r) => r.status === "failed")
+        ?.assertions?.find((a) => a.message)?.message;
+      const firstAssertion = rawAssertion?.slice(0, MAX_ERROR_MSG_LEN);
+
       await sandbox.stop();
       await untrackSandbox(visitorId, sandboxName);
       return Response.json({
         passed: false,
-        error: "agent started but didn't respond to a test message",
+        error: firstAssertion
+          ? `eval failed (${failedIds}): ${firstAssertion}`
+          : `agent failed its eval (${failedIds}), check your instructions and tool logic`,
       });
     }
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      await sandbox.stop();
-      await untrackSandbox(visitorId, sandboxName);
-      return Response.json({
-        passed: false,
-        error: errText || "agent rejected the test message",
-      });
-    }
+    const { total = 0, passed = 0 } = evalReport.summary ?? {};
 
     return Response.json({
       passed: true,
-      output: `${files.length} file(s) validated, agent responded to a live test message`,
+      output: `${files.length} file(s) validated, ${passed}/${total} eval check(s) passed against a live eve runtime`,
       sandboxName,
       url,
     });
