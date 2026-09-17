@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
-import { CheckIcon, type CheckIconHandle } from "@/components/ui/check";
+import { CheckIcon } from "@/components/ui/check";
 import {
   FileTextIcon,
   type FileTextIconHandle,
@@ -28,6 +28,10 @@ import {
   type ChevronRightIconHandle,
 } from "@/components/ui/chevron-right";
 import { HistoryIcon, type HistoryIconHandle } from "@/components/ui/history";
+import {
+  HeartHandshakeIcon,
+  type HeartHandshakeIconHandle,
+} from "@/components/ui/heart-handshake";
 import {
   LayoutGridIcon,
   type LayoutGridIconHandle,
@@ -75,6 +79,7 @@ import { ClockIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { getConnectionEnvVars } from "@/app/lib/eve-connections";
 import { ArrowUpIcon } from "@/components/ui/arrow-up";
+import { SPONSORS_URL } from "@/lib/constants";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | "skipped" | null;
@@ -439,6 +444,7 @@ function HomeInner() {
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const featuresIconRef = useRef<LayoutGridIconHandle>(null);
+  const sponsorsIconRef = useRef<HeartHandshakeIconHandle>(null);
   const builtWithIconRef = useRef<LayersIconHandle>(null);
   const historyIconRef = useRef<HistoryIconHandle>(null);
   const logoutIconRef = useRef<LogoutIconHandle>(null);
@@ -1539,6 +1545,17 @@ function HomeInner() {
             >
               <LayersIcon ref={builtWithIconRef} size={16} />
             </button>
+            <a
+              href={SPONSORS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onMouseEnter={() => sponsorsIconRef.current?.startAnimation()}
+              onMouseLeave={() => sponsorsIconRef.current?.stopAnimation()}
+              aria-label="sponsor this project"
+              className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
+            >
+              <HeartHandshakeIcon ref={sponsorsIconRef} size={16} />
+            </a>
           </div>
         }
       />
