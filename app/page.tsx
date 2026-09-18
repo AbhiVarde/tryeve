@@ -1662,60 +1662,83 @@ function HomeInner() {
                     );
                   }
 
+                  if (state === "failed") {
+                    const messageIndex = messages.findIndex(
+                      (m) => m.id === message.id,
+                    );
+                    const userMsg = messages[messageIndex - 1];
+                    return (
+                      <div
+                        key={message.id}
+                        className="flex flex-col gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3.5 py-3"
+                      >
+                        <p className="flex items-center gap-1.5 font-mono text-xs font-medium text-rose-300">
+                          <span className="text-sm">⚠</span>
+                          couldn't build this one
+                        </p>
+                        {result?.error && (
+                          <p className="font-mono text-xs leading-relaxed text-muted-foreground">
+                            {result.error}
+                          </p>
+                        )}
+                        {files.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-0.5">
+                            {files.map((file, idx) => (
+                              <button
+                                key={file.filename}
+                                onClick={() => openFile(message.id, idx)}
+                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border/40 bg-background px-2.5 py-1 font-mono text-xs transition-colors hover:bg-accent hover:text-accent-foreground"
+                              >
+                                <FileTextIcon
+                                  size={13}
+                                  className="text-muted-foreground/70"
+                                />
+                                {file.filename}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (userMsg?.role === "user")
+                              retryGenerate(userMsg.text, message.id);
+                          }}
+                          disabled={busy}
+                          onMouseEnter={retryIcons.onEnter(message.id)}
+                          onMouseLeave={retryIcons.onLeave(message.id)}
+                          className="flex w-fit cursor-pointer items-center gap-1.5 font-mono text-xs text-rose-300 underline decoration-rose-300/30 underline-offset-2 transition-colors hover:text-rose-200 disabled:opacity-50"
+                        >
+                          <RefreshCWIcon
+                            ref={retryIcons.setRef(message.id)}
+                            size={12}
+                          />
+                          try again
+                        </button>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex flex-col gap-1">
                           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-                            {files.length === 0 && state === "failed"
-                              ? "generation failed"
-                              : `${files.length} file${files.length !== 1 ? "s" : ""} generated`}
+                            {`${files.length} file${files.length !== 1 ? "s" : ""} generated`}
                             {finishedTesting && files.length > 0 && (
                               <span
                                 className={
                                   state === "passed"
                                     ? "text-emerald-500"
-                                    : state === "skipped"
-                                      ? "text-amber-400"
-                                      : "text-red-400"
+                                    : "text-amber-400"
                                 }
                               >
                                 ·{" "}
                                 {state === "passed"
                                   ? "tests passed"
-                                  : state === "skipped"
-                                    ? "connects to a real service"
-                                    : "tests failed"}
+                                  : "connects to a real service"}
                               </span>
                             )}
                           </p>
-                          {state === "failed" && result?.error && (
-                            <div className="flex flex-col gap-2">
-                              <p className="font-mono text-xs text-red-400/80">
-                                {result.error}
-                              </p>
-                              <button
-                                onClick={() => {
-                                  const messageIndex = messages.findIndex(
-                                    (m) => m.id === message.id,
-                                  );
-                                  const userMsg = messages[messageIndex - 1];
-                                  if (userMsg?.role === "user")
-                                    retryGenerate(userMsg.text, message.id);
-                                }}
-                                disabled={busy}
-                                onMouseEnter={retryIcons.onEnter(message.id)}
-                                onMouseLeave={retryIcons.onLeave(message.id)}
-                                className="flex w-fit cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                              >
-                                <RefreshCWIcon
-                                  ref={retryIcons.setRef(message.id)}
-                                  size={12}
-                                />
-                                retry
-                              </button>
-                            </div>
-                          )}
                         </div>
 
                         {finishedTesting && files.length > 0 && (
