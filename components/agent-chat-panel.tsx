@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   Message,
   MessageContent,
@@ -49,7 +49,7 @@ export function useAgentChat(
 ) {
   const transport = useMemo(
     () =>
-      new DefaultChatTransport({
+      new DefaultChatTransport<UIMessage>({
         api: "/api/agent-chat",
         prepareSendMessagesRequest({ messages }) {
           const last = messages[messages.length - 1];
@@ -68,10 +68,10 @@ export function useAgentChat(
     [session],
   );
 
-  return useChat({
+  return useChat<UIMessage>({
     id: chatId,
     transport,
-    messages: toInitialMessages(initialMessages),
+    messages: toInitialMessages(initialMessages) as UIMessage[] | undefined,
     experimental_throttle: 40,
     onData: (part: any) => {
       if (part.type === "data-session") {

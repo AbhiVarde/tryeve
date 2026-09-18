@@ -546,7 +546,7 @@ function buildChatPage(prompt: string) {
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
@@ -648,7 +648,7 @@ export default function Home() {
 
   const transport = useMemo(
     () =>
-      new DefaultChatTransport({
+      new DefaultChatTransport<UIMessage>({
         api: "/api/agent-chat",
         fetch: reviveAndRetry,
         prepareSendMessagesRequest({ messages }) {
