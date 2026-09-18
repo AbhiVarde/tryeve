@@ -431,6 +431,7 @@ function HomeInner() {
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
   const lastFileKey = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const downloadIcons = useIconRefs<DownloadIconHandle>();
   const linkIcons = useIconRefs<LinkIconHandle>();
@@ -1169,6 +1170,14 @@ function HomeInner() {
     await generateAgent(prompt);
   }
 
+  function editPrompt(text: string) {
+    setInput(text);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(text.length, text.length);
+    });
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -1461,6 +1470,7 @@ function HomeInner() {
         )}
         <div className="relative">
           <Textarea
+            ref={textareaRef}
             placeholder={
               systemPaused && !chatSession
                 ? "generation is temporarily unavailable..."
@@ -1620,16 +1630,46 @@ function HomeInner() {
                     state === "skipped";
                   const needsClarify = state === "clarify";
 
+                  if (needsClarify) {
+                    const userMsg =
+                      messages[
+                        messages.findIndex((m) => m.id === message.id) - 1
+                      ];
+                    return (
+                      <div
+                        key={message.id}
+                        className="flex flex-col gap-2 rounded-lg border border-sky-500/20 bg-sky-500/5 px-3.5 py-3"
+                      >
+                        <p className="flex items-center gap-1.5 font-mono text-xs font-medium text-sky-300">
+                          <span className="text-sm">✦</span>
+                          let's make this more specific
+                        </p>
+                        {result?.error && (
+                          <p className="font-mono text-xs leading-relaxed text-muted-foreground">
+                            {result.error}
+                          </p>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (userMsg?.role === "user")
+                              editPrompt(userMsg.text);
+                          }}
+                          className="flex w-fit cursor-pointer items-center gap-1.5 font-mono text-xs text-sky-300 underline decoration-sky-300/30 underline-offset-2 transition-colors hover:text-sky-200"
+                        >
+                          edit and try again
+                        </button>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex flex-col gap-1">
                           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-                            {needsClarify
-                              ? "needs more detail"
-                              : files.length === 0 && state === "failed"
-                                ? "generation failed"
-                                : `${files.length} file${files.length !== 1 ? "s" : ""} generated`}
+                            {files.length === 0 && state === "failed"
+                              ? "generation failed"
+                              : `${files.length} file${files.length !== 1 ? "s" : ""} generated`}
                             {finishedTesting && files.length > 0 && (
                               <span
                                 className={
@@ -1649,11 +1689,6 @@ function HomeInner() {
                               </span>
                             )}
                           </p>
-                          {needsClarify && result?.error && (
-                            <p className="font-mono text-xs text-amber-400/80">
-                              {result.error}
-                            </p>
-                          )}
                           {state === "failed" && result?.error && (
                             <div className="flex flex-col gap-2">
                               <p className="font-mono text-xs text-red-400/80">
