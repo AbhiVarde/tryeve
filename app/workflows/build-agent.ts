@@ -298,7 +298,7 @@ async function checkBuildable(
 
   try {
     const result = await experimental_evaluate({
-      model: "typesafe-ai/jev-latest",
+      model: "typesafe-ai/jev",
       state: { prompt },
       questions: {
         buildable: {
