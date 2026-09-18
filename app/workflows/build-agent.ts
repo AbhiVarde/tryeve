@@ -1,10 +1,13 @@
 import { FatalError } from "workflow";
+import { experimental_evaluate } from "ai";
 import { primaryModel } from "@/flags";
 
 const FALLBACK_MODELS = [
   "inclusional/qing-3.0-flash-fin",
   "alibaba/qwen3.8-flash",
 ] as const;
+
+const BUILDABLE_THRESHOLD = 0.35;
 
 const SYSTEM_PROMPT = `you generate eve agent projects. eve is vercel's filesystem-first agent framework. output ONLY eve files in this exact format, nothing else. no setup instructions, no npm commands, no shell commands, no .env templates as separate files.
 
@@ -257,6 +260,22 @@ export async function buildAgentWorkflow(
 ) {
   "use workflow";
 
+  if (!previousCode) {
+    const preflight = await checkBuildable(prompt);
+    if (!preflight.buildable) {
+      return {
+        code: "",
+        passed: false,
+        skipped: true,
+        needsClarification: true,
+        missingConnectionEnv: null,
+        error: preflight.reason,
+        sandboxName: null,
+        url: null,
+      };
+    }
+  }
+
   const code = await generateAgent(prompt, previousCode);
   const result = await testAgent(code, prompt, visitorId);
 
@@ -264,11 +283,50 @@ export async function buildAgentWorkflow(
     code,
     passed: result.passed,
     skipped: result.skipped ?? false,
+    needsClarification: false,
     missingConnectionEnv: result.missingConnectionEnv ?? null,
     error: result.error ?? null,
     sandboxName: result.sandboxName ?? null,
     url: result.url ?? null,
   };
+}
+
+async function checkBuildable(
+  prompt: string,
+): Promise<{ buildable: boolean; reason?: string }> {
+  "use step";
+
+  try {
+    const result = await experimental_evaluate({
+      model: "typesafe-ai/jev-latest",
+      state: { prompt },
+      questions: {
+        buildable: {
+          type: "boolean",
+          instructions:
+            "can a working eve agent (instructions.md plus a few typed tools) actually be generated from this request? answer false only if the request is too vague, contradictory, or not describing an agent at all.",
+        },
+      },
+    });
+
+    const probability = result.answers.buildable.probability;
+
+    if (probability < BUILDABLE_THRESHOLD) {
+      return {
+        buildable: false,
+        reason:
+          "this description is too vague to build from, try naming what the agent should actually do, like 'log expenses with amount and category' instead of 'help me with money'",
+      };
+    }
+
+    return { buildable: true };
+  } catch (err) {
+    console.error(
+      "checkBuildable: jev evaluation failed, skipping preflight",
+      err,
+    );
+    return { buildable: true };
+  }
 }
 
 async function generateAgent(

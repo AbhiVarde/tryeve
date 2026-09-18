@@ -82,7 +82,7 @@ import { ArrowUpIcon } from "@/components/ui/arrow-up";
 import { SPONSORS_URL } from "@/lib/constants";
 
 type FileBlock = { filename: string; content: string };
-type TestState = "testing" | "passed" | "failed" | "skipped" | null;
+type TestState = "testing" | "passed" | "failed" | "skipped" | "clarify" | null;
 type TestResult = {
   state: TestState;
   error?: string;
@@ -1127,11 +1127,13 @@ function HomeInner() {
       setTestStatus((prev) => ({
         ...prev,
         [assistantId]: {
-          state: result.skipped
-            ? "skipped"
-            : result.passed
-              ? "passed"
-              : "failed",
+          state: result.needsClarification
+            ? "clarify"
+            : result.skipped
+              ? "skipped"
+              : result.passed
+                ? "passed"
+                : "failed",
           error: result.error,
           missingConnectionEnv: result.missingConnectionEnv ?? undefined,
         },
@@ -1616,15 +1618,18 @@ function HomeInner() {
                     state === "passed" ||
                     state === "failed" ||
                     state === "skipped";
+                  const needsClarify = state === "clarify";
 
                   return (
                     <div key={message.id} className="flex flex-col gap-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex flex-col gap-1">
                           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-                            {files.length === 0 && state === "failed"
-                              ? "generation failed"
-                              : `${files.length} file${files.length !== 1 ? "s" : ""} generated`}
+                            {needsClarify
+                              ? "needs more detail"
+                              : files.length === 0 && state === "failed"
+                                ? "generation failed"
+                                : `${files.length} file${files.length !== 1 ? "s" : ""} generated`}
                             {finishedTesting && files.length > 0 && (
                               <span
                                 className={
@@ -1644,6 +1649,11 @@ function HomeInner() {
                               </span>
                             )}
                           </p>
+                          {needsClarify && result?.error && (
+                            <p className="font-mono text-xs text-amber-400/80">
+                              {result.error}
+                            </p>
+                          )}
                           {state === "failed" && result?.error && (
                             <div className="flex flex-col gap-2">
                               <p className="font-mono text-xs text-red-400/80">
