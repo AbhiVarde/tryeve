@@ -73,6 +73,32 @@ export default defineTool({
 });
 \`\`\`
 
+some tools have a real-world side effect the moment they run, not just a lookup, examples: deploying something, deleting a record, sending an email, charging a payment, posting publicly. for exactly these tools, add an approval field so the tool asks before it fires instead of running blind:
+
+\`\`\`
+// filename: agent/tools/send_invoice.ts
+import { defineTool } from "eve/tools";
+import { auto } from "eve/tools/approval";
+import { z } from "zod";
+export default defineTool({
+  description: "Sends an invoice email to a client",
+  approval: auto(),
+  inputSchema: z.object({
+    to: z.string(),
+    amount: z.number(),
+  }),
+  async execute(input) {
+    try {
+      return { success: true, sent: true, invoice: input };
+    } catch {
+      return { success: false, message: "couldn't send the invoice" };
+    }
+  },
+});
+\`\`\`
+
+a plain lookup, calculation, or logging tool never needs approval, only add it when the tool's own description names a real-world action with a consequence, like sending, deleting, charging, deploying, or publishing.
+
 example output for a request that needs real-world lookup, like "an agent that tells me about mines":
 
 \`\`\`
@@ -234,6 +260,7 @@ every eval file must import defineEval from eve/evals and includes from eve/eval
 if both the root agent and a subagent need the same connection, duplicate the connection file under the subagent's own agent/subagents/<id>/connections/, a subagent inherits nothing from root
 never output shell commands, npm commands, or .env files as their own code block
 every tool file must import defineTool from eve/tools and use a zod inputSchema
+if a tool's description involves sending, deleting, charging, deploying, publishing, or any other real-world action with a consequence, import auto from eve/tools/approval and set approval: auto() on that tool, never on a plain lookup, calculation, or logging tool
 every subagent file must import defineAgent from eve and include a description
 every connection file must import defineMcpClientConnection from eve/connections and declare auth unless the service is explicitly local or public
 every schedule file must import defineSchedule from eve/schedules and declare a cron expression
