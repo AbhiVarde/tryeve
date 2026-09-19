@@ -3,8 +3,9 @@ import { experimental_evaluate } from "ai";
 import { primaryModel } from "@/flags";
 
 const FALLBACK_MODELS = [
+  "inclusionai/ling-3.0-flash-vl-free",
   "inclusionai/ling-3.0-flash-fin",
-  "alibaba/qwen3.8-omni-flash",
+  "inclusionai/ling-3.0-flash-fin-free",
   "poolside/laguna-s-2.1-free",
 ] as const;
 
@@ -23,7 +24,7 @@ a subagent is a separate child agent the main agent delegates a focused subtask 
 import { defineAgent } from "eve";
 export default defineAgent({
   description: "investigates ambiguous questions before the parent responds",
-  model: "anthropic/claude-opus-4.8",
+  model: "inclusionai/ling-3.0-flash-vl",
 });
 \`\`\`
 
@@ -42,11 +43,11 @@ Ask for amount, category, and date when logging.
 // filename: agent/agent.ts
 import { defineAgent } from "eve";
 export default defineAgent({
-  model: "moonshotai/kimi-k2.7-code",
+  model: "inclusionai/ling-3.0-flash-vl",
   modelOptions: {
     providerOptions: {
       gateway: {
-        models: ["kwaipilot/kat-coder-pro-v2.5", "zai/glm-5-turbo"],
+        models: ["inclusionai/ling-3.0-flash-vl-free", "inclusionai/ling-3.0-flash-fin"],
       },
     },
   },
@@ -114,11 +115,11 @@ If search doesn't return enough to answer confidently, say so plainly instead of
 // filename: agent/agent.ts
 import { defineAgent } from "eve";
 export default defineAgent({
-  model: "moonshotai/kimi-k2.7-code",
+  model: "inclusionai/ling-3.0-flash-vl",
   modelOptions: {
     providerOptions: {
       gateway: {
-        models: ["kwaipilot/kat-coder-pro-v2.5", "zai/glm-5-turbo"],
+        models: ["inclusionai/ling-3.0-flash-vl-free", "inclusionai/ling-3.0-flash-fin"],
       },
     },
   },
@@ -174,7 +175,7 @@ Delegate open-ended investigation to the researcher subagent, then write the sum
 import { defineAgent } from "eve";
 export default defineAgent({
   description: "investigates a topic in depth and reports back findings",
-  model: "anthropic/claude-opus-4.8",
+  model: "inclusionai/ling-3.0-flash-vl",
 });
 \`\`\`
 
@@ -258,7 +259,7 @@ every file must start with // filename: <real path under agent/>
 every filename after // filename: must be the actual name, never a placeholder
 tool filenames must be descriptive snake_case matching the tool's purpose, since eve derives the tool name from the filename
 always include agent.ts, every agent must explicitly set a model, never rely on eve's own default model
-unless the request clearly implies a different model is needed, default agent.ts to a primary model of "moonshotai/kimi-k2.7-code" with fallback models declared under modelOptions.providerOptions.gateway.models, so a rate limit or outage on the primary model doesn't fail the whole turn
+unless the request clearly implies a different model is needed, default agent.ts to a primary model of "inclusionai/ling-3.0-flash-vl" with fallback models declared under modelOptions.providerOptions.gateway.models, so a rate limit or outage on the primary model doesn't fail the whole turn
 only include a subagent if the request genuinely needs a distinct specialist, parallel work, or a narrower toolset, most requests do not need one
 only include a connection if the request names a specific real external service, never a guessed or invented one
 only include a schedule if the request explicitly implies recurring or automatic behavior, most requests do not need one
@@ -281,7 +282,6 @@ every tool's execute() function must wrap its logic in try/catch and must never 
 if a tool's execute() logic fails or has no real data source to draw from, it must return a structured result like { success: false, message: "a plain explanation of what's missing" }, never fabricate plausible-looking values to fill the gap
 if the request needs real-world facts, current information, or details about something specific that eve has no dedicated connection for, add agent/tools/web_search.ts instead of writing a custom tool that guesses at data, since eve ships a built-in web search tool
 only write a custom data-returning tool when the request implies a specific structured action, like logging, calculating, or formatting, never as a substitute for real-world lookup
-weather, news, prices, scores, and any other live data must use agent/tools/web_search.ts. custom tools must never call fetch or any external url, the sandbox blocks outbound network access
 weather, news, prices, scores, and any other live data must use agent/tools/web_search.ts. custom tools must never call fetch or any external url, the sandbox blocks outbound network access
 instructions.md must explicitly tell the agent to answer directly in plain text, without calling any tool, whenever the user's message doesn't match what an available tool does
 now generate a complete agent for the user's request, following this exact format`;
@@ -393,6 +393,7 @@ async function generateAgent(
         model,
         system: SYSTEM_PROMPT,
         prompt: effectivePrompt,
+        maxRetries: 0,
       });
 
       text = "";

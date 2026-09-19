@@ -11,6 +11,6 @@ export const generationEnabled = flag({
 export const primaryModel = flag<string>({
   key: "primary-model",
   adapter: vercelAdapter(),
-  decide: () => "moonshotai/kimi-k2.7-code",
+  decide: () => "inclusionai/ling-3.0-flash-vl",
   description: "the first model tried in the generation fallback chain",
 });
