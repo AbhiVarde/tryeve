@@ -3,8 +3,9 @@ import { experimental_evaluate } from "ai";
 import { primaryModel } from "@/flags";
 
 const FALLBACK_MODELS = [
-  "inclusional/qing-3.0-flash-fin",
-  "alibaba/qwen3.8-flash",
+  "inclusionai/ling-3.0-flash-fin",
+  "alibaba/qwen3.8-omni-flash",
+  "poolside/laguna-s-2.1-free",
 ] as const;
 
 const BUILDABLE_THRESHOLD = 0.35;
