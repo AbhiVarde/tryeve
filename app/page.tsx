@@ -114,20 +114,21 @@ const GENERATE_MESSAGES = [
 const STARTER_PROMPTS = [
   {
     label: "expense tracker",
-    prompt: "an agent that logs expenses with amount, category, and date",
+    prompt:
+      "an agent that logs an expense when given an amount, category, and date",
   },
   {
     label: "linear summarizer",
     prompt: "an agent that summarizes new issues on a linear project",
   },
   {
-    label: "standup reminder",
-    prompt: "an agent that sends a daily standup reminder every weekday at 9am",
+    label: "weather lookup",
+    prompt: "an agent that looks up the current weather for a city",
   },
   {
-    label: "contract drafting",
+    label: "invoice sender",
     prompt:
-      "an agent that drafts contract sections following a fixed formatting standard",
+      "an agent that sends an invoice email to a client when given their email and the amount",
   },
 ] as const;
 
