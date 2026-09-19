@@ -1,151 +1,107 @@
-# how the generate and test loop works
+# How the generate and test loop works
 
-most tools that generate ai agent code show the output and stop there. tryeve doesn't. an agent isn't shown until it has actually run, against a real runtime, and answered a real message.
+An agent isn't shown until it has run against a real runtime and answered a real message. This document covers the pipeline, what gets tested, and the real bugs found building it.
 
-## the core idea
+## The core idea
 
-a model can write eve files without much trouble. what it can't guarantee is that those files are correct against the real eve runtime. so nothing is shown until that's proven, not assumed.
+A model can write eve files without much trouble. It can't guarantee those files are correct against the real eve runtime. So nothing is shown until that's proven, not assumed.
 
-## the pipeline
+## The pipeline
 
-↳ a botid check runs first, bot traffic never reaches the ai gateway  
-↳ a prompt is routed through the ai gateway to a model, which writes real eve files  
-↳ a vercel sandbox installs eve for real, not stubbed  
-↳ `eve dev` boots inside the sandbox  
-↳ the exposed port is polled until eve's http server responds  
-↳ a test message derived from your actual prompt is sent to `/eve/v1/session`  
-↳ a real reply means it passed, a failure is surfaced as-is  
-↳ on a pass, the sandbox stays alive, so connecting later reuses it instead of booting a second one
+| Step | What happens                                                                      |
+| ---- | --------------------------------------------------------------------------------- |
+| 1    | BotID check, bot traffic never reaches the AI Gateway                             |
+| 2    | jev (typesafe ai) screens the prompt for buildability before any sandbox spins up |
+| 3    | The AI Gateway routes the request to a model, which writes real eve files         |
+| 4    | A Vercel Sandbox installs eve for real, not stubbed                               |
+| 5    | `eve dev` boots inside the sandbox                                                |
+| 6    | The exposed port is polled until eve's HTTP server responds                       |
+| 7    | A test message derived from the prompt is sent to `/eve/v1/session`               |
+| 8    | A real reply means it passed. A failure is surfaced as is                         |
+| 9    | On a pass, the sandbox stays alive so a later connect reuses it                   |
 
-the first five steps run as one durable workflow step.  
-↳ a crash mid generation resumes instead of losing the request
+Steps 3 through 8 run as one durable workflow step. A crash mid-generation resumes instead of losing the request.
 
-## connections
+## Preflight with jev
 
-if you name a real service, the model also writes a connection file, eve's native way to give an agent another app's own tools without hand-writing wrappers for them.
+Before generation runs, the prompt is checked with jev via the AI SDK's `evaluate()` method, routed through the AI Gateway.
 
-↳ only added when the request names a specific real service, never guessed  
-↳ auth is declared on the connection, pulled from an env var at call time  
-↳ tryeve never holds that credential, so a connection agent can't be tested or chatted with here, that's marked skipped, not failed, and names the exact variable needed  
-↳ deploy to github and deploy to vercel stay available regardless, since pushing files doesn't need the credential, only live chat does  
-↳ a subagent inherits no connection from root, if both need the same service the connection file is duplicated under the subagent's own directory  
-↳ once deployed with the real credential set, the connection works like any other tool
+- A low buildability score returns a clarification message, no sandbox is created.
+- If jev or the gateway errors, the check fails open, generation proceeds as normal.
+- Only runs on a fresh build. A follow-up refinement skips this check.
 
-## schedules
+## Connections
 
-a schedule runs the agent on its own cron cadence instead of waiting for a message, for daily digests, weekly reports, or recurring sweeps.
+If a request names a real service, the model writes a connection file, eve's native way to give an agent another app's tools without hand-written wrappers.
 
-↳ only added when the request explicitly implies recurring or automatic behavior  
-↳ lives at agent/schedules/, root only, a subagent can't have one  
-↳ eve dev never fires a schedule on its real cadence, only a deployed app does, so tryeve's own sandbox test doesn't exercise it directly, only confirms the agent still responds to a normal message
+- Only added when a specific real service is named, never guessed.
+- Auth is declared on the connection, pulled from an environment variable at call time.
+- tryeve never holds that credential. A connection agent can't be tested or chatted with here. This is marked skipped, not failed, and names the missing variable.
+- Deploy to GitHub and Vercel stay available regardless, since pushing files doesn't need the credential.
+- A subagent inherits no connection from root. If both need the same service, the connection file is duplicated under the subagent's own directory.
 
-## skills and evals
+## Schedules
 
-when a request implies a specific procedure, formatting standard, or house style, the model writes an agent/skills/<name>.md file alongside the agent, same pattern as adding a connection or a schedule.
+A schedule runs the agent on its own cron cadence for daily digests, weekly reports, or recurring sweeps.
 
-↳ only added when the request calls for it, never generated by default
-↳ every agent also ships one evals/core.eval.ts file, regardless of the request
-↳ evals aren't run by tryeve, only generated and included in the zip/deploy, running one during testing risks the 60s workflow maxDuration
+- Only added when the request explicitly implies recurring or automatic behavior.
+- Lives at `agent/schedules/`, root only, a subagent can't have one.
+- `eve dev` never fires a schedule on its real cadence. Only a deployed app does. tryeve's sandbox test only confirms the agent responds to a normal message.
 
-## remix
+## Skills and evals
 
-an already-built agent can be refined with a follow-up instruction instead of regenerating from scratch.
+- A skill is written to `agent/skills/<name>.md` when the request implies a specific procedure or house style. Only added when called for.
+- Every agent ships one `evals/core.eval.ts` file regardless of the request.
+- Evals aren't run by tryeve, only generated and included in the zip or deploy. Running one during testing would risk the 60s workflow timeout.
 
-↳ a follow-up reruns the same pipeline against the existing files, not a blank slate
-↳ previousCode is optional everywhere, a fresh build still works exactly as before
+## Refine
 
-## sandbox network policy
+An already-built agent can be refined with a follow-up instruction instead of regenerating from scratch.
 
-generated tool code runs with real credentials injected, a service token for a named connection. before this, the sandbox running that code had no restriction on where it could send them.
+- A follow-up reruns the same pipeline against the existing files, not a blank slate.
+- `previousCode` is optional everywhere. A fresh build works exactly as before.
 
-↳ Sandbox.create() now takes a networkPolicy allow-list
-↳ outbound is restricted to registry.npmjs.org plus whichever model-provider host is configured, ai-gateway.vercel.sh, api.anthropic.com, or api.openai.com
-↳ closes the gap where llm-generated code held a real secret and unrestricted network access to send it anywhere
+## Tool approval
 
-## why real testing instead of stubs
+A tool description that names a real-world consequence, sending, deleting, charging, deploying, or publishing, gets `approval: auto()` from `eve/tools/approval` attached during generation. A plain lookup, calculation, or logging tool never gets this. The approval decision is also backed by jev.
 
-the first version stubbed `eve`, `eve/tools`, and `zod` to catch syntax errors cheaply.
+## Sandbox network policy
 
-↳ fast, and wrong  
-↳ a file could pass the stub and still fail against the real runtime  
-↳ a passing test that isn't true is worse than no test  
-↳ stubs were removed, testing is slower now, and the result means what it says
+Generated tool code runs with real credentials injected when a connection is present. The sandbox running that code is restricted outbound to `registry.npmjs.org` plus whichever model-provider host is configured (`ai-gateway.vercel.sh`, `api.anthropic.com`, or `api.openai.com`). This closes the gap where generated code held a real secret and unrestricted network access.
 
-## the ownership and privacy boundary
+## Why real testing instead of stubs
 
-a share link lets anyone view an agent's files and chat with it. it doesn't let them touch it.
+The first version stubbed `eve`, `eve/tools`, and `zod` to catch syntax errors cheaply. This was fast and wrong: a file could pass the stub and still fail against the real runtime. A passing test that isn't true is worse than no test. Stubs were removed.
 
-↳ every agent is tagged with its creator's identity at generation time  
-↳ overwriting a session or stopping a sandbox is checked against that identity, a stranger gets a 403  
-↳ chatting and viewing files stay open to anyone with the link, that's the point of sharing  
-↳ github deploy only ever touches the deploying visitor's own account, never the creator's  
-↳ vercel deploy follows the same rule, checked against the same identity, before it ever touches the deploying visitor's own vercel account
+## Ownership and privacy boundary
 
-## bugs found building this
+A share link lets anyone view an agent's files and chat with it. It doesn't let them touch it.
 
-**a stale first-read race**  
-↳ a first-time visitor's history sometimes looked empty right after a successful write  
-↳ the cookie and the blob write could land a beat after the first read  
-↳ fix: refetch on every panel open instead of caching
+- Every agent is tagged with its creator's identity at generation time.
+- Overwriting a session or stopping a sandbox is checked against that identity. A stranger gets a 403.
+- Viewing files and chatting stay open to anyone with the link, that's the point of sharing.
+- GitHub and Vercel deploy only ever touch the deploying visitor's own account, never the creator's.
 
-**next.js's private-folder convention**  
-↳ a cleanup route 404'd silently for an hour  
-↳ it sat in an underscore-prefixed folder, which next.js excludes from routing by design
+## Bugs found building this
 
-**vercel firewall's rate-limit rule quota**  
-↳ hobby allows one rate-limit rule per project, not per route  
-↳ two protected routes meant one rule with an or-condition on path
+| Bug                                          | Cause                                                                                     | Fix                                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Stale first-read race                        | History looked empty right after a write, cookie and blob write landed a beat apart       | Refetch on every panel open instead of caching                                     |
+| Silent 404 on cleanup route                  | Sat in an underscore-prefixed folder, excluded from Next.js routing by design             | Moved out of the private folder                                                    |
+| Firewall rule quota                          | Hobby allows one rate-limit rule per project, not per route                               | One rule with an or-condition across both paths                                    |
+| Sandbox has no ID accessor                   | `@vercel/sandbox` has no `sandboxId`, identity is the `name` set at creation              | `Sandbox.get()` takes `{ name }`                                                   |
+| Tab switch treated as exit                   | A `visibilitychange` listener stopped the sandbox on any tab switch                       | Only `beforeunload` counts as a real exit                                          |
+| `useChat` has no memory                      | AI SDK keeps messages in React state only, reconnecting showed an empty chat              | Each turn syncs to Blob, restored as initial state                                 |
+| Sandboxes snapshotted by default             | Auto-snapshot on every stop exhausted a month's storage quota in a day                    | `persistent: false` on every `Sandbox.create()`                                    |
+| GitHub Apps can't create personal repos      | Vercel Connect's GitHub connector is blocked from `POST /user/repos` on personal accounts | Repo creation split to a direct classic OAuth flow, Connect kept for pushing files |
+| IP rate limit doesn't stop distributed abuse | A botnet spreads requests across many IPs                                                 | BotID screens actual bot signals, firewall stays as backstop                       |
+| Model choice hardcoded                       | Changing the model or pausing generation meant a redeploy                                 | Flags SDK exposes both live, no redeploy                                           |
+| Deploy retried the wrong flow                | GitHub and Vercel deploy shared one popup name and retry callback                         | Each flow gets its own window name and retry callback                              |
+| Missing OAuth client ID failed silently      | An unset `GITHUB_OAUTH_CLIENT_ID` produced a broken redirect to GitHub's own 404          | Route checks for the client ID first, returns a real error                         |
+| jev model ID mismatch                        | Used `typesafe-ai/jev-latest`, gateway lists it as `typesafe-ai/jev`                      | Corrected the model string                                                         |
 
-**sandbox identity isn't an id**  
-↳ `@vercel/sandbox` has no `sandboxId` accessor  
-↳ identity is the `name` set at creation, `Sandbox.get()` takes `{ name }`
+## What's deliberately not built
 
-**tab visibility isn't tab closing**  
-↳ a `visibilitychange` listener stopped the sandbox on any tab switch, not just real exits  
-↳ this was the actual cause of two bugs, share links only showing files, and history reconnects never working  
-↳ fix: only `beforeunload` counts as a real exit now
+Hosting a generated agent on tryeve's own infrastructure as a permanent live service was built, then removed. That would mean running someone else's agent indefinitely, on this project's own account and cost, forever.
 
-**`useChat` has no memory of its own**  
-↳ the ai sdk keeps messages in react state only, by design  
-↳ reconnecting to a live sandbox still showed an empty chat, nothing to restore from  
-↳ fix: each turn syncs to blob, restored as `useChat`'s initial state on reconnect
-
-**sandboxes were persistent by default, and nothing needed that**  
-↳ `@vercel/sandbox` auto-snapshots the filesystem on every stop, meant for resuming later  
-↳ tryeve never resumes a stopped sandbox, connect always reuses one still running  
-↳ every stop during testing snapshotted anyway, exhausting a month's storage quota in a day  
-↳ fix: `persistent: false` on every `Sandbox.create()`, stopping now discards instead of saving
-
-**github apps can't create personal repos**  
-↳ vercel connect's github connector is a github app under the hood  
-↳ github apps are blocked from `POST /user/repos` on personal accounts by design, org repos only  
-↳ fix: repo creation split off to a direct, self-hosted classic oauth flow, connect kept for pushing files
-
-**firewall's ip limit doesn't stop a distributed botnet**  
-↳ rate limiting by ip works against a single abuser, not requests spread across many ips  
-↳ fix: botid screens actual bot signals on the generation endpoint, firewall's ip limit stays as a backstop
-
-**model choice and the kill-switch were hardcoded**  
-↳ changing the model, or pausing generation during an incident, meant a redeploy either way  
-↳ fix: flags sdk exposes both live from the dashboard, no redeploy needed
-
-**deploy to vercel retried the wrong deploy**  
-↳ deploy-to-github and deploy-to-vercel shared one popup window name and one hardcoded retry callback  
-↳ closing the vercel auth popup always retried the github deploy instead, showing "deploying..." on the wrong button  
-↳ fix: each flow gets its own window name and its own retry callback
-
-**a missing oauth client id failed silently as a 404**  
-↳ the github oauth start route built the authorize url even when `GITHUB_OAUTH_CLIENT_ID` was unset for an environment  
-↳ an empty `client_id` param sends github straight to its own 404, no error message, no clue why  
-↳ fix: the route checks for the client id first and returns a real error instead of a broken redirect
-
-## what's deliberately not built
-
-hosting a generated agent on tryeve's own infrastructure as a permanent live service was built, then removed.
-
-↳ that would mean tryeve running someone else's agent indefinitely, on my account, at my cost, forever  
-↳ it stayed out for that reason, not because a deployed agent has nothing to show
-
-deploying the generated code to the user's own github made the cut instead. it's not hosting, it's handing over files the person owns, the full app, agent and chat ui both, not the agent's api alone. pushing those files uses a short-lived scoped token from a github app, issued through connect. creating the repo itself uses a separate classic oauth token, because github apps cannot create repositories on personal accounts, only on organizations, so connect's github app can't do that one step. either way, one produces a repo they control, the other a process nobody asked for.
-
-deploying that same repo to a user's own vercel account was added the same way, later. it's still not tryeve hosting anything, it's handing the same working app to an account the person controls, this time via a vercel marketplace integration oauth instead of a github app token. it depends on the github deploy step running first, since it deploys straight from that repo rather than a second copy of the files. one manual step remains before it responds, a model credential has to be added in the new project's vercel settings and redeployed, since no key of mine is included.
+Deploying to the user's own GitHub and Vercel accounts replaced it. This isn't hosting, it's handing over files the person owns, the full app, agent and chat UI both, not just an API. Pushing files uses a short-lived scoped token via Connect. Creating the repo uses a separate classic OAuth token, since GitHub Apps can't create personal repos. Deploying to Vercel depends on the GitHub step running first, since it deploys from that repo rather than a second copy of the files. One manual step remains before either app responds: a model credential added in the new project's settings, since no key from this project is included.

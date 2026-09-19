@@ -2,214 +2,171 @@
 
 **Agent builder for eve.**
 
-tested against a live eve runtime, ready to talk before you ever see it. connects to real services over MCP when you name one, deploys straight to your own github and vercel. no install, no terminal.
+Describe an agent in plain English. tryeve generates real eve files, tests them against a live eve runtime in an isolated sandbox, then lets you chat with it, download it, or deploy it to your own GitHub and Vercel.
 
-[live demo](https://tryeve.abhivarde.in) · built with ▲ [vercel](https://vercel.com)
+[Live demo](https://tryeve.abhivarde.in) · Built with ▲ [Vercel](https://vercel.com)
 
-## what it does
+## What it does
 
-you type a description. tryeve generates real eve files, connecting to a real third-party service over MCP if you name one, and boots them in an isolated sandbox against the actual eve runtime. nothing is shown until it has confirmed the agent responds to a live message.
+1. You describe an agent.
+2. tryeve generates real eve files and connects to a named third-party service over MCP if you asked for one.
+3. A sandbox boots the actual eve runtime and confirms the agent responds to a live message.
+4. Once it passes, you can chat with it, download it, deploy it to your own GitHub, or deploy that repo straight to your own Vercel account.
 
-once it passes, you can chat with it live, download it as a working project, deploy it straight to your own github, or take that same repo straight to your own vercel account as a fully working, live app. share a link and anyone can talk to it too.
+Nothing is shown until step 3 passes. Reloading the page restores your agent, chat, and files exactly where you left them.
 
-reload the page anytime. your agent, your chat, your files, all still there.
+## Features
 
-## features
+| Category    | What it does                                                                                                                                                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build       | Plain English to real eve files. Adds a connection, schedule, or skill only when the request calls for it. Ships one eval file per agent.                                                                                    |
+| Verify      | Checked with jev (typesafe ai) before generation starts, catching prompts too vague to build from before a sandbox is spent. Every agent is then tested live against your actual prompt in a real sandbox before you see it. |
+| Refine      | Follow up on an existing agent instead of starting over.                                                                                                                                                                     |
+| Deploy      | One click to your own GitHub, one click from there to your own Vercel account. No OAuth app setup required on your end.                                                                                                      |
+| Chat        | Connect right after a build passes. Markdown-formatted replies. Transcripts persist across reloads and share links.                                                                                                          |
+| Share       | Anyone with a link can view files and chat. Only the creator can overwrite or stop the session.                                                                                                                              |
+| Reliability | Idle sandboxes shut down automatically. Tab switches never disconnect you, only closing the tab does. Failed builds show why and offer a retry.                                                                              |
+| Privacy     | Your build history is private, tied to a cookie, deletable at any time. Concurrent sandboxes are capped per visitor.                                                                                                         |
 
-- describe an agent in plain english
-- generates real, working eve files
-- connects to real third-party services over MCP when you name one, like "connect to linear" or "search notion", never a guessed or invented connection
-- a connection agent can't be tested or chatted with inside tryeve, since tryeve never holds your service credential, files and deploy still work either way, chat opens once you deploy it with your own credential set
-- runs on a schedule instead of waiting for a message, for daily digests or recurring jobs, when you ask for one
-- adds a skills file when your request implies a specific procedure or house style
-- ships an eval file with every agent, ready to run in your own pipeline
-- refine an already-built agent with a follow-up instead of starting from scratch
-- generation requests are screened by botid before they reach the ai gateway, bots never touch a sandbox
-- generated code runs in a sandbox network-locked to only the hosts it needs
-- the model used for generation and a kill-switch can be flipped live from the dashboard, no redeploy
-- every agent is tested live against your actual prompt before you see it
-- generation and testing run as one durable step, survives crashes
-- if a build fails, the reason is shown and you can retry with one click
-- inspect every file with syntax highlighting
-- export the full agent as a zip
-- deploy any generated agent straight to your own GitHub, no OAuth app to set up yourself
-- deploy that same agent to your own vercel account too, one-time authorization, full app included, not just the agent's api, chat ui ships in the same repo
-- one manual step remains after vercel deploy, add a model credential in your new project's settings and redeploy, no key of mine ships with your copy
-- share a live link to any agent you build, anyone with the link can chat with it directly
-- connect to your agent right after it's built, no install needed
-- chat with it live, with markdown formatted replies
-- your chat transcript is saved, reopening an agent from history or a share link restores the real conversation, not an empty chat
-- reload the page anytime, your agent and chat pick up right where you left off
-- idle or closed sandboxes shut down automatically, nothing left running
-- switching tabs never disconnects your agent, only closing the tab or explicit disconnect does
-- warned before disconnect, never cut off without notice
-- only you can overwrite or stop your own agent's session, anyone with your share link can still chat with it, they just can't touch it
-- every agent you've built is saved to your own private history, delete any entry or clear it all
-- concurrent sandboxes are capped per visitor, so usage stays fair for everyone
-- dark, minimal interface
+## How it works
 
-## how it works
+1. A botid check rejects bot traffic before it reaches the AI Gateway.
+2. jev screens the prompt. Too vague, and you get a clarification prompt before any sandbox spins up.
+3. The AI Gateway routes the request to a model, which writes real eve files.
+4. A Vercel Sandbox installs eve for real and boots it, no stubs.
+5. tryeve sends a live test message and confirms a real response.
+6. If the agent needs a connection credential tryeve doesn't hold, this step is marked skipped, not failed, and names the missing variable.
+7. On a pass, the sandbox stays alive so a later chat reuses it instantly.
+8. The agent, its session, and its transcript are stored in Blob, so a reload or share link restores everything.
+9. It's added to your private history, tracked by a cookie.
+10. Optionally, deploy to your own GitHub via Vercel Connect, no long-lived secret stored.
+11. Optionally, deploy that same repo to your own Vercel account via Vercel OAuth.
 
-1. you describe an agent
-2. a botid check runs first, bot traffic is rejected before it costs anything
-3. the ai gateway routes the request to a model (switchable live via flags sdk), which writes real eve files, including a connection to a real third-party service if you named one
-4. a vercel sandbox installs eve for real and boots it, no stubs
-5. tryeve sends a live test message and confirms the agent actually responds, if the agent connects to a real service, tryeve can't hold that credential, so this step is marked skipped instead of failed, and names the exact variable needed
-6. if it passes, the sandbox is kept alive rather than thrown away, so connecting afterward is instant
-7. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
-8. it's also added to your own history, tracked by a private cookie, not visible to anyone else
-9. optionally, deploy the generated files straight to your own GitHub via Vercel Connect, no long-lived secret ever stored
-10. optionally, deploy that same repo straight to your own vercel account via a vercel oauth authorization, no token of mine ever touches it, this deploys the whole app, agent and chat ui together, not the agent alone
+Steps 2 through 5 run as one durable workflow step. A crash mid-generation resumes instead of losing the request. A cron job separately sweeps sandboxes left behind by closed tabs or crashed browsers.
 
-steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
+Full technical breakdown: [HOW_IT_WORKS.md](https://github.com/AbhiVarde/tryeve/blob/main/HOW_IT_WORKS.md). System design: [ARCHITECTURE.md](https://github.com/AbhiVarde/tryeve/blob/main/ARCHITECTURE.md).
 
-if step 5 is skipped because of a missing connection credential, steps 9 and 10 still work, deploying doesn't need the credential, only live chat does.
+## Built with ▲
 
-for the full technical breakdown, including real bugs hit building this, see [HOW_IT_WORKS.md](https://github.com/AbhiVarde/tryeve/blob/main/HOW_IT_WORKS.md).
+| Product                                                | Role                                                                  |
+| ------------------------------------------------------ | --------------------------------------------------------------------- |
+| [eve](https://eve.dev)                                 | The agent framework every generated agent runs on                     |
+| [Next.js](https://nextjs.org)                          | The app itself                                                        |
+| [AI Gateway](https://vercel.com/docs/ai-gateway)       | Routes generation and preflight checks to a model                     |
+| [AI SDK](https://sdk.vercel.ai)                        | Streams generation, runs the jev evaluation call                      |
+| [Sandbox](https://vercel.com/docs/sandbox)             | Tests and runs every agent, network-locked to only the hosts it needs |
+| [Workflow SDK](https://vercel.com/docs/workflow)       | Runs generate and test as one durable step                            |
+| [Blob](https://vercel.com/docs/storage/vercel-blob)    | Stores agents, sessions, transcripts, and history                     |
+| [Cron](https://vercel.com/docs/cron-jobs)              | Sweeps stale sandbox sessions                                         |
+| [Firewall](https://vercel.com/docs/vercel-firewall)    | Rate limits generation, connect, and chat                             |
+| [Observability](https://vercel.com/docs/observability) | Traces the sandbox pipeline                                           |
+| [Connect](https://vercel.com/docs/connect)             | Issues short-lived GitHub tokens for deploy                           |
+| [Vercel OAuth](https://vercel.com/docs/integrations)   | Lets a visitor deploy to their own Vercel account                     |
+| [BotID](https://vercel.com/docs/botid)                 | Blocks bot traffic on generation                                      |
+| [Flags SDK](https://vercel.com/docs/feature-flags)     | Flips the model or pauses generation live                             |
+| [AI Elements](https://ai-sdk.dev/elements)             | Chat UI, task progress, loading states                                |
+| [Streamdown](https://streamdown.ai)                    | Renders code and markdown                                             |
+| [shadcn/ui](https://ui.shadcn.com)                     | UI components                                                         |
+| [Vercel](https://vercel.com)                           | Hosting and deploys                                                   |
+| [Analytics](https://vercel.com/docs/analytics)         | Usage tracking                                                        |
 
-## built with ▲
+Icons animated by [lucide-animated](https://lucide-animated.com).
 
-| product                                                | role                                                                                                       |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| [eve](https://eve.dev)                                 | the agent framework every generated agent runs on, tested and deployed for real, not stubbed               |
-| [next.js](https://nextjs.org)                          | the app itself                                                                                             |
-| [ai gateway](https://vercel.com/docs/ai-gateway)       | routes the generation request to a model                                                                   |
-| [ai sdk](https://sdk.vercel.ai)                        | streams the model's response                                                                               |
-| [sandbox](https://vercel.com/docs/sandbox)             | tests every agent against a real eve runtime, then runs it live, network-locked to only the hosts it needs |
-| [workflow sdk](https://vercel.com/docs/workflow)       | runs generate and test as one durable step                                                                 |
-| [blob](https://vercel.com/docs/storage/vercel-blob)    | stores each agent, its live session, chat transcript, and per-visitor history                              |
-| [cron](https://vercel.com/docs/cron-jobs)              | sweeps stale sandbox sessions on a schedule                                                                |
-| [firewall](https://vercel.com/docs/vercel-firewall)    | rate limits generation, connect, and chat requests                                                         |
-| [observability](https://vercel.com/docs/observability) | traces the sandbox pipeline for failures                                                                   |
-| [connect](https://vercel.com/docs/connect)             | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets                |
-| [vercel oauth](https://vercel.com/docs/integrations)   | lets a visitor authorize deploy-to-vercel on their own account, no token of mine involved                  |
-| [botid](https://vercel.com/docs/botid)                 | blocks bot traffic on generation, invisible to real users                                                  |
-| [flags sdk](https://vercel.com/docs/feature-flags)     | flips the model or pauses generation live, no redeploy                                                     |
-| [ai elements](https://ai-sdk.dev/elements)             | chat interface, task progress ui, loading states                                                           |
-| [streamdown](https://streamdown.ai)                    | renders code and markdown cleanly                                                                          |
-| [shadcn/ui](https://ui.shadcn.com)                     | every ui component                                                                                         |
-| [vercel](https://vercel.com)                           | hosts and deploys the app                                                                                  |
-| [analytics](https://vercel.com/docs/analytics)         | tracks real usage without slowing anything down                                                            |
+## Getting started
 
-icons animated by [lucide-animated](https://lucide-animated.com).
-
-## getting started
-
-clone the repo and install dependencies:
-
-```
+```bash
 git clone https://github.com/AbhiVarde/tryeve.git
 cd tryeve
 npm install
-```
-
-link the project to vercel and pull environment variables:
-
-```
 vercel link
 vercel env pull
-```
-
-run the dev server:
-
-```
 npm run dev
 ```
 
-open [localhost:3000](http://localhost:3000).
+Open [localhost:3000](http://localhost:3000).
 
-## environment variables
+## Environment variables
 
-tryeve needs at least one model credential and a blob token. set these in your vercel project or in `.env.local`:
-
-```
+```bash
 BLOB_READ_WRITE_TOKEN=
 
-# at least one of the following
+# at least one model credential
 AI_GATEWAY_API_KEY=
 VERCEL_OIDC_TOKEN=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 
-# optional, only needed for GitHub deploy
+# optional, GitHub deploy
 GITHUB_CONNECTOR_UID=github/tryeve
 GITHUB_OAUTH_CLIENT_ID=
 GITHUB_OAUTH_CLIENT_SECRET=
 
-# optional, only needed for vercel deploy (requires GitHub deploy to run first)
+# optional, Vercel deploy (requires GitHub deploy first)
 VERCEL_OAUTH_CLIENT_ID=
 VERCEL_OAUTH_CLIENT_SECRET=
 VERCEL_INTEGRATION_SLUG=
 ```
 
-`VERCEL_OIDC_TOKEN` is generated automatically when the project is linked and deployed on vercel. for local development, `vercel env pull` handles this for you.
+| Variable                                                        | Note                                                                                                                   |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `VERCEL_OIDC_TOKEN`                                             | Generated automatically on link and deploy. `vercel env pull` handles local dev.                                       |
+| `GITHUB_CONNECTOR_UID`                                          | Defaults to `github/tryeve`. Used by a Vercel Connect GitHub App connector to push files.                              |
+| `GITHUB_OAUTH_CLIENT_ID` / `SECRET`                             | From a separate classic GitHub OAuth App, used only to create the repository. GitHub Apps can't create personal repos. |
+| `VERCEL_OAUTH_CLIENT_ID` / `SECRET` / `VERCEL_INTEGRATION_SLUG` | From a Vercel Marketplace Integration, lets a visitor deploy to their own Vercel account. Runs after GitHub deploy.    |
 
-`GITHUB_CONNECTOR_UID` defaults to `github/tryeve`, used to push generated files via a Vercel Connect GitHub App connector — see [Vercel Connect docs](https://vercel.com/docs/connect) for setup.
+A named connection's own credential (e.g. `LINEAR_API_TOKEN`) is never held by tryeve. It's requested at test time and added to the exported project's own environment.
 
-`GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` come from a separate, plain GitHub OAuth App, used only to create the repository itself. GitHub Apps cannot create repositories on personal accounts, so repo creation goes through a direct classic OAuth flow instead of Connect.
-
-`VERCEL_OAUTH_CLIENT_ID`, `VERCEL_OAUTH_CLIENT_SECRET`, and `VERCEL_INTEGRATION_SLUG` come from a Vercel Marketplace Integration, used to let a visitor authorize deploy-to-vercel on their own account. deploy-to-vercel reads from the repo created by GitHub deploy, so GitHub deploy must run first.
-
-if a generated agent connects to a real third-party service over MCP, that service's own credential (e.g. `LINEAR_API_TOKEN`) is never tryeve's to hold, it's requested from you at test time and added to the exported project's own environment, not this one.
-
-## project structure
+## Project structure
 
 ```
 app/
   api/
-    build-agent/      generates and tests an agent as one durable workflow step
-    test-agent/       boots the agent in a sandbox and confirms it responds
-    run-agent/        boots or reuses a live sandbox for chat, owner-restricted
-    stop-agent/       stops a sandbox on disconnect, idle, or tab close, owner-restricted
-    agent-chat/       streams chat responses from the live sandbox, rate limited
-    agents/           returns the current visitor's private history
-    save-transcript/  persists chat messages so past conversations survive reloads
-    github/deploy/          creates the repo (direct OAuth) and pushes files (via Connect)
-    github/oauth/start/     redirects to GitHub's OAuth consent screen
-    github/oauth/callback/  exchanges the OAuth code for a token, stores it
-    vercel/deploy-repo/     deploys the existing GitHub repo to the visitor's own vercel account
-    vercel/oauth/callback/  exchanges the vercel OAuth code for a token, stores it
-    cron/cleanup/     scheduled sweep for stale sandbox sessions
-  agent/[id]/         shared agent view, includes real chat, not just file viewing
-  page.tsx            the main app
+    build-agent/       generates and tests an agent as one durable step
+    test-agent/        boots the agent in a sandbox, confirms it responds
+    run-agent/         boots or reuses a live sandbox for chat
+    stop-agent/        stops a sandbox, owner-restricted
+    agent-chat/        streams chat responses
+    agents/            returns the visitor's private history
+    save-transcript/   persists chat messages
+    github/deploy/          creates the repo, pushes files
+    github/oauth/           GitHub OAuth flow
+    vercel/deploy-repo/     deploys the repo to the visitor's Vercel account
+    vercel/oauth/           Vercel OAuth flow
+    cron/cleanup/      sweeps stale sandbox sessions
+  agent/[id]/          shared agent view, real chat included
+  page.tsx             main app
 components/
-  agent-chat-panel.tsx   chat state, streaming ui, transcript sync
+  agent-chat-panel.tsx   chat state, streaming, transcript sync
 lib/
-  sandbox-quota.ts       per-visitor concurrent sandbox cap
-  github-connect.ts       Vercel Connect token handling for GitHub deploy
-  vercel-connect.ts       vercel OAuth token handling for vercel deploy
-  vercel-deploy-files.ts  builds the full app exported to github and vercel
+  sandbox-quota.ts        per-visitor sandbox cap
+  github-connect.ts       GitHub token handling
+  vercel-connect.ts       Vercel OAuth token handling
+  vercel-deploy-files.ts  builds the exported app
 ```
 
-## security
+## Security
 
-- generation requests are screened by botid before reaching a sandbox, keeping bot traffic and cost predictable
-- generated agents are tagged with their creator's identity at generation time
-- anyone with a share link can view a generated agent's files and chat with it live
-- only the original creator can overwrite or stop that agent's session, share-link visitors cannot
-- GitHub deploy only ever touches the deploying visitor's own GitHub account, never the original agent owner's data
-- vercel deploy only ever touches the deploying visitor's own vercel account, never the original agent owner's data
-- an MCP connection is only ever generated when you name a real service, never guessed, and its credential is never stored by tryeve, only referenced by an environment variable name
-- a connection agent can't open a live chat session inside tryeve, only a deployed copy with your own credential set can
-- chat, generation, and connect requests are all rate limited per visitor
-- generated code runs sandboxed with outbound network access locked to only the hosts it needs, closing off unrestricted access to any injected credential
+- Generation requests are screened by BotID before reaching a sandbox.
+- Agents are tagged with their creator's identity. Only the creator can overwrite or stop a session.
+- GitHub and Vercel deploys only ever touch the deploying visitor's own account.
+- A connection is only ever generated for a named service. Its credential is never stored, only referenced.
+- Chat, generation, and connect requests are rate limited per visitor.
+- Generated code runs sandboxed with outbound access locked to only the hosts it needs.
 
-## limits
+## Limits
 
-sandboxes run on the [hobby plan](https://vercel.com/docs/plans/hobby) by default. this means:
+Sandboxes run on the [Hobby plan](https://vercel.com/docs/plans/hobby):
 
-- 5 free sandbox cpu hours per month
-- sandbox sessions can run up to 45 minutes before an automatic timeout
-- concurrent sandboxes are capped per visitor to keep usage fair
-- generation, connect, and chat requests are all rate limited per ip
-- sandboxes are created with `persistent: false`, so stopping one never writes to Snapshot Storage, only compute hours apply
+- 5 free sandbox CPU hours per month
+- Sessions time out automatically after 45 minutes
+- Concurrent sandboxes capped per visitor
+- All API routes rate limited per IP
+- Sandboxes run with `persistent: false`, so stopping one never writes to Snapshot Storage
 
-these are generous enough for regular use. earlier builds of this project did not set `persistent: false`, which caused Snapshot Storage (a separate Hobby allowance) to fill up from routine testing alone. that's fixed as of the current version, heavy usage now only affects the compute hour allowance, not storage.
+## Deploy your own
 
-## deploy your own
+[![Deploy with Vercel](https://camo.githubusercontent.com/7015516519ae874ab75537283bc75f86b3d46386ed994093a3790a1180913164/68747470733a2f2f76657263656c2e636f6d2f627574746f6e)](https://vercel.com/new/clone?repository-url=https://github.com/AbhiVarde/tryeve)
 
-[![deploy with vercel](https://camo.githubusercontent.com/7015516519ae874ab75537283bc75f86b3d46386ed994093a3790a1180913164/68747470733a2f2f76657263656c2e636f6d2f627574746f6e)](https://vercel.com/new/clone?repository-url=https://github.com/AbhiVarde/tryeve)
+## License
 
-## license
-
-mit
+MIT
