@@ -281,6 +281,8 @@ every tool's execute() function must wrap its logic in try/catch and must never 
 if a tool's execute() logic fails or has no real data source to draw from, it must return a structured result like { success: false, message: "a plain explanation of what's missing" }, never fabricate plausible-looking values to fill the gap
 if the request needs real-world facts, current information, or details about something specific that eve has no dedicated connection for, add agent/tools/web_search.ts instead of writing a custom tool that guesses at data, since eve ships a built-in web search tool
 only write a custom data-returning tool when the request implies a specific structured action, like logging, calculating, or formatting, never as a substitute for real-world lookup
+weather, news, prices, scores, and any other live data must use agent/tools/web_search.ts. custom tools must never call fetch or any external url, the sandbox blocks outbound network access
+weather, news, prices, scores, and any other live data must use agent/tools/web_search.ts. custom tools must never call fetch or any external url, the sandbox blocks outbound network access
 instructions.md must explicitly tell the agent to answer directly in plain text, without calling any tool, whenever the user's message doesn't match what an available tool does
 now generate a complete agent for the user's request, following this exact format`;
 

@@ -146,6 +146,7 @@ type EvalReport = {
   results?: {
     id: string;
     status: "passed" | "failed" | "skipped";
+    error?: string;
     assertions?: { message?: string }[];
   }[];
 };
@@ -442,15 +443,15 @@ export async function POST(req: Request) {
     }
 
     if (evalRun.exitCode !== 0 || (evalReport.summary?.failed ?? 0) > 0) {
-      const failedIds =
-        evalReport.results
-          ?.filter((r) => r.status === "failed")
-          .map((r) => r.id)
-          .join(", ") || "unknown";
-      const rawAssertion = evalReport.results
-        ?.find((r) => r.status === "failed")
-        ?.assertions?.find((a) => a.message)?.message;
+      const failed =
+        evalReport.results?.filter((r) => r.status === "failed") ?? [];
+      const failedIds = failed.map((r) => r.id).join(", ") || "unknown";
+      const rawAssertion =
+        failed.flatMap((r) => r.assertions ?? []).find((a) => a.message)
+          ?.message ?? failed.find((r) => r.error)?.error;
       const firstAssertion = rawAssertion?.slice(0, MAX_ERROR_MSG_LEN);
+      console.error("eval failed, stdout:", evalStdout.slice(0, 4000));
+      console.error("eval failed, stderr:", evalStderr.slice(0, 2000));
 
       await cleanupOnFailure();
       return Response.json({

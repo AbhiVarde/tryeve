@@ -118,17 +118,18 @@ const STARTER_PROMPTS = [
       "an agent that logs an expense when given an amount, category, and date",
   },
   {
-    label: "linear summarizer",
-    prompt: "an agent that summarizes new issues on a linear project",
+    label: "bill splitter",
+    prompt:
+      "an agent that splits a bill between people when given the total, tip percentage, and number of people",
+  },
+  {
+    label: "habit logger",
+    prompt:
+      "an agent that logs a daily habit when given the habit name, date, and whether it was completed",
   },
   {
     label: "weather lookup",
     prompt: "an agent that looks up the current weather for a city",
-  },
-  {
-    label: "invoice sender",
-    prompt:
-      "an agent that sends an invoice email to a client when given their email and the amount",
   },
 ] as const;
 
@@ -1211,11 +1212,22 @@ function HomeInner() {
     });
   }
 
-  function useTemplate(prompt: string) {
+  function runTemplate(prompt: string) {
     if (busy) return;
+    if (systemPaused) {
+      toast.error(
+        pauseReason ?? "generation is temporarily paused, try again shortly",
+      );
+      return;
+    }
     setMessages((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), role: "user", text: prompt, kind: "generate" },
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        text: prompt,
+        kind: "generate",
+      },
     ]);
     generateAgent(prompt);
   }
@@ -1658,7 +1670,7 @@ function HomeInner() {
                         <button
                           key={t.label}
                           type="button"
-                          onClick={() => useTemplate(t.prompt)}
+                          onClick={() => runTemplate(t.prompt)}
                           className="cursor-pointer rounded-full border border-border/30 px-2.5 py-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:border-border/60 hover:text-foreground"
                         >
                           {t.label}
