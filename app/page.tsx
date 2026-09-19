@@ -473,6 +473,11 @@ function HomeInner() {
   const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
   const [systemPaused, setSystemPaused] = useState(false);
   const [pauseReason, setPauseReason] = useState<string | null>(null);
+  const [usage, setUsage] = useState<{
+    hours: number;
+    capHours: number;
+    percentUsed: number;
+  } | null>(null);
   const [genMsgIndex, setGenMsgIndex] = useState(0);
 
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
@@ -585,6 +590,13 @@ function HomeInner() {
           setSystemPaused(true);
           setPauseReason(data.reason ?? null);
         }
+      })
+      .catch(() => {});
+
+    fetch("/api/usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setUsage(data);
       })
       .catch(() => {});
   }, []);
@@ -1624,6 +1636,12 @@ function HomeInner() {
                   github and vercel.
                 </p>
               </div>
+              {usage && usage.percentUsed >= 50 && (
+                <p className="mb-2 font-mono text-[11px] text-muted-foreground/60">
+                  {usage.hours.toFixed(1)}/{usage.capHours} sandbox hours used
+                  this month
+                </p>
+              )}
               <div className="mt-2 w-full">
                 {restoring ? (
                   <div className="font-mono text-sm text-muted-foreground">
