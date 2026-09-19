@@ -111,6 +111,26 @@ const GENERATE_MESSAGES = [
   "almost done generating...",
 ];
 
+const STARTER_PROMPTS = [
+  {
+    label: "expense tracker",
+    prompt: "an agent that logs expenses with amount, category, and date",
+  },
+  {
+    label: "linear summarizer",
+    prompt: "an agent that summarizes new issues on a linear project",
+  },
+  {
+    label: "standup reminder",
+    prompt: "an agent that sends a daily standup reminder every weekday at 9am",
+  },
+  {
+    label: "contract drafting",
+    prompt:
+      "an agent that drafts contract sections following a fixed formatting standard",
+  },
+] as const;
+
 const FEATURE_GROUPS: { label: string; items: string[] }[] = [
   {
     label: "build & test",
@@ -1178,6 +1198,15 @@ function HomeInner() {
     });
   }
 
+  function useTemplate(prompt: string) {
+    if (busy) return;
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role: "user", text: prompt, kind: "generate" },
+    ]);
+    generateAgent(prompt);
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -1579,7 +1608,7 @@ function HomeInner() {
       >
         {restoring || messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-14 sm:px-6 sm:py-20">
-            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-5 text-center sm:gap-6">
+            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-2 sm:gap-4 text-center">
               <Badge
                 variant="outline"
                 className="rounded-full px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
@@ -1595,13 +1624,30 @@ function HomeInner() {
                   github and vercel.
                 </p>
               </div>
-              <div className="mt-3 w-full sm:mt-4">
+              <div className="mt-2 w-full">
                 {restoring ? (
                   <div className="font-mono text-sm text-muted-foreground">
                     <Shimmer duration={1.5}>loading your agent...</Shimmer>
                   </div>
                 ) : (
-                  inputBar
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <span className="font-mono text-[11px] text-muted-foreground/60">
+                        try:
+                      </span>
+                      {STARTER_PROMPTS.map((t) => (
+                        <button
+                          key={t.label}
+                          type="button"
+                          onClick={() => useTemplate(t.prompt)}
+                          className="cursor-pointer rounded-full border border-border/30 px-2.5 py-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:border-border/60 hover:text-foreground"
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    {inputBar}
+                  </div>
                 )}
               </div>
             </div>
