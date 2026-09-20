@@ -2,6 +2,8 @@ import { FatalError } from "workflow";
 import { experimental_evaluate } from "ai";
 import { primaryModel } from "@/flags";
 
+const DEFAULT_MODEL = "inclusionai/ling-3.0-flash-vl";
+
 const FALLBACK_MODELS = [
   "inclusionai/ling-3.0-flash-vl-free",
   "inclusionai/ling-3.0-flash-fin",
@@ -10,52 +12,61 @@ const FALLBACK_MODELS = [
 ] as const;
 
 const BUILDABLE_THRESHOLD = 0.35;
+const ROUNDS = 3;
+const ROUND_DELAY_MS = 4000;
+const MODEL_DELAY_MS = 1000;
+const TEST_RETRY_DELAY_MS = 5000;
+const NON_RETRYABLE_TEST_ERROR =
+  /too many active|no model credentials|no tool or agent files/i;
 
-const SYSTEM_PROMPT = `you generate eve agent projects. eve is vercel's filesystem-first agent framework. output ONLY eve files in this exact format, nothing else. no setup instructions, no npm commands, no shell commands, no .env templates as separate files.
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-in eve, a tool's filename becomes its tool name at runtime. there is no registration step. this means tool filenames are not cosmetic, they are the tool's identity. every tool file must be named after what it does, in snake_case, like get_weather.ts or log_expense.ts or send_invoice.ts. never use generic names like tool.ts, tool-1.ts, or helper.ts.
+const file = (name: string, body: string) =>
+  ["```", `// filename: ${name}`, body.trim(), "```"].join("\n");
 
-instructions.md alone is a complete, working eve agent. only generate agent.ts when the request needs a specific model or runtime config beyond the default. if the request is a simple, general-purpose agent, skip agent.ts entirely and output only instructions.md plus tools.
-
-a subagent is a separate child agent the main agent delegates a focused subtask to, with its own identity and fresh conversation history. only add a declared subagent when the request genuinely involves a distinct specialist role, a step that benefits from running with a narrower toolset or a different model, or work that should happen in parallel. most requests do not need one, do not add a subagent just to seem thorough. a declared subagent lives at agent/subagents/<id>/agent.ts, where <id> is a short snake_case name for its role, and requires a description, description is mandatory for every subagent:
-
-\`\`\`
-// filename: agent/subagents/investigator/agent.ts
+const AGENT_TS = `
 import { defineAgent } from "eve";
 export default defineAgent({
-  description: "investigates ambiguous questions before the parent responds",
-  model: "inclusionai/ling-3.0-flash-vl",
-});
-\`\`\`
-
-a subagent can also have its own agent/subagents/<id>/instructions.md if it needs specific guidance beyond its description, using the exact same format as the root instructions.md. the parent agent does not need any special tool file to call a subagent, eve discovers subagents automatically from their directory.
-
-example output for a request like "an agent that tracks expenses":
-
-\`\`\`
-// filename: agent/instructions.md
-# Expense Tracker Agent
-You help the user log and review expenses.
-Ask for amount, category, and date when logging.
-\`\`\`
-
-\`\`\`
-// filename: agent/agent.ts
-import { defineAgent } from "eve";
-export default defineAgent({
-  model: "inclusionai/ling-3.0-flash-vl",
+  model: "${DEFAULT_MODEL}",
   modelOptions: {
     providerOptions: {
       gateway: {
-        models: ["inclusionai/ling-3.0-flash-vl-free", "inclusionai/ling-3.0-flash-fin"],
+        models: ["${FALLBACK_MODELS[0]}", "${FALLBACK_MODELS[1]}"],
       },
     },
   },
 });
-\`\`\`
+`;
 
-\`\`\`
-// filename: agent/tools/log_expense.ts
+const SYSTEM_PROMPT = [
+  `you generate eve agent projects. eve is vercel's filesystem-first agent framework, an agent is a directory of files discovered by name, with no registration step. output only files in the exact format shown below, nothing else. no setup instructions, no shell commands, no .env files.`,
+
+  `files you may output, each in its own code block that starts with a "// filename: <path>" line:
+agent/instructions.md, always. the agent's always-on system prompt
+agent/agent.ts, always. every agent sets its model explicitly
+agent/tools/<snake_case_name>.ts, one to three small tools. the filename is the tool name at runtime, so name it after what it does, like log_expense.ts, never tool.ts or helper.ts
+agent/skills/<name>.md, only when the request implies a specific procedure, formatting standard, or house style. plain markdown, no imports, no code fences
+agent/subagents/<id>/agent.ts plus an optional instructions.md, only for a distinct specialist, parallel work, or a narrower toolset. description is required
+agent/connections/<service>.ts, only when the user names a real external service
+agent/schedules/<name>.ts, only when the request implies recurring or automatic behavior, root only
+evals/core.eval.ts, always, exactly one
+most requests need only instructions.md, agent.ts, one to three tools, and the eval.`,
+
+  `example for "an agent that tracks expenses":`,
+  file(
+    "agent/instructions.md",
+    `
+# Expense Tracker Agent
+You help the user log expenses.
+Ask for amount, category, and date when any is missing.
+Always call log_expense to log an expense, never log it in text, then report the tool's result.
+If the message is not about logging an expense, answer directly in plain text without calling any tool.
+`,
+  ),
+  file("agent/agent.ts", AGENT_TS),
+  file(
+    "agent/tools/log_expense.ts",
+    `
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 export default defineTool({
@@ -73,174 +84,11 @@ export default defineTool({
     }
   },
 });
-\`\`\`
-
-some tools have a real-world side effect the moment they run, not just a lookup, examples: deploying something, deleting a record, sending an email, charging a payment, posting publicly. for exactly these tools, set needsApproval so a human signs off before it fires instead of running blind:
-
-\`\`\`
-// filename: agent/tools/send_invoice.ts
-import { defineTool } from "eve/tools";
-import { always } from "eve/tools/approval";
-import { z } from "zod";
-export default defineTool({
-  description: "Sends an invoice email to a client",
-  needsApproval: always(),
-  inputSchema: z.object({
-    to: z.string(),
-    amount: z.number(),
-  }),
-  async execute(input) {
-    try {
-      return { success: true, sent: true, invoice: input };
-    } catch {
-      return { success: false, message: "couldn't send the invoice" };
-    }
-  },
-});
-\`\`\`
-
-never() is the default when needsApproval is omitted, once() asks only the first time in a session then auto-allows, always() asks every time. a plain lookup, calculation, or logging tool never needs any of these, only set needsApproval when the tool's own description names a real-world action with a consequence, like sending, deleting, charging, deploying, or publishing.
-
-example output for a request that needs real-world lookup, like "an agent that tells me about mines":
-
-\`\`\`
-// filename: agent/instructions.md
-# Mine Details Agent
-You help the user learn about mines, mining operations, and mining topics.
-Use web search to find real, current information before answering.
-If search doesn't return enough to answer confidently, say so plainly instead of guessing.
-\`\`\`
-
-\`\`\`
-// filename: agent/agent.ts
-import { defineAgent } from "eve";
-export default defineAgent({
-  model: "inclusionai/ling-3.0-flash-vl",
-  modelOptions: {
-    providerOptions: {
-      gateway: {
-        models: ["inclusionai/ling-3.0-flash-vl-free", "inclusionai/ling-3.0-flash-fin"],
-      },
-    },
-  },
-});
-\`\`\`
-
-\`\`\`
-// filename: agent/tools/web_search.ts
-export { default } from "eve/tools/web_search";
-\`\`\`
-
-example output for a request that explicitly needs a specific model, like "an agent that uses gpt-5.4 to draft legal contracts":
-
-\`\`\`
-// filename: agent/instructions.md
-# Contract Drafting Agent
-You draft legal contracts based on user requirements.
-\`\`\`
-
-\`\`\`
-// filename: agent/agent.ts
-import { defineAgent } from "eve";
-export default defineAgent({ model: "openai/gpt-5.4" });
-\`\`\`
-
-\`\`\`
-// filename: agent/tools/draft_contract.ts
-import { defineTool } from "eve/tools";
-import { z } from "zod";
-export default defineTool({
-  description: "Drafts a contract section based on requirements",
-  inputSchema: z.object({
-    section: z.string(),
-    requirements: z.string(),
-  }),
-  async execute(input) {
-    return { drafted: true, section: input.section };
-  },
-});
-\`\`\`
-
-example output for a request that needs a specialist subagent, like "an agent that researches a topic and writes a summary":
-
-\`\`\`
-// filename: agent/instructions.md
-# Research Summarizer Agent
-You help the user research a topic and produce a clear written summary.
-Delegate open-ended investigation to the researcher subagent, then write the summary yourself once it reports back.
-\`\`\`
-
-\`\`\`
-// filename: agent/subagents/researcher/agent.ts
-import { defineAgent } from "eve";
-export default defineAgent({
-  description: "investigates a topic in depth and reports back findings",
-  model: "inclusionai/ling-3.0-flash-vl",
-});
-\`\`\`
-
-\`\`\`
-// filename: agent/subagents/researcher/instructions.md
-# Researcher
-You investigate the topic you are given as thoroughly as possible.
-Report back a clear, structured set of findings, not a final summary, the parent agent handles the writing.
-\`\`\`
-
-a connection lets the agent use an existing third-party service's own tools, instead of you writing wrapper tools for it. only add a connection when the user's request names a specific real service by name, like "connect to linear" or "search notion". never invent, guess, or assume an mcp server url for a service the user didn't name. if the request doesn't name a real external service, skip connections entirely, most requests do not need one.
-
-a connection lives at agent/connections/<service>.ts, named after the service. it needs no matching tool file, eve discovers that service's tools automatically once the connection exists:
-
-\`\`\`
-// filename: agent/connections/linear.ts
-import { defineMcpClientConnection } from "eve/connections";
-export default defineMcpClientConnection({
-  url: "https://mcp.linear.app/mcp",
-  description: "Linear workspace: issues, projects, cycles, and comments.",
-  auth: {
-    getToken: async () => ({ token: process.env.LINEAR_API_TOKEN! }),
-  },
-});
-\`\`\`
-
-always declare auth with getToken pulling from a named environment variable, formatted <SERVICE>_API_TOKEN. never omit auth for a real third-party service, even if the user didn't mention credentials, since an unauthenticated connection to a sensitive service is unsafe by default. only omit auth entirely for a connection the user explicitly describes as local or public, like a localhost mcp server.
-
-a schedule runs the agent on its own cron cadence instead of waiting for a message, for things like daily digests, weekly reports, or recurring sweeps. only add one when the request explicitly implies recurring or automatic behavior, like "daily", "every morning", or "weekly". schedules are root-only, never inside a subagent.
-
-if the agent has a connection, instructions.md must include a line telling the model to report a connection tool failure plainly and in plain language, never show a raw error code or stack trace to the user.
-
-a schedule lives at agent/schedules/<name>.ts:
-
-\`\`\`
-// filename: agent/schedules/weekly_recap.ts
-import { defineSchedule } from "eve/schedules";
-export default defineSchedule({
-  cron: "0 9 * * 1",
-  markdown: "Summarize last week's activity and prepare a short recap.",
-});
-\`\`\`
-
-a skill is a markdown playbook the agent loads only when it's relevant, instead of carrying procedural detail inside instructions.md on every turn. only add a skill when the request implies a specific, non-obvious procedure the agent must follow exactly, like a formatting standard, a fixed step-by-step process, or a house style. most requests do not need one, do not add a skill just to seem thorough. a skill lives at agent/skills/<name>.md, named after what it teaches:
-
-\`\`\`
-// filename: agent/skills/invoice_format.md
-# Invoice Formatting
-Every invoice must list: date, client name, line items with quantity and unit price, subtotal, tax, and total.
-Amounts are always shown with two decimal places and a currency symbol.
-Never omit the tax line, even if it is zero.
-\`\`\`
-
-an eval is a scored test case for the agent's actual behavior, kept outside agent/ at the project root, at evals/<name>.eval.ts. always generate exactly one eval per agent, derived from the user's request, this is not optional the way skills and subagents are. the eval sends one realistic message the agent should be able to handle, then checks the run in this order:
-
-first, t.succeeded(), confirming the run completed at all.
-second, if the agent has any tools, t.calledTool("<exact tool filename without extension>"), since the tool name is deterministic and never depends on the model's exact wording, this is the primary correctness check.
-third, never check t.reply when the agent has tools, small models can return an empty reply after a tool call, t.succeeded() and t.calledTool() are the complete check.
-
-if the agent is schedule-only with no chat-triggerable action, the eval instead sends a message asking the agent to run that same action immediately, per the schedule rule below, and checks that.
-
-if the agent has no tools at all, a plain conversational agent, skip t.calledTool and check t.reply with includes(...) using a common, safe word likely to appear regardless of phrasing.
-
-\`\`\`
-// filename: evals/core.eval.ts
+`,
+  ),
+  file(
+    "evals/core.eval.ts",
+    `
 import { defineEval } from "eve/evals";
 
 export default defineEval({
@@ -250,47 +98,165 @@ export default defineEval({
     t.calledTool("log_expense");
   },
 });
-\`\`\`
+`,
+  ),
 
-rules:
-every file must start with // filename: <real path under agent/>
-every filename after // filename: must be the actual name, never a placeholder
-tool filenames must be descriptive snake_case matching the tool's purpose, since eve derives the tool name from the filename
-always include agent.ts, every agent must explicitly set a model, never rely on eve's own default model
-unless the request clearly implies a different model is needed, default agent.ts to a primary model of "inclusionai/ling-3.0-flash-vl" with fallback models declared under modelOptions.providerOptions.gateway.models, so a rate limit or outage on the primary model doesn't fail the whole turn
-only include a subagent if the request genuinely needs a distinct specialist, parallel work, or a narrower toolset, most requests do not need one
-only include a connection if the request names a specific real external service, never a guessed or invented one
-only include a schedule if the request explicitly implies recurring or automatic behavior, most requests do not need one
-only include a skill if the request implies a specific procedure, formatting standard, or house style the agent must follow, most requests do not need one
-every skill file is plain markdown under agent/skills/, no imports, no code fences inside it
-always include exactly one eval file at evals/core.eval.ts, every agent needs one, this is never optional
-the eval's t.send message must be a realistic example of the agent's actual job, never a generic greeting
-if the agent defines any tools, the eval must include t.calledTool with that tool's exact name, this is more reliable than a reply-text check alone since it doesn't depend on the model's phrasing
-every eval file must import defineEval from eve/evals, and includes from eve/evals/expect only when the eval uses includes
-if both the root agent and a subagent need the same connection, duplicate the connection file under the subagent's own agent/subagents/<id>/connections/, a subagent inherits nothing from root
-never output shell commands, npm commands, or .env files as their own code block
-every tool file must import defineTool from eve/tools and use a zod inputSchema
-if a tool's description involves sending, deleting, charging, deploying, publishing, or any other real-world action with a consequence, import always from eve/tools/approval and set needsApproval: always() on that tool, never on a plain lookup, calculation, or logging tool
-every subagent file must import defineAgent from eve and include a description
-every connection file must import defineMcpClientConnection from eve/connections and declare auth unless the service is explicitly local or public
-every schedule file must import defineSchedule from eve/schedules and declare a cron expression
-no comments explaining the obvious, no em dashes, no filler text
-generate 2 to 4 tool files maximum, keep each one small and realistic
-every tool's execute() function must wrap its logic in try/catch and must never throw, an uncaught error inside a tool fails the entire turn, not just the tool
-if a tool's execute() logic fails or has no real data source to draw from, it must return a structured result like { success: false, message: "a plain explanation of what's missing" }, never fabricate plausible-looking values to fill the gap
-if the request needs real-world facts, current information, or details about something specific that eve has no dedicated connection for, add agent/tools/web_search.ts instead of writing a custom tool that guesses at data, since eve ships a built-in web search tool
-only write a custom data-returning tool when the request implies a specific structured action, like logging, calculating, or formatting, never as a substitute for real-world lookup
-weather, news, prices, scores, and any other live data must use agent/tools/web_search.ts. custom tools must never call fetch or any external url, the sandbox blocks outbound network access
-instructions.md must explicitly tell the agent to answer directly in plain text, without calling any tool, whenever the user's message doesn't match what an available tool does
-instructions.md must also tell the agent to always call its tool for the task the tool does, never calculate, log, or format it itself in text, and to report the tool's result in the reply
-for a calculation tool, the tool's execute() must do the real math and return the numbers, so the reply is built from the tool result
-now generate a complete agent for the user's request, following this exact format`;
+  `live data uses the built-in web search tool, never a custom fetch:`,
+  file(
+    "agent/tools/web_search.ts",
+    `export { default } from "eve/tools/web_search";`,
+  ),
+
+  `a tool with a real-world side effect needs human approval:`,
+  file(
+    "agent/tools/send_invoice.ts",
+    `
+import { defineTool } from "eve/tools";
+import { always } from "eve/tools/approval";
+import { z } from "zod";
+export default defineTool({
+  description: "Sends an invoice email to a client",
+  needsApproval: always(),
+  inputSchema: z.object({ to: z.string(), amount: z.number() }),
+  async execute(input) {
+    try {
+      return { success: true, sent: true, invoice: input };
+    } catch {
+      return { success: false, message: "couldn't send the invoice" };
+    }
+  },
+});
+`,
+  ),
+
+  `a named service uses a connection, its tools are discovered automatically:`,
+  file(
+    "agent/connections/linear.ts",
+    `
+import { defineMcpClientConnection } from "eve/connections";
+export default defineMcpClientConnection({
+  url: "https://mcp.linear.app/mcp",
+  description: "Linear workspace: issues, projects, cycles, and comments.",
+  auth: {
+    getToken: async () => ({ token: process.env.LINEAR_API_TOKEN! }),
+  },
+});
+`,
+  ),
+
+  `recurring behavior uses a schedule:`,
+  file(
+    "agent/schedules/weekly_recap.ts",
+    `
+import { defineSchedule } from "eve/schedules";
+export default defineSchedule({
+  cron: "0 9 * * 1",
+  markdown: "Summarize last week's activity and prepare a short recap.",
+});
+`,
+  ),
+
+  `a specialist subagent, the parent discovers it from its directory:`,
+  file(
+    "agent/subagents/researcher/agent.ts",
+    `
+import { defineAgent } from "eve";
+export default defineAgent({
+  description: "investigates a topic in depth and reports back findings",
+  model: "${DEFAULT_MODEL}",
+});
+`,
+  ),
+
+  `rules:
+model: default agent.ts to "${DEFAULT_MODEL}" with the gateway fallbacks shown in the example. only use another model when the user names one, and then use exactly that id
+tools: import defineTool from "eve/tools" and use a zod inputSchema. execute() wraps its logic in try/catch and never throws. when it fails or has no real data source, return { success: false, message: "..." } and never invent values. tools do the real work, a calculation tool computes and returns the numbers, a logging tool returns what it logged
+live data: weather, news, prices, scores, and any real-world fact always use agent/tools/web_search.ts. custom tools never call fetch or any url, the sandbox blocks outbound network access
+approval: a tool that sends, deletes, charges, deploys, or publishes sets needsApproval: always() imported from eve/tools/approval. plain lookups, calculations, and logging never do
+instructions: instructions.md tells the agent to always call its tool for the task the tool does, never do that work in text, and report the tool's result. it also tells the agent to answer directly in plain text, without calling any tool, when the message does not match what a tool does. with a connection, it also tells the agent to report a connection failure in plain language, never a raw error code or stack trace
+connections: only for a service the user names, never an invented url. always declare auth with getToken reading process.env.<SERVICE>_API_TOKEN, omit auth only for a service the user calls local or public
+eval: send one realistic message the agent's real job handles, never a greeting. t.succeeded() first, then t.calledTool("<tool filename without extension>") when the agent has tools. never check t.reply for an agent with tools, small models can return an empty reply after a tool call. only an agent with no tools checks t.reply, with includes(...) from eve/evals/expect and a common word. a schedule-only agent's message asks it to run the scheduled action now
+style: no comments, no em dashes, no filler text, output the files and nothing else`,
+
+  `now generate a complete agent for the user's request, following this exact format.`,
+].join("\n\n");
 
 function getBaseUrl() {
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
   return "http://localhost:3000";
+}
+
+function readFiles(raw: string) {
+  const files = new Map<string, string>();
+  const regex =
+    /```[a-zA-Z]*\n(?:\/\/|#)\s*filename:\s*(\S+)[^\n]*\n([\s\S]*?)```/g;
+  let match;
+  while ((match = regex.exec(raw)) !== null) {
+    files.set(match[1].trim(), match[2].trim());
+  }
+  return files;
+}
+
+function validateAgent(raw: string): string[] {
+  const files = readFiles(raw);
+  const problems: string[] = [];
+
+  for (const required of [
+    "agent/instructions.md",
+    "agent/agent.ts",
+    "evals/core.eval.ts",
+  ]) {
+    if (!files.has(required)) problems.push(`missing ${required}`);
+  }
+
+  const tools = [...files].filter(([name]) => name.startsWith("agent/tools/"));
+
+  for (const [name, body] of tools) {
+    if (!/^agent\/tools\/[a-z][a-z0-9_]*\.ts$/.test(name)) {
+      problems.push(`tool filename must be snake_case: ${name}`);
+    }
+    if (/\bfetch\s*\(|https?:\/\//.test(body)) {
+      problems.push(
+        `${name} must not call external urls, use agent/tools/web_search.ts for live data`,
+      );
+    }
+  }
+
+  const evalBody = files.get("evals/core.eval.ts") ?? "";
+
+  if (tools.length > 0) {
+    const toolNames = tools.map(([name]) =>
+      name.slice("agent/tools/".length, -".ts".length),
+    );
+    if (!toolNames.some((tool) => evalBody.includes(`calledTool("${tool}")`))) {
+      problems.push(
+        "evals/core.eval.ts must call t.calledTool with an existing tool name",
+      );
+    }
+    if (/t\.reply/.test(evalBody)) {
+      problems.push(
+        "evals/core.eval.ts must not check t.reply when the agent has tools",
+      );
+    }
+  }
+
+  return problems;
+}
+
+function buildPrompt(
+  prompt: string,
+  previousCode?: string,
+  repair?: { code: string; problems: string[] },
+) {
+  const base = previousCode
+    ? `here is the existing agent's files:\n\n${previousCode}\n\nthe user now wants this change: "${prompt}"\n\napply only what's needed for this change and output the complete updated set of files in the same format, keep everything else the same.`
+    : prompt;
+
+  if (!repair) return base;
+
+  return `${base}\n\nyour previous output had these problems:\n- ${repair.problems.join("\n- ")}\n\nprevious output:\n${repair.code}\n\nfix every problem and output the complete set of files again.`;
 }
 
 export async function buildAgentWorkflow(
@@ -309,14 +275,25 @@ export async function buildAgentWorkflow(
         skipped: true,
         needsClarification: true,
         missingConnectionEnv: null,
-        error: preflight.reason,
+        error: preflight.reason ?? null,
         sandboxName: null,
         url: null,
       };
     }
   }
 
-  const code = await generateAgent(prompt, previousCode);
+  let code = await generateAgent(prompt, previousCode);
+  const problems = validateAgent(code);
+
+  if (problems.length > 0) {
+    console.error("buildAgentWorkflow: repairing output", problems);
+    code = await generateAgent(prompt, previousCode, { code, problems });
+    const remaining = validateAgent(code);
+    if (remaining.length > 0) {
+      console.error("buildAgentWorkflow: still invalid", remaining);
+    }
+  }
+
   const result = await testAgent(code, prompt, visitorId);
 
   return {
@@ -349,9 +326,7 @@ async function checkBuildable(
       },
     });
 
-    const probability = result.answers.buildable.probability;
-
-    if (probability < BUILDABLE_THRESHOLD) {
+    if (result.answers.buildable.probability < BUILDABLE_THRESHOLD) {
       return {
         buildable: false,
         reason:
@@ -361,10 +336,7 @@ async function checkBuildable(
 
     return { buildable: true };
   } catch (err) {
-    console.error(
-      "checkBuildable: jev evaluation failed, skipping preflight",
-      err,
-    );
+    console.error("checkBuildable: jev failed, skipping preflight", err);
     return { buildable: true };
   }
 }
@@ -372,89 +344,113 @@ async function checkBuildable(
 async function generateAgent(
   prompt: string,
   previousCode?: string,
+  repair?: { code: string; problems: string[] },
 ): Promise<string> {
   "use step";
 
   const { streamText } = await import("ai");
 
   const primary = await primaryModel();
-  const models = [primary, ...FALLBACK_MODELS];
+  const models = [...new Set<string>([primary, ...FALLBACK_MODELS])];
+  const userPrompt = buildPrompt(prompt, previousCode, repair);
 
-  const effectivePrompt = previousCode
-    ? `here is the existing agent's files:\n\n${previousCode}\n\nthe user now wants this change: "${prompt}"\n\napply only what's needed for this change and output the complete updated set of files in the same format, keep everything else the same.`
-    : prompt;
-
-  let text = "";
   let lastError: unknown = null;
 
-  for (const model of models) {
-    try {
-      const result = streamText({
-        model,
-        system: SYSTEM_PROMPT,
-        prompt: effectivePrompt,
-        maxRetries: 0,
-      });
+  for (let round = 0; round < ROUNDS; round++) {
+    if (round > 0) await sleep(ROUND_DELAY_MS * round);
 
-      text = "";
-      for await (const chunk of result.textStream) {
-        text += chunk;
-      }
+    for (const [i, model] of models.entries()) {
+      if (i > 0) await sleep(MODEL_DELAY_MS);
 
-      if (text.trim()) {
-        return text;
+      try {
+        const result = streamText({
+          model,
+          system: SYSTEM_PROMPT,
+          prompt: userPrompt,
+          maxRetries: 0,
+        });
+
+        let text = "";
+        for await (const chunk of result.textStream) {
+          text += chunk;
+        }
+
+        if (text.trim()) return text;
+      } catch (err) {
+        lastError = err;
+        console.error(
+          `generateAgent: round ${round + 1}, "${model}" failed`,
+          err,
+        );
       }
-    } catch (err) {
-      lastError = err;
-      console.error(`generateAgent: model "${model}" failed`, err);
     }
   }
 
-  console.error("generateAgent: all models exhausted", lastError);
+  console.error("generateAgent: all rounds exhausted", lastError);
   throw new FatalError(
-    "couldn't generate your agent right now, please try again in a moment",
+    "the free model pool is busy right now, please try again in a minute",
   );
 }
 
-async function testAgent(
-  code: string,
-  prompt: string,
-  visitorId?: string,
-): Promise<{
+type TestResult = {
   passed: boolean;
   skipped?: boolean;
   missingConnectionEnv?: string[];
   error?: string;
   sandboxName?: string;
   url?: string;
-}> {
-  "use step";
+};
 
-  let res: Response;
+async function callTestService(
+  code: string,
+  prompt: string,
+  visitorId?: string,
+): Promise<TestResult> {
   try {
-    res = await fetch(`${getBaseUrl()}/api/test-agent`, {
+    const res = await fetch(`${getBaseUrl()}/api/test-agent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, prompt, visitorId }),
     });
+
+    const data = await res.json().catch(() => null);
+
+    if (!data) {
+      console.error(`testAgent: invalid response, status ${res.status}`);
+      return {
+        passed: false,
+        error: "the test service returned an invalid response",
+      };
+    }
+
+    if (typeof data.passed !== "boolean") {
+      return { passed: false, error: data.error ?? "unexpected test response" };
+    }
+
+    return data;
   } catch (err) {
     console.error("testAgent: fetch failed", err);
     return { passed: false, error: "couldn't reach the test service" };
   }
+}
 
-  const data = await res.json().catch(() => null);
+async function testAgent(
+  code: string,
+  prompt: string,
+  visitorId?: string,
+): Promise<TestResult> {
+  "use step";
 
-  if (!data) {
-    console.error(`testAgent: invalid response, status ${res.status}`);
-    return {
-      passed: false,
-      error: "the test service returned an invalid response",
-    };
+  const first = await callTestService(code, prompt, visitorId);
+
+  if (
+    first.passed ||
+    first.skipped ||
+    NON_RETRYABLE_TEST_ERROR.test(first.error ?? "")
+  ) {
+    return first;
   }
 
-  if (typeof data.passed !== "boolean") {
-    return { passed: false, error: data.error ?? "unexpected test response" };
-  }
-
-  return data;
+  await sleep(TEST_RETRY_DELAY_MS);
+  return callTestService(code, prompt, visitorId);
 }

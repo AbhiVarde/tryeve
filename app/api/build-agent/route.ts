@@ -7,8 +7,10 @@ import { cookies } from "next/headers";
 import { buildAgentWorkflow } from "@/app/workflows/build-agent";
 import { checkBotId } from "botid/server";
 import { generationEnabled } from "@/flags";
+import { MAX_INPUT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/constants";
 
 const tracer = trace.getTracer("tryeve");
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const botCheck = await checkBotId();
@@ -44,7 +46,14 @@ export async function POST(req: Request) {
     });
   }
 
-  const { prompt, previousCode } = await req.json();
+  const body = await req.json().catch(() => null);
+  const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
+  const previousCode =
+    typeof body?.previousCode === "string" ? body.previousCode : undefined;
+
+  if (prompt.length < MIN_PROMPT_LENGTH || prompt.length > MAX_INPUT_LENGTH) {
+    return Response.json({ error: "invalid prompt" }, { status: 400 });
+  }
 
   let result;
   try {
@@ -71,6 +80,10 @@ export async function POST(req: Request) {
       { error: "couldn't build your agent, please try again" },
       { status: 500 },
     );
+  }
+
+  if (!result.code || (!result.passed && !result.skipped)) {
+    return Response.json(result);
   }
 
   const id = nanoid(8);
