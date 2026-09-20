@@ -90,11 +90,17 @@ export async function DELETE(req: Request) {
     );
   }
 
+  const history = await readHistory(key);
+  if (!history.some((entry) => entry.id === id)) {
+    return Response.json({ ok: false, error: "not found" }, { status: 404 });
+  }
+
   try {
     await stopAgentBlobs(id);
-    const history = await readHistory(key);
-    const filtered = history.filter((entry) => entry.id !== id);
-    await writeHistory(key, filtered);
+    await writeHistory(
+      key,
+      history.filter((entry) => entry.id !== id),
+    );
     return Response.json({ ok: true });
   } catch (err) {
     console.error("delete history entry failed:", err);

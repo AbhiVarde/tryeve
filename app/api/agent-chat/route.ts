@@ -1,6 +1,7 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { checkRateLimit } from "@vercel/firewall";
 import { trace } from "@opentelemetry/api";
+import { MAX_INPUT_LENGTH } from "@/lib/constants";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
@@ -12,6 +13,26 @@ const DASH_RE = /[\u2014\u2013]/g;
 
 function clean(text: string) {
   return text.replace(DASH_RE, ", ").replace(/[ \t]{2,}/g, " ");
+}
+
+function isSafeAgentUrl(raw: string) {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return false;
+    const h = u.hostname;
+    return !(
+      h === "localhost" ||
+      h === "[::1]" ||
+      h.endsWith(".local") ||
+      h.endsWith(".internal") ||
+      /^(0|10|127)\./.test(h) ||
+      /^192\.168\./.test(h) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
+      /^169\.254\./.test(h)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: Request) {
@@ -27,11 +48,20 @@ export async function POST(req: Request) {
   const { url, message, sessionId, continuationToken, turnCount } =
     await req.json();
 
-  if (!url || !message) {
+  if (
+    typeof url !== "string" ||
+    typeof message !== "string" ||
+    !message.trim() ||
+    message.length > MAX_INPUT_LENGTH
+  ) {
     return Response.json(
-      { error: "url and message are required" },
+      { error: "a valid url and message are required" },
       { status: 400 },
     );
+  }
+
+  if (!isSafeAgentUrl(url)) {
+    return Response.json({ error: "invalid agent url" }, { status: 400 });
   }
 
   const target = sessionId

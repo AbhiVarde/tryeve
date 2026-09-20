@@ -1,12 +1,12 @@
 type FileBlock = { filename: string; content: string };
 
-const CONNECTION_PREFIX = "agent/connections/";
+const CONNECTION_FILE_RE = /^agent\/(?:subagents\/[^/]+\/)?connections\//;
 const ENV_VAR_RE = /process\.env\.([A-Z0-9_]+)/g;
 
 export function getConnectionEnvVars(files: FileBlock[]): string[] {
   const vars = new Set<string>();
   for (const f of files) {
-    if (!f.filename.startsWith(CONNECTION_PREFIX)) continue;
+    if (!CONNECTION_FILE_RE.test(f.filename)) continue;
     const matches = f.content.matchAll(ENV_VAR_RE);
     for (const m of matches) vars.add(m[1]);
   }
