@@ -450,8 +450,17 @@ export async function POST(req: Request) {
         failed.flatMap((r) => r.assertions ?? []).find((a) => a.message)
           ?.message ?? failed.find((r) => r.error)?.error;
       const firstAssertion = rawAssertion?.slice(0, MAX_ERROR_MSG_LEN);
-      console.error("eval failed, stdout:", evalStdout.slice(0, 4000));
-      console.error("eval failed, stderr:", evalStderr.slice(0, 2000));
+      console.error(
+        "eval failed:",
+        JSON.stringify(
+          evalReport.results?.map((r) => ({
+            id: r.id,
+            status: r.status,
+            error: r.error,
+            assertions: r.assertions,
+          })),
+        ),
+      );
 
       await cleanupOnFailure();
       return Response.json({

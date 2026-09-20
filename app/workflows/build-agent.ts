@@ -284,6 +284,8 @@ if the request needs real-world facts, current information, or details about som
 only write a custom data-returning tool when the request implies a specific structured action, like logging, calculating, or formatting, never as a substitute for real-world lookup
 weather, news, prices, scores, and any other live data must use agent/tools/web_search.ts. custom tools must never call fetch or any external url, the sandbox blocks outbound network access
 instructions.md must explicitly tell the agent to answer directly in plain text, without calling any tool, whenever the user's message doesn't match what an available tool does
+instructions.md must also tell the agent to always call its tool for the task the tool does, never calculate, log, or format it itself in text, and to report the tool's result in the reply
+for a calculation tool, the tool's execute() must do the real math and return the numbers, so the reply is built from the tool result
 now generate a complete agent for the user's request, following this exact format`;
 
 function getBaseUrl() {
