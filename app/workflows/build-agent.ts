@@ -267,7 +267,7 @@ function validateAgent(raw: string): string[] {
     }
     const hasTurnScopedNegativeCheck = toolNames.some((tool) =>
       new RegExp(
-        `\b[A-Za-z_$][\w$]*\.notCalledTool\("${tool}"\)`,
+        `\b[A-Za-z_$][\w$]*\.notCalledTool\(\s*["']${tool}["']\s*\)`,
       ).test(evalBody),
     );
     if (!hasTurnScopedNegativeCheck) {
