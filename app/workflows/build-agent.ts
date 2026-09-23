@@ -93,13 +93,11 @@ import { defineEval } from "eve/evals";
 
 export default defineEval({
   async test(t) {
-    await t.send("log a $42.50 expense for office supplies today");
-    t.succeeded();
-    t.calledTool("log_expense");
+    const expenseTurn = await t.send("log a $42.50 expense for office supplies today");
+    expenseTurn.calledTool("log_expense");
 
-    await t.send("tell me a joke");
-    t.succeeded();
-    t.calledTool("log_expense", { count: 0 });
+    const offTopicTurn = await t.send("tell me a joke");
+    offTopicTurn.notCalledTool("log_expense");
   },
 });
 `,
@@ -179,7 +177,7 @@ live data: weather, news, prices, scores, and any real-world fact always use age
 approval: a tool that sends, deletes, charges, deploys, or publishes sets needsApproval: always() imported from eve/tools/approval. plain lookups, calculations, and logging never do
 instructions: instructions.md tells the agent to always call its tool for the task the tool does, never do that work in text, and report the tool's result. it also tells the agent to answer directly in plain text, without calling any tool, when the message does not match what a tool does. with a connection, it also tells the agent to report a connection failure in plain language, never a raw error code or stack trace
 connections: only for a service the user names, never an invented url. always declare auth with getToken reading process.env.<SERVICE>_API_TOKEN, omit auth only for a service the user calls local or public
-eval: an agent with tools sends two messages, each with await t.send(...), each its own fresh session. first message is a realistic task the agent's job actually handles, never a greeting, followed by t.succeeded() then t.calledTool("<tool filename without extension>"). second message is the negative check and must be copied verbatim from this exact list, never invented: "tell me a joke", "what's 2 plus 2", "say hi". a custom message risks overlapping the agent's own domain and failing a correct agent. followed by t.succeeded() then t.calledTool("<same tool>", { count: 0 }). with multiple tools, only the primary tool needs the negative check. never check t.reply for an agent with tools, small models can return an empty reply after a tool call. an agent with no tools sends one message and checks t.reply with includes(...) from eve/evals/expect and a common word. a schedule-only agent sends one message asking it to run the scheduled action now
+eval: an agent with tools sends two messages, each with await t.send(...), which creates a fresh session. store each returned turn in a variable. first message is a realistic task the agent's job actually handles, never a greeting, followed by <firstTurn>.calledTool("<tool filename without extension>"). second message is the negative check and must be copied verbatim from this exact list, never invented: "tell me a joke", "what's 2 plus 2", "say hi". a custom message risks overlapping the agent's own domain and failing a correct agent. follow it with <secondTurn>.notCalledTool("<same tool>"). never use t.calledTool(..., { count: 0 }) or t.notCalledTool(...) for the negative check because t aggregates every session in the eval. with multiple tools, only the primary tool needs the negative check. never check t.reply for an agent with tools, small models can return an empty reply after a tool call. an agent with no tools sends one message and checks t.reply with includes(...) from eve/evals/expect and a common word. a schedule-only agent sends one message asking it to run the scheduled action now
 style: no comments, no em dashes, no filler text, output the files and nothing else`,
 
   `now generate a complete agent for the user's request, following this exact format.`,
@@ -259,6 +257,24 @@ function validateAgent(raw: string): string[] {
         `evals/core.eval.ts must use one of these exact negative-check phrases for the second t.send: ${NEGATIVE_CHECK_PHRASES.map((p) => `"${p}"`).join(", ")}`,
       );
     }
+    if (
+      /t\.calledTool\([^)]*count\s*:\s*0/.test(evalBody) ||
+      /t\.notCalledTool\(/.test(evalBody)
+    ) {
+      problems.push(
+        "evals/core.eval.ts must scope its negative tool assertion to the turn returned by the second t.send",
+      );
+    }
+    const hasTurnScopedNegativeCheck = toolNames.some((tool) =>
+      new RegExp(
+        `\b[A-Za-z_$][\w$]*\.notCalledTool\(\s*["']${tool}["']\s*\)`,
+      ).test(evalBody),
+    );
+    if (!hasTurnScopedNegativeCheck) {
+      problems.push(
+        "evals/core.eval.ts must call <secondTurn>.notCalledTool with an existing tool name",
+      );
+    }
   }
 
   return problems;
@@ -313,23 +329,7 @@ export async function buildAgentWorkflow(
     }
   }
 
-  let result = await testAgent(code, prompt, visitorId);
-
-  if (
-    !result.passed &&
-    !result.skipped &&
-    result.error?.startsWith("eval failed")
-  ) {
-    code = await generateAgent(prompt, previousCode, {
-      code,
-      problems: [
-        result.error,
-        "Fix agent/instructions.md: only call tools for the task they are designed for. For off-topic messages such as jokes, greetings, or simple questions, respond in plain text without calling a tool.",
-      ],
-    });
-
-    result = await testAgent(code, prompt, visitorId);
-  }
+  const result = await testAgent(code, prompt, visitorId);
 
   return {
     code,
