@@ -313,7 +313,23 @@ export async function buildAgentWorkflow(
     }
   }
 
-  const result = await testAgent(code, prompt, visitorId);
+  let result = await testAgent(code, prompt, visitorId);
+
+  if (
+    !result.passed &&
+    !result.skipped &&
+    result.error?.startsWith("eval failed")
+  ) {
+    code = await generateAgent(prompt, previousCode, {
+      code,
+      problems: [
+        result.error,
+        "Fix agent/instructions.md: only call tools for the task they are designed for. For off-topic messages such as jokes, greetings, or simple questions, respond in plain text without calling a tool.",
+      ],
+    });
+
+    result = await testAgent(code, prompt, visitorId);
+  }
 
   return {
     code,
