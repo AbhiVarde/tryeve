@@ -65,6 +65,8 @@ export const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "chat with it live, with markdown-formatted replies",
       "share a live link, anyone with it can chat with your agent directly",
       "your chat history is saved, reopening an agent restores the real conversation",
+      "publish an agent to the public gallery with one toggle",
+      "browse and open any agent others have published",
     ],
   },
   {

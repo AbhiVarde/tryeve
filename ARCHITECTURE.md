@@ -32,6 +32,7 @@ Blob storage (agent, session, transcript, history)
   │
   ├─▶ chat (reuses live sandbox)
   ├─▶ download as zip
+  ├─▶ publish (public flag + shared index) ──▶ gallery listing
   ├─▶ deploy to GitHub (Connect + classic OAuth)
   └─▶ deploy to Vercel (Vercel OAuth, depends on GitHub deploy)
 ```
@@ -46,6 +47,7 @@ Blob storage (agent, session, transcript, history)
 | Durability   | Generation and testing run as one Workflow SDK step, `"use workflow"` / `"use step"`. A crash resumes instead of losing the request.                                                                                                                                                                                         |
 | Storage      | Blob stores the agent's files, its live session pointer, its chat transcript, and per-visitor history, keyed by a private cookie.                                                                                                                                                                                            |
 | Chat         | A live sandbox is kept alive after a passing test. Chat streams through the AI SDK, `useChat`, backed by the sandbox's own HTTP endpoint.                                                                                                                                                                                    |
+| Discovery    | A public flag on the agent record and a shared index decide what the gallery lists. Each card's preview image is generated on demand via `next/og` from the agent's prompt.                                                                                                                                                  |
 | Deploy       | GitHub deploy uses two separate identities: Vercel Connect for pushing files with a short-lived scoped token, and a classic GitHub OAuth App for repo creation, since GitHub Apps can't create personal repos. Vercel deploy uses a Vercel Marketplace Integration OAuth, runs only after GitHub deploy has produced a repo. |
 | Cleanup      | A cron job sweeps sandbox sessions left behind by closed tabs or crashed browsers. Idle sessions also self-terminate client-side.                                                                                                                                                                                            |
 
@@ -57,6 +59,7 @@ Every agent is tagged with its creator's identity at generation time, tracked by
 | ------------------------------- | ------------------------------------------------------------------------------------------ |
 | View files, chat via share link | Anyone with the link                                                                       |
 | Overwrite or stop a session     | Only the creator                                                                           |
+| Publish or unpublish to gallery | Only the creator                                                                           |
 | Deploy to GitHub or Vercel      | Only the deploying visitor, against their own account, regardless of who created the agent |
 
 ## Network boundaries

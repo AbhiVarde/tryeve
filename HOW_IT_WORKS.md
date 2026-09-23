@@ -52,6 +52,7 @@ A schedule runs the agent on its own cron cadence for daily digests, weekly repo
 
 - A skill is written to `agent/skills/<name>.md` when the request implies a specific procedure or house style. Only added when called for.
 - Every agent ships one `evals/core.eval.ts` file regardless of the request.
+- An agent with tools sends two messages: the real task it should handle, and a fixed off-topic message it should not call any tool for.
 - Evals aren't run by tryeve, only generated and included in the zip or deploy. Running one during testing would risk the 60s workflow timeout.
 
 ## Refine
@@ -60,6 +61,15 @@ An already-built agent can be refined with a follow-up instruction instead of re
 
 - A follow-up reruns the same pipeline against the existing files, not a blank slate.
 - `previousCode` is optional everywhere. A fresh build works exactly as before.
+
+## Publish and discovery
+
+An agent can be listed in the public gallery so anyone can find and open it, separate from a private share link.
+
+- A `public` flag lives on the agent's own record, off by default.
+- Toggling it also updates a single shared index of published agents. Only the creator can flip it.
+- The gallery page reads that index and shows a generated preview image per agent, rendered on demand from the agent's prompt.
+- Unpublishing removes the agent from the index. The individual share link still works exactly as before.
 
 ## Tool approval
 
@@ -84,21 +94,23 @@ A share link lets anyone view an agent's files and chat with it. It doesn't let 
 
 ## Bugs found building this
 
-| Bug                                          | Cause                                                                                     | Fix                                                                                |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Stale first-read race                        | History looked empty right after a write, cookie and blob write landed a beat apart       | Refetch on every panel open instead of caching                                     |
-| Silent 404 on cleanup route                  | Sat in an underscore-prefixed folder, excluded from Next.js routing by design             | Moved out of the private folder                                                    |
-| Firewall rule quota                          | Hobby allows one rate-limit rule per project, not per route                               | One rule with an or-condition across both paths                                    |
-| Sandbox has no ID accessor                   | `@vercel/sandbox` has no `sandboxId`, identity is the `name` set at creation              | `Sandbox.get()` takes `{ name }`                                                   |
-| Tab switch treated as exit                   | A `visibilitychange` listener stopped the sandbox on any tab switch                       | Only `beforeunload` counts as a real exit                                          |
-| `useChat` has no memory                      | AI SDK keeps messages in React state only, reconnecting showed an empty chat              | Each turn syncs to Blob, restored as initial state                                 |
-| Sandboxes snapshotted by default             | Auto-snapshot on every stop exhausted a month's storage quota in a day                    | `persistent: false` on every `Sandbox.create()`                                    |
-| GitHub Apps can't create personal repos      | Vercel Connect's GitHub connector is blocked from `POST /user/repos` on personal accounts | Repo creation split to a direct classic OAuth flow, Connect kept for pushing files |
-| IP rate limit doesn't stop distributed abuse | A botnet spreads requests across many IPs                                                 | BotID screens actual bot signals, firewall stays as backstop                       |
-| Model choice hardcoded                       | Changing the model or pausing generation meant a redeploy                                 | Flags SDK exposes both live, no redeploy                                           |
-| Deploy retried the wrong flow                | GitHub and Vercel deploy shared one popup name and retry callback                         | Each flow gets its own window name and retry callback                              |
-| Missing OAuth client ID failed silently      | An unset `GITHUB_OAUTH_CLIENT_ID` produced a broken redirect to GitHub's own 404          | Route checks for the client ID first, returns a real error                         |
-| jev model ID mismatch                        | Used `typesafe-ai/jev-latest`, gateway lists it as `typesafe-ai/jev`                      | Corrected the model string                                                         |
+| Bug                                          | Cause                                                                                                                            | Fix                                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Stale first-read race                        | History looked empty right after a write, cookie and blob write landed a beat apart                                              | Refetch on every panel open instead of caching                                     |
+| Silent 404 on cleanup route                  | Sat in an underscore-prefixed folder, excluded from Next.js routing by design                                                    | Moved out of the private folder                                                    |
+| Firewall rule quota                          | Hobby allows one rate-limit rule per project, not per route                                                                      | One rule with an or-condition across both paths                                    |
+| Sandbox has no ID accessor                   | `@vercel/sandbox` has no `sandboxId`, identity is the `name` set at creation                                                     | `Sandbox.get()` takes `{ name }`                                                   |
+| Tab switch treated as exit                   | A `visibilitychange` listener stopped the sandbox on any tab switch                                                              | Only `beforeunload` counts as a real exit                                          |
+| `useChat` has no memory                      | AI SDK keeps messages in React state only, reconnecting showed an empty chat                                                     | Each turn syncs to Blob, restored as initial state                                 |
+| Sandboxes snapshotted by default             | Auto-snapshot on every stop exhausted a month's storage quota in a day                                                           | `persistent: false` on every `Sandbox.create()`                                    |
+| GitHub Apps can't create personal repos      | Vercel Connect's GitHub connector is blocked from `POST /user/repos` on personal accounts                                        | Repo creation split to a direct classic OAuth flow, Connect kept for pushing files |
+| IP rate limit doesn't stop distributed abuse | A botnet spreads requests across many IPs                                                                                        | BotID screens actual bot signals, firewall stays as backstop                       |
+| Model choice hardcoded                       | Changing the model or pausing generation meant a redeploy                                                                        | Flags SDK exposes both live, no redeploy                                           |
+| Deploy retried the wrong flow                | GitHub and Vercel deploy shared one popup name and retry callback                                                                | Each flow gets its own window name and retry callback                              |
+| Missing OAuth client ID failed silently      | An unset `GITHUB_OAUTH_CLIENT_ID` produced a broken redirect to GitHub's own 404                                                 | Route checks for the client ID first, returns a real error                         |
+| jev model ID mismatch                        | Used `typesafe-ai/jev-latest`, gateway lists it as `typesafe-ai/jev`                                                             | Corrected the model string                                                         |
+| Gallery didn't reflect a publish toggle      | Vercel Blob's CDN can serve stale content for up to 60s after an overwrite, and `cacheControlMaxAge` can't go below that minimum | Reads of an overwritten blob path append a cache-busting query param               |
+| Chat threw a 410 on an older shared agent    | A sandbox can expire independent of any idle timer tracked client-side                                                           | Ping the sandbox before every send, revive and queue the message if it's gone      |
 
 ## What's deliberately not built
 

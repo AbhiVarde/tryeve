@@ -11,7 +11,7 @@ Describe an agent in plain English. tryeve generates real eve files, tests them 
 1. You describe an agent.
 2. tryeve generates real eve files and connects to a named third-party service over MCP if you asked for one.
 3. A sandbox boots the actual eve runtime and confirms the agent responds to a live message.
-4. Once it passes, you can chat with it, download it, deploy it to your own GitHub, or deploy that repo straight to your own Vercel account.
+4. Once it passes, you can chat with it, download it, publish it to the public gallery, deploy it to your own GitHub, or deploy that repo straight to your own Vercel account.
 
 Nothing is shown until step 3 passes. Reloading the page restores your agent, chat, and files exactly where you left them.
 
@@ -25,6 +25,7 @@ Nothing is shown until step 3 passes. Reloading the page restores your agent, ch
 | Deploy      | One click to your own GitHub, one click from there to your own Vercel account. No OAuth app setup required on your end.                                                                                                      |
 | Chat        | Connect right after a build passes. Markdown-formatted replies. Transcripts persist across reloads and share links.                                                                                                          |
 | Share       | Anyone with a link can view files and chat. Only the creator can overwrite or stop the session.                                                                                                                              |
+| Discover    | Publish an agent to a public gallery with one toggle. Only the creator can unpublish it.                                                                                                                                     |
 | Reliability | Idle sandboxes shut down automatically. Tab switches never disconnect you, only closing the tab does. Failed builds show why and offer a retry.                                                                              |
 | Privacy     | Your build history is private, tied to a cookie, deletable at any time. Concurrent sandboxes are capped per visitor.                                                                                                         |
 
@@ -39,8 +40,9 @@ Nothing is shown until step 3 passes. Reloading the page restores your agent, ch
 7. On a pass, the sandbox stays alive so a later chat reuses it instantly.
 8. The agent, its session, and its transcript are stored in Blob, so a reload or share link restores everything.
 9. It's added to your private history, tracked by a cookie.
-10. Optionally, deploy to your own GitHub via Vercel Connect, no long-lived secret stored.
-11. Optionally, deploy that same repo to your own Vercel account via Vercel OAuth.
+10. Optionally, publish it to the public gallery with one toggle, listed for anyone to browse and open.
+11. Optionally, deploy to your own GitHub via Vercel Connect, no long-lived secret stored.
+12. Optionally, deploy that same repo to your own Vercel account via Vercel OAuth.
 
 Steps 2 through 5 run as one durable workflow step. A crash mid-generation resumes instead of losing the request. A cron job separately sweeps sandboxes left behind by closed tabs or crashed browsers.
 
@@ -127,6 +129,7 @@ app/
     stop-agent/        stops a sandbox, owner-restricted
     agent-chat/        streams chat responses
     agents/            returns the visitor's private history
+    agents/[id]/visibility/  toggles an agent public or private
     save-transcript/   persists chat messages
     github/deploy/          creates the repo, pushes files
     github/oauth/           GitHub OAuth flow
@@ -134,6 +137,8 @@ app/
     vercel/oauth/           Vercel OAuth flow
     cron/cleanup/      sweeps stale sandbox sessions
   agent/[id]/          shared agent view, real chat included
+  agent/[id]/opengraph-image.tsx  generates each agent's preview image
+  gallery/page.tsx     public gallery, lists published agents
   page.tsx             main app
 components/
   agent-chat-panel.tsx   chat state, streaming, transcript sync
@@ -148,6 +153,7 @@ lib/
 
 - Generation requests are screened by BotID before reaching a sandbox.
 - Agents are tagged with their creator's identity. Only the creator can overwrite or stop a session.
+- Only the creator can publish an agent to the gallery or remove it.
 - GitHub and Vercel deploys only ever touch the deploying visitor's own account.
 - A connection is only ever generated for a named service. Its credential is never stored, only referenced.
 - Chat, generation, and connect requests are rate limited per visitor.
