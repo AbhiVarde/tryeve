@@ -166,6 +166,7 @@ export function AgentViewer({
     (patch) => setSession((prev) => (prev ? { ...prev, ...patch } : prev)),
     session?.sandboxName ?? `viewer-${shareId}`,
     initialMessages,
+    shareId,
   );
 
   useTranscriptSync(shareId, agentMessages, status);

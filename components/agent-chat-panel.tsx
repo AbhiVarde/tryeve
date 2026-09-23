@@ -46,6 +46,7 @@ export function useAgentChat(
   onSessionUpdate: (patch: Partial<AgentSession>) => void,
   chatId: string,
   initialMessages?: StoredMessage[] | null,
+  shareId?: string,
 ) {
   const transport = useMemo(
     () =>
@@ -61,11 +62,12 @@ export function useAgentChat(
               sessionId: session?.sessionId ?? null,
               continuationToken: session?.continuationToken ?? null,
               turnCount: session?.turnCount ?? 0,
+              shareId: shareId ?? null,
             },
           };
         },
       }),
-    [session],
+    [session, shareId],
   );
 
   return useChat<UIMessage>({
@@ -78,7 +80,13 @@ export function useAgentChat(
         onSessionUpdate({
           sessionId: part.data.sessionId,
           continuationToken: part.data.continuationToken,
-          turnCount: (session?.turnCount ?? 0) + 1,
+          turnCount:
+            typeof part.data.turnCount === "number"
+              ? part.data.turnCount
+              : (session?.turnCount ?? 0) + 1,
+          ...(part.data.url
+            ? { url: part.data.url, sandboxName: part.data.sandboxName }
+            : {}),
         });
       }
     },

@@ -368,6 +368,10 @@ function HomeInner() {
     StoredMessage[] | null
   >(null);
 
+  const activeShareId = chatSession
+    ? messages.find((m) => m.id === chatSession.agentMessageId)?.shareId
+    : undefined;
+
   const {
     messages: agentMessages,
     sendMessage,
@@ -377,11 +381,9 @@ function HomeInner() {
     (patch) => setChatSession((prev) => (prev ? { ...prev, ...patch } : prev)),
     chatSession?.sandboxName ?? chatKey,
     initialMessages,
+    activeShareId,
   );
 
-  const activeShareId = chatSession
-    ? messages.find((m) => m.id === chatSession.agentMessageId)?.shareId
-    : undefined;
   useTranscriptSync(activeShareId, agentMessages, status);
 
   useEffect(() => {

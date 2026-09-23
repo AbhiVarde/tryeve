@@ -5,7 +5,7 @@ import { MAX_INPUT_LENGTH } from "@/lib/constants";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 type StreamEvent = { type?: string; data?: any };
 
@@ -35,6 +35,38 @@ function isSafeAgentUrl(raw: string) {
   }
 }
 
+function getBaseUrl() {
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
+function isDeadSandboxResponse(res: Response | null) {
+  if (!res) return true;
+  return res.status === 404 || res.status === 410 || res.status >= 500;
+}
+
+async function reviveSandbox(shareId: string, req: Request) {
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/revive-agent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: req.headers.get("cookie") ?? "",
+      },
+      body: JSON.stringify({ shareId }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!data?.ok) return null;
+    return {
+      url: data.url as string,
+      sandboxName: data.sandboxName as string,
+    };
+  } catch (err) {
+    console.error("agent-chat: revive failed", err);
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   const { rateLimited } = await checkRateLimit("rate-limit-ai-routes");
 
@@ -45,7 +77,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { url, message, sessionId, continuationToken, turnCount } =
+  const { url, message, sessionId, continuationToken, turnCount, shareId } =
     await req.json();
 
   if (
@@ -64,21 +96,39 @@ export async function POST(req: Request) {
     return Response.json({ error: "invalid agent url" }, { status: 400 });
   }
 
-  const target = sessionId
-    ? `${url}/eve/v1/session/${sessionId}`
-    : `${url}/eve/v1/session`;
+  let agentUrl = url;
+  let target = sessionId
+    ? `${agentUrl}/eve/v1/session/${sessionId}`
+    : `${agentUrl}/eve/v1/session`;
 
   const body = { message };
-  const skipTurns = typeof turnCount === "number" ? turnCount : 0;
 
-  let res: Response;
-  try {
-    res = await fetch(target, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch {
+  async function trySend(t: string) {
+    try {
+      return await fetch(t, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  let res = await trySend(target);
+  let revived: { url: string; sandboxName: string } | null = null;
+
+  if (isDeadSandboxResponse(res) && typeof shareId === "string" && shareId) {
+    revived = await reviveSandbox(shareId, req);
+
+    if (revived) {
+      agentUrl = revived.url;
+      target = `${agentUrl}/eve/v1/session`; // fresh sandbox, fresh session
+      res = await trySend(target);
+    }
+  }
+
+  if (!res) {
     return Response.json(
       { error: "couldn't reach the agent sandbox" },
       { status: 502 },
@@ -94,7 +144,8 @@ export async function POST(req: Request) {
   }
 
   const data = await res.json().catch(() => null);
-  const newSessionId = res.headers.get("x-eve-session-id") ?? sessionId;
+  const newSessionId =
+    res.headers.get("x-eve-session-id") ?? (revived ? null : sessionId);
   const newContinuationToken = data?.continuationToken ?? continuationToken;
 
   if (!newSessionId) {
@@ -104,9 +155,13 @@ export async function POST(req: Request) {
     );
   }
 
+  const skipTurns = revived ? 0 : typeof turnCount === "number" ? turnCount : 0;
+
   let streamRes: Response;
   try {
-    streamRes = await fetch(`${url}/eve/v1/session/${newSessionId}/stream`);
+    streamRes = await fetch(
+      `${agentUrl}/eve/v1/session/${newSessionId}/stream`,
+    );
   } catch {
     return Response.json(
       { error: "couldn't stream the agent session" },
@@ -245,6 +300,13 @@ export async function POST(req: Request) {
         data: {
           sessionId: newSessionId,
           continuationToken: newContinuationToken,
+          ...(revived
+            ? {
+                url: revived.url,
+                sandboxName: revived.sandboxName,
+                turnCount: 1,
+              }
+            : {}),
         },
       });
     },
