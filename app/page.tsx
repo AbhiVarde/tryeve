@@ -361,6 +361,7 @@ function HomeInner() {
     null,
   );
   const [vercelLinks, setVercelLinks] = useState<Record<string, string>>({});
+  const [publicIds, setPublicIds] = useState<Set<string>>(new Set());
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [chatKey, setChatKey] = useState(() => crypto.randomUUID());
   const [initialMessages, setInitialMessages] = useState<
@@ -606,6 +607,36 @@ function HomeInner() {
       cancelled = true;
     };
   }, [searchParams]);
+
+  async function togglePublic(message: Message) {
+    if (!message.shareId) return;
+    const makePublic = !publicIds.has(message.id);
+
+    try {
+      const res = await fetch(`/api/agents/${message.shareId}/visibility`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ makePublic }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        toast.error(data.error ?? "couldn't update visibility");
+        return;
+      }
+
+      setPublicIds((prev) => {
+        const next = new Set(prev);
+        if (makePublic) next.add(message.id);
+        else next.delete(message.id);
+        return next;
+      });
+
+      toast.success(makePublic ? "shared to gallery" : "removed from gallery");
+    } catch {
+      toast.error("couldn't reach the server, try again");
+    }
+  }
 
   function resetSession() {
     if (busy) return;
@@ -1727,6 +1758,14 @@ function HomeInner() {
                                 size={14}
                               />
                               share
+                            </button>
+                            <button
+                              onClick={() => togglePublic(message)}
+                              className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              {publicIds.has(message.id)
+                                ? "in gallery"
+                                : "add to gallery"}
                             </button>
                           </div>
                         )}

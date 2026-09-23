@@ -90,7 +90,12 @@ export async function POST(req: Request) {
 
   await put(
     `agents/${id}.json`,
-    JSON.stringify({ prompt, code: result.code, ownerId: visitorId }),
+    JSON.stringify({
+      prompt,
+      code: result.code,
+      ownerId: visitorId,
+      public: false,
+    }),
     {
       access: "public",
       addRandomSuffix: false,
