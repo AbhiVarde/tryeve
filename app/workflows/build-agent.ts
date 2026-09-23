@@ -97,7 +97,7 @@ export default defineEval({
     t.succeeded();
     t.calledTool("log_expense");
 
-    await t.send("what's the weather like today");
+    await t.send("tell me a joke");
     t.succeeded();
     t.calledTool("log_expense", { count: 0 });
   },
@@ -179,7 +179,7 @@ live data: weather, news, prices, scores, and any real-world fact always use age
 approval: a tool that sends, deletes, charges, deploys, or publishes sets needsApproval: always() imported from eve/tools/approval. plain lookups, calculations, and logging never do
 instructions: instructions.md tells the agent to always call its tool for the task the tool does, never do that work in text, and report the tool's result. it also tells the agent to answer directly in plain text, without calling any tool, when the message does not match what a tool does. with a connection, it also tells the agent to report a connection failure in plain language, never a raw error code or stack trace
 connections: only for a service the user names, never an invented url. always declare auth with getToken reading process.env.<SERVICE>_API_TOKEN, omit auth only for a service the user calls local or public
-eval: an agent with tools sends two messages, each with await t.send(...), each its own fresh session. first message is a realistic task the agent's job actually handles, never a greeting, followed by t.succeeded() then t.calledTool("<tool filename without extension>"). second message is something unrelated to any tool, like a generic question, followed by t.succeeded() then t.calledTool("<same tool>", { count: 0 }) to confirm it does not fire on an off-topic message. with multiple tools, only the primary tool needs the negative check. never check t.reply for an agent with tools, small models can return an empty reply after a tool call. an agent with no tools sends one message and checks t.reply with includes(...) from eve/evals/expect and a common word. a schedule-only agent sends one message asking it to run the scheduled action now
+eval: an agent with tools sends two messages, each with await t.send(...), each its own fresh session. first message is a realistic task the agent's job actually handles, never a greeting, followed by t.succeeded() then t.calledTool("<tool filename without extension>"). second message is the negative check and must be copied verbatim from this exact list, never invented: "tell me a joke", "what's 2 plus 2", "say hi". a custom message risks overlapping the agent's own domain and failing a correct agent. followed by t.succeeded() then t.calledTool("<same tool>", { count: 0 }). with multiple tools, only the primary tool needs the negative check. never check t.reply for an agent with tools, small models can return an empty reply after a tool call. an agent with no tools sends one message and checks t.reply with includes(...) from eve/evals/expect and a common word. a schedule-only agent sends one message asking it to run the scheduled action now
 style: no comments, no em dashes, no filler text, output the files and nothing else`,
 
   `now generate a complete agent for the user's request, following this exact format.`,
@@ -247,6 +247,16 @@ function validateAgent(raw: string): string[] {
     if ((evalBody.match(/await t\.send\(/g) ?? []).length < 2) {
       problems.push(
         "evals/core.eval.ts must call t.send at least twice for a tool-using agent, once for the real task and once for an off-topic message that should not call any tool",
+      );
+    }
+    const NEGATIVE_CHECK_PHRASES = [
+      "tell me a joke",
+      "what's 2 plus 2",
+      "say hi",
+    ];
+    if (!NEGATIVE_CHECK_PHRASES.some((phrase) => evalBody.includes(phrase))) {
+      problems.push(
+        `evals/core.eval.ts must use one of these exact negative-check phrases for the second t.send: ${NEGATIVE_CHECK_PHRASES.map((p) => `"${p}"`).join(", ")}`,
       );
     }
   }
