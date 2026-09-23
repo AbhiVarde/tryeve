@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { head } from "@vercel/blob";
 import { AppShell } from "@/components/app-shell";
 import { TopBar } from "@/components/topbar";
+import { GalleryCard } from "./gallery-card";
 
 type PublicEntry = { id: string; prompt: string; createdAt: string };
 
@@ -23,7 +23,7 @@ async function getPublicAgents(): Promise<PublicEntry[]> {
 
 export const metadata = {
   title: "gallery",
-  description: "agents the community has published",
+  description: "agents published by the community",
 };
 
 export default async function GalleryPage() {
@@ -32,30 +32,30 @@ export default async function GalleryPage() {
   return (
     <AppShell>
       <TopBar />
-      <div className="mx-auto w-full max-w-2xl px-6 pt-24 pb-16">
-        <div className="mb-6">
+      <div className="mx-auto w-full max-w-3xl px-6 pt-24 pb-16">
+        <div className="mb-8">
           <h1 className="font-mono text-lg font-medium">gallery</h1>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
-            agents the community has published
+            {agents.length > 0
+              ? `${agents.length} agent${agents.length !== 1 ? "s" : ""} published by the community`
+              : "agents published by the community"}
           </p>
         </div>
         {agents.length === 0 ? (
           <p className="font-mono text-sm text-muted-foreground">
-            nothing published yet — be the first to share an agent
+            nothing published yet. be the first to share an agent.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {agents.map((a) => (
-              <li key={a.id}>
-                <Link
-                  href={`/agent/${a.id}`}
-                  className="block rounded-md border border-border/40 px-3 py-2 font-mono text-sm transition-colors hover:bg-accent"
-                >
-                  {a.prompt}
-                </Link>
-              </li>
+              <GalleryCard
+                key={a.id}
+                id={a.id}
+                prompt={a.prompt}
+                createdAt={a.createdAt}
+              />
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </AppShell>
