@@ -1759,14 +1759,14 @@ function HomeInner() {
                               />
                               share
                             </button>
-                            <button
+                            {/* <button
                               onClick={() => togglePublic(message)}
                               className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                             >
                               {publicIds.has(message.id)
                                 ? "in gallery"
                                 : "add to gallery"}
-                            </button>
+                            </button> */}
                           </div>
                         )}
                       </div>
