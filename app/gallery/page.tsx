@@ -46,14 +46,9 @@ export default async function GalleryPage() {
             nothing published yet. be the first to share an agent.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {agents.map((a) => (
-              <GalleryCard
-                key={a.id}
-                id={a.id}
-                prompt={a.prompt}
-                createdAt={a.createdAt}
-              />
+              <GalleryCard key={a.id} id={a.id} />
             ))}
           </div>
         )}
