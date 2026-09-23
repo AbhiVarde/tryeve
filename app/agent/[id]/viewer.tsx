@@ -57,6 +57,7 @@ export function AgentViewer({
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const xIconRef = useRef<XIconHandle>(null);
+  const pendingMessageRef = useRef<string | null>(null);
 
   const [session, setSession] = useState<AgentSession | null>(null);
   const [connecting, setConnecting] = useState(true);
@@ -169,12 +170,56 @@ export function AgentViewer({
 
   useTranscriptSync(shareId, agentMessages, status);
 
-  function onSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    if (session && pendingMessageRef.current) {
+      const text = pendingMessageRef.current;
+      pendingMessageRef.current = null;
+      sendMessage({ text });
+    }
+  }, [session, sendMessage]);
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || !session) return;
     setInput("");
-    sendMessage({ text: trimmed });
+
+    const alive = await fetch("/api/ping-agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: session.url }),
+    })
+      .then((r) => r.json())
+      .then((d) => d.alive)
+      .catch(() => false);
+
+    if (alive) {
+      sendMessage({ text: trimmed });
+      return;
+    }
+
+    setReviving(true);
+    const reviveRes = await fetch("/api/revive-agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shareId }),
+    });
+    const revived = await reviveRes.json().catch(() => null);
+    setReviving(false);
+
+    if (!revived?.ok) {
+      setInput(trimmed);
+      return;
+    }
+
+    pendingMessageRef.current = trimmed;
+    setSession({
+      url: revived.url,
+      sandboxName: revived.sandboxName,
+      sessionId: null,
+      continuationToken: null,
+      turnCount: 0,
+    });
   }
 
   function openFilesPanel() {

@@ -18,7 +18,9 @@ async function readAgent(id: string): Promise<AgentRecord | null> {
     const blob = await head(`agents/${id}.json`, {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    const res = await fetch(blob.url, { cache: "no-store" });
+    const res = await fetch(`${blob.url}?v=${blob.uploadedAt.getTime()}`, {
+      cache: "no-store",
+    });
     return res.ok ? await res.json() : null;
   } catch {
     return null;
@@ -30,7 +32,9 @@ async function readPublicIndex(): Promise<PublicEntry[]> {
     const blob = await head("agents/public/index.json", {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    const res = await fetch(blob.url, { cache: "no-store" });
+    const res = await fetch(`${blob.url}?v=${blob.uploadedAt.getTime()}`, {
+      cache: "no-store",
+    });
     return res.ok ? await res.json() : [];
   } catch {
     return [];
@@ -42,7 +46,6 @@ async function writePublicIndex(entries: PublicEntry[]) {
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: true,
-    cacheControlMaxAge: 0,
     token: process.env.BLOB_READ_WRITE_TOKEN,
   });
 }
@@ -99,7 +102,6 @@ export async function POST(
       access: "public",
       addRandomSuffix: false,
       allowOverwrite: true,
-      cacheControlMaxAge: 0,
       token: process.env.BLOB_READ_WRITE_TOKEN,
     },
   );

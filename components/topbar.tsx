@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useRef, type ReactNode } from "react";
 import { GithubIcon, type GithubIconHandle } from "@/components/ui/github";
+import {
+  GalleryVerticalEndIcon,
+  type GalleryVerticalEndIconHandle,
+} from "@/components/ui/gallery-vertical-end";
 import { VercelMark } from "@/components/vercel-mark";
 
 const GITHUB_URL = "https://github.com/AbhiVarde/tryeve";
@@ -17,6 +21,7 @@ export function TopBar({
   rightSlot?: ReactNode;
 }) {
   const githubIconRef = useRef<GithubIconHandle>(null);
+  const galleryIconRef = useRef<GalleryVerticalEndIconHandle>(null);
 
   const logo = (
     <span className="flex items-center gap-2">
@@ -54,6 +59,15 @@ export function TopBar({
         )}
         <div className="flex items-center gap-4">
           {rightSlot}
+          <Link
+            href="/gallery"
+            onMouseEnter={() => galleryIconRef.current?.startAnimation()}
+            onMouseLeave={() => galleryIconRef.current?.stopAnimation()}
+            aria-label="gallery"
+            className="text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
+          >
+            <GalleryVerticalEndIcon ref={galleryIconRef} size={16} />
+          </Link>
           <a
             href={GITHUB_URL}
             target="_blank"

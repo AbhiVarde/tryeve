@@ -38,6 +38,10 @@ import {
 } from "@/components/ui/layout-grid";
 import { LayersIcon, type LayersIconHandle } from "@/components/ui/layers";
 import {
+  GalleryVerticalEndIcon,
+  type GalleryVerticalEndIconHandle,
+} from "@/components/ui/gallery-vertical-end";
+import {
   BotMessageSquareIcon,
   type BotMessageSquareHandle,
 } from "@/components/ui/bot-message-square";
@@ -333,6 +337,7 @@ function HomeInner() {
   const historyRowIcons = useIconRefs<CornerDownRightIconHandle>();
   const retryIcons = useIconRefs<RefreshCCWIconWIcon>();
   const deleteIcons = useIconRefs<DeleteIconHandle>();
+  const galleryIcons = useIconRefs<GalleryVerticalEndIconHandle>();
 
   const connectPromptIconRef = useRef<BotMessageSquareHandle>(null);
   const deployIconRef = useRef<GithubIconHandle>(null);
@@ -355,6 +360,7 @@ function HomeInner() {
   const [genMsgIndex, setGenMsgIndex] = useState(0);
 
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
+  const pendingMessageRef = useRef<string | null>(null);
   const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
   const [deployingId, setDeployingId] = useState<string | null>(null);
   const [vercelDeployingId, setVercelDeployingId] = useState<string | null>(
@@ -383,6 +389,14 @@ function HomeInner() {
     ? messages.find((m) => m.id === chatSession.agentMessageId)?.shareId
     : undefined;
   useTranscriptSync(activeShareId, agentMessages, status);
+
+  useEffect(() => {
+    if (chatSession && pendingMessageRef.current) {
+      const text = pendingMessageRef.current;
+      pendingMessageRef.current = null;
+      sendMessage({ text });
+    }
+  }, [chatSession, sendMessage]);
 
   const panelOpen =
     !!selectedFile || showFeatures || showBuiltWith || showHistory;
@@ -493,6 +507,7 @@ function HomeInner() {
             prompt: string;
             code: string;
             missingConnectionEnv?: string[];
+            public?: boolean;
           } | null,
         ) => {
           if (cancelled || !data) return;
@@ -520,6 +535,10 @@ function HomeInner() {
                 ? { state: "skipped", missingConnectionEnv }
                 : { state: "passed" },
           }));
+
+          if (data.public) {
+            setPublicIds((prev) => new Set(prev).add(assistantId));
+          }
 
           fetch(`/agent/${shareId}/raw?repo=1`)
             .then((res) => (res.ok ? res.json() : null))
@@ -1171,7 +1190,53 @@ function HomeInner() {
     setInput("");
 
     if (chatSession) {
-      sendMessage({ text: trimmed });
+      const alive = await fetch("/api/ping-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: chatSession.url }),
+      })
+        .then((r) => r.json())
+        .then((d) => d.alive)
+        .catch(() => false);
+
+      if (alive) {
+        sendMessage({ text: trimmed });
+        return;
+      }
+
+      const agentMessage = messages.find(
+        (m) => m.id === chatSession.agentMessageId,
+      );
+
+      if (!agentMessage?.shareId) {
+        toast.error("this agent disconnected, start a new one");
+        setChatSession(null);
+        return;
+      }
+
+      toast.info("waking this agent back up...");
+      const reviveRes = await fetch("/api/revive-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shareId: agentMessage.shareId }),
+      });
+      const revived = await reviveRes.json().catch(() => null);
+
+      if (!revived?.ok) {
+        toast.error("couldn't reconnect to this agent, try again");
+        setInput(trimmed);
+        return;
+      }
+
+      pendingMessageRef.current = trimmed;
+      setChatSession({
+        agentMessageId: chatSession.agentMessageId,
+        url: revived.url,
+        sandboxName: revived.sandboxName,
+        sessionId: null,
+        continuationToken: null,
+        turnCount: 0,
+      });
       return;
     }
 
@@ -1759,14 +1824,20 @@ function HomeInner() {
                               />
                               share
                             </button>
-                            {/* <button
+                            <button
                               onClick={() => togglePublic(message)}
+                              onMouseEnter={galleryIcons.onEnter(message.id)}
+                              onMouseLeave={galleryIcons.onLeave(message.id)}
                               className="flex cursor-pointer items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                             >
+                              <GalleryVerticalEndIcon
+                                ref={galleryIcons.setRef(message.id)}
+                                size={14}
+                              />
                               {publicIds.has(message.id)
-                                ? "in gallery"
-                                : "add to gallery"}
-                            </button> */}
+                                ? "published"
+                                : "publish"}
+                            </button>
                           </div>
                         )}
                       </div>

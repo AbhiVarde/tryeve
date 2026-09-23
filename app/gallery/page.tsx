@@ -5,12 +5,16 @@ import { TopBar } from "@/components/topbar";
 
 type PublicEntry = { id: string; prompt: string; createdAt: string };
 
+export const dynamic = "force-dynamic";
+
 async function getPublicAgents(): Promise<PublicEntry[]> {
   try {
     const blob = await head("agents/public/index.json", {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
-    const res = await fetch(blob.url, { cache: "no-store" });
+    const res = await fetch(`${blob.url}?v=${blob.uploadedAt.getTime()}`, {
+      cache: "no-store",
+    });
     return res.ok ? await res.json() : [];
   } catch {
     return [];
@@ -19,7 +23,7 @@ async function getPublicAgents(): Promise<PublicEntry[]> {
 
 export const metadata = {
   title: "gallery",
-  description: "agents built with tryeve, shared publicly",
+  description: "agents the community has published",
 };
 
 export default async function GalleryPage() {
@@ -29,10 +33,15 @@ export default async function GalleryPage() {
     <AppShell>
       <TopBar />
       <div className="mx-auto w-full max-w-2xl px-6 pt-24 pb-16">
-        <h1 className="mb-6 font-mono text-lg font-medium">gallery</h1>
+        <div className="mb-6">
+          <h1 className="font-mono text-lg font-medium">gallery</h1>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            agents the community has published
+          </p>
+        </div>
         {agents.length === 0 ? (
           <p className="font-mono text-sm text-muted-foreground">
-            no public agents yet, be the first to share one
+            nothing published yet — be the first to share an agent
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
