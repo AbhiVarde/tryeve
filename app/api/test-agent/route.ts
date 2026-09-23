@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export const maxDuration = 180;
 
 const DEADLINE_MS = 150_000;
-const EVAL_TIMEOUT_MS = 60_000;
+const EVAL_TIMEOUT_MS = 75_000;
 const MAX_ERROR_MSG_LEN = 200;
 
 type FileBlock = { filename: string; content: string };
