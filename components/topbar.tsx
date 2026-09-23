@@ -7,7 +7,12 @@ import {
   GalleryVerticalEndIcon,
   type GalleryVerticalEndIconHandle,
 } from "@/components/ui/gallery-vertical-end";
+import {
+  HeartHandshakeIcon,
+  type HeartHandshakeIconHandle,
+} from "@/components/ui/heart-handshake";
 import { VercelMark } from "@/components/vercel-mark";
+import { SPONSORS_URL } from "@/lib/constants";
 
 const GITHUB_URL = "https://github.com/AbhiVarde/tryeve";
 
@@ -22,6 +27,7 @@ export function TopBar({
 }) {
   const githubIconRef = useRef<GithubIconHandle>(null);
   const galleryIconRef = useRef<GalleryVerticalEndIconHandle>(null);
+  const sponsorsIconRef = useRef<HeartHandshakeIconHandle>(null);
 
   const logo = (
     <span className="flex items-center gap-2">
@@ -68,6 +74,17 @@ export function TopBar({
           >
             <GalleryVerticalEndIcon ref={galleryIconRef} size={16} />
           </Link>
+          <a
+            href={SPONSORS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onMouseEnter={() => sponsorsIconRef.current?.startAnimation()}
+            onMouseLeave={() => sponsorsIconRef.current?.stopAnimation()}
+            aria-label="sponsor this project"
+            className="text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
+          >
+            <HeartHandshakeIcon ref={sponsorsIconRef} size={16} />
+          </a>
           <a
             href={GITHUB_URL}
             target="_blank"

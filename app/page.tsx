@@ -29,10 +29,6 @@ import {
 } from "@/components/ui/chevron-right";
 import { HistoryIcon, type HistoryIconHandle } from "@/components/ui/history";
 import {
-  HeartHandshakeIcon,
-  type HeartHandshakeIconHandle,
-} from "@/components/ui/heart-handshake";
-import {
   LayoutGridIcon,
   type LayoutGridIconHandle,
 } from "@/components/ui/layout-grid";
@@ -88,7 +84,6 @@ import {
   GENERATE_MESSAGES,
   MAX_INPUT_LENGTH,
   MIN_PROMPT_LENGTH,
-  SPONSORS_URL,
   STARTER_PROMPTS,
   VERCEL_PRODUCTS,
 } from "@/lib/constants";
@@ -344,7 +339,6 @@ function HomeInner() {
   const chevronLeftIconRef = useRef<ChevronLeftIconHandle>(null);
   const chevronRightIconRef = useRef<ChevronRightIconHandle>(null);
   const featuresIconRef = useRef<LayoutGridIconHandle>(null);
-  const sponsorsIconRef = useRef<HeartHandshakeIconHandle>(null);
   const builtWithIconRef = useRef<LayersIconHandle>(null);
   const historyIconRef = useRef<HistoryIconHandle>(null);
   const logoutIconRef = useRef<LogoutIconHandle>(null);
@@ -1583,17 +1577,6 @@ function HomeInner() {
             >
               <LayersIcon ref={builtWithIconRef} size={16} />
             </button>
-            <a
-              href={SPONSORS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseEnter={() => sponsorsIconRef.current?.startAnimation()}
-              onMouseLeave={() => sponsorsIconRef.current?.stopAnimation()}
-              aria-label="sponsor this project"
-              className="cursor-pointer text-muted-foreground opacity-90 transition-opacity hover:opacity-100 hover:text-foreground"
-            >
-              <HeartHandshakeIcon ref={sponsorsIconRef} size={16} />
-            </a>
           </div>
         }
       />
