@@ -1,4 +1,4 @@
-import { Sandbox } from "@vercel/sandbox";
+import { Sandbox, Drive } from "@vercel/sandbox";
 import { nanoid } from "nanoid";
 import { trace } from "@opentelemetry/api";
 import { checkRateLimit } from "@vercel/firewall";
@@ -193,6 +193,22 @@ export async function POST(req: Request) {
   const sandboxName = `eve-agent-${nanoid(8)}`;
   const sandboxEnv = getSandboxEnv();
 
+  const agentDrive =
+    shareId && typeof shareId === "string"
+      ? await Drive.getOrCreate({ name: `agent-${shareId}` }).catch(
+          (err: unknown) => {
+            console.error("run-agent: drive get/create failed", err);
+            return null;
+          },
+        )
+      : null;
+
+  const codeHash = agentDrive
+    ? Buffer.from(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code)),
+      ).toString("hex")
+    : null;
+
   if (Object.keys(sandboxEnv).length === 0) {
     return Response.json({
       ok: false,
@@ -223,6 +239,7 @@ export async function POST(req: Request) {
           ports: [3000],
           env: sandboxEnv,
           persistent: false,
+          ...(agentDrive ? { mounts: { "/vercel/sandbox": agentDrive } } : {}),
         });
       } finally {
         span.end();
@@ -246,53 +263,73 @@ export async function POST(req: Request) {
   await markResumed();
   await trackSandbox(runVisitorId, sandboxName);
 
-  await Promise.all(
-    [...getDirectories(files), "agent/channels"].map((dir) =>
-      sandbox.fs.mkdir(dir, { recursive: true }),
-    ),
-  );
+  const alreadySeeded = agentDrive
+    ? (
+        await sandbox.runCommand({
+          cmd: "sh",
+          args: [
+            "-c",
+            `test -f agent/agent.ts && test -d node_modules/eve && [ "$(cat .drive-hash 2>/dev/null)" = "${codeHash}" ]`,
+          ],
+        })
+      ).exitCode === 0
+    : false;
 
-  await sandbox.writeFiles([
-    ...files.map((f) => ({
-      path: f.filename,
-      content: Buffer.from(f.content),
-    })),
-    {
-      path: "package.json",
-      content: Buffer.from(
-        JSON.stringify({
-          name: "eve-agent-live",
-          private: true,
-          type: "module",
-          dependencies: { eve: "latest" },
-        }),
+  if (!alreadySeeded) {
+    await Promise.all(
+      [...getDirectories(files), "agent/channels"].map((dir) =>
+        sandbox.fs.mkdir(dir, { recursive: true }),
       ),
-    },
-    {
-      path: "agent/channels/eve.ts",
-      content: Buffer.from(OPEN_CHANNEL_AUTH),
-    },
-  ]);
+    );
 
-  const install = await tracer.startActiveSpan(
-    "sandbox.install",
-    async (span) => {
-      try {
-        return await sandbox.runCommand({
-          cmd: "npm",
-          args: ["install", "--no-audit", "--no-fund"],
-        });
-      } finally {
-        span.end();
-      }
-    },
-  );
+    await sandbox.writeFiles([
+      ...files.map((f) => ({
+        path: f.filename,
+        content: Buffer.from(f.content),
+      })),
+      {
+        path: "package.json",
+        content: Buffer.from(
+          JSON.stringify({
+            name: "eve-agent-live",
+            private: true,
+            type: "module",
+            dependencies: { eve: "latest" },
+          }),
+        ),
+      },
+      {
+        path: "agent/channels/eve.ts",
+        content: Buffer.from(OPEN_CHANNEL_AUTH),
+      },
+    ]);
 
-  if (install.exitCode !== 0) {
-    const err = await install.stderr();
-    await sandbox.stop();
-    await untrackSandbox(runVisitorId, sandboxName);
-    return Response.json({ ok: false, error: `install failed: ${err}` });
+    const install = await tracer.startActiveSpan(
+      "sandbox.install",
+      async (span) => {
+        try {
+          return await sandbox.runCommand({
+            cmd: "npm",
+            args: ["install", "--no-audit", "--no-fund"],
+          });
+        } finally {
+          span.end();
+        }
+      },
+    );
+
+    if (install.exitCode !== 0) {
+      const err = await install.stderr();
+      await sandbox.stop();
+      await untrackSandbox(runVisitorId, sandboxName);
+      return Response.json({ ok: false, error: `install failed: ${err}` });
+    }
+
+    if (agentDrive && codeHash) {
+      await sandbox.writeFiles([
+        { path: ".drive-hash", content: Buffer.from(codeHash) },
+      ]);
+    }
   }
 
   await sandbox.runCommand({

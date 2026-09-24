@@ -1,6 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
 import { nanoid } from "nanoid";
 import { trace } from "@opentelemetry/api";
+import { Drive } from "@vercel/sandbox";
 import {
   canCreateSandbox,
   trackSandbox,
@@ -155,7 +156,7 @@ export async function POST(req: Request) {
   const startedAt = Date.now();
   const remaining = () => DEADLINE_MS - (Date.now() - startedAt);
 
-  const { code, prompt, visitorId } = await req.json();
+  const { code, prompt, visitorId, id } = await req.json();
 
   if (!code || typeof code !== "string") {
     return Response.json(
@@ -205,6 +206,22 @@ export async function POST(req: Request) {
   let sandbox: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
   let tracked = false;
 
+  const agentDrive =
+    typeof id === "string" && id
+      ? await Drive.getOrCreate({ name: `agent-${id}` }).catch(
+          (err: unknown) => {
+            console.error("test-agent: drive get/create failed", err);
+            return null;
+          },
+        )
+      : null;
+
+  const codeHash = agentDrive
+    ? Buffer.from(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code)),
+      ).toString("hex")
+    : null;
+
   async function cleanupOnFailure() {
     if (sandbox) {
       await withTimeout(sandbox.stop(), 10_000, "sandbox stop").catch((err) =>
@@ -235,6 +252,9 @@ export async function POST(req: Request) {
               ),
             },
             persistent: false,
+            ...(agentDrive
+              ? { mounts: { "/vercel/sandbox": agentDrive } }
+              : {}),
             networkPolicy: {
               allow: [
                 "registry.npmjs.org",
@@ -286,68 +306,88 @@ export async function POST(req: Request) {
       ),
     );
 
-    await sandbox.writeFiles([
-      ...files.map((f) => ({
-        path: f.filename,
-        content: Buffer.from(f.content),
-      })),
-      {
-        path: "package.json",
-        content: Buffer.from(
-          JSON.stringify({
-            name: "eve-agent-test",
-            private: true,
-            type: "module",
-            dependencies: { eve: "latest" },
+    const alreadySeeded = agentDrive
+      ? (
+          await sandbox.runCommand({
+            cmd: "sh",
+            args: [
+              "-c",
+              `test -f agent/agent.ts && test -d node_modules/eve && [ "$(cat .drive-hash 2>/dev/null)" = "${codeHash}" ]`,
+            ],
+          })
+        ).exitCode === 0
+      : false;
+
+    if (!alreadySeeded) {
+      await sandbox.writeFiles([
+        ...files.map((f) => ({
+          path: f.filename,
+          content: Buffer.from(f.content),
+        })),
+        {
+          path: "package.json",
+          content: Buffer.from(
+            JSON.stringify({
+              name: "eve-agent-test",
+              private: true,
+              type: "module",
+              dependencies: { eve: "latest" },
+            }),
+          ),
+        },
+        {
+          path: "agent/channels/eve.ts",
+          content: Buffer.from(OPEN_CHANNEL_AUTH),
+        },
+        {
+          path: "evals/evals.config.ts",
+          content: Buffer.from(EVAL_CONFIG),
+        },
+      ]);
+
+      let install: Awaited<ReturnType<typeof sandbox.runCommand>>;
+      try {
+        const installBudget = Math.max(
+          Math.min(remaining() - 20_000, 90_000),
+          10_000,
+        );
+        install = await withTimeout(
+          tracer.startActiveSpan("sandbox.install", async (span) => {
+            try {
+              return await sandbox!.runCommand({
+                cmd: "npm",
+                args: ["install", "--no-audit", "--no-fund"],
+              });
+            } finally {
+              span.end();
+            }
           }),
-        ),
-      },
-      {
-        path: "agent/channels/eve.ts",
-        content: Buffer.from(OPEN_CHANNEL_AUTH),
-      },
-      {
-        path: "evals/evals.config.ts",
-        content: Buffer.from(EVAL_CONFIG),
-      },
-    ]);
+          installBudget,
+          "install",
+        );
+      } catch (err) {
+        console.error("install failed or timed out:", err);
+        await cleanupOnFailure();
+        return Response.json({
+          passed: false,
+          error: "dependency install took too long, please try again",
+        });
+      }
 
-    let install: Awaited<ReturnType<typeof sandbox.runCommand>>;
-    try {
-      const installBudget = Math.max(
-        Math.min(remaining() - 20_000, 90_000),
-        10_000,
-      );
-      install = await withTimeout(
-        tracer.startActiveSpan("sandbox.install", async (span) => {
-          try {
-            return await sandbox!.runCommand({
-              cmd: "npm",
-              args: ["install", "--no-audit", "--no-fund"],
-            });
-          } finally {
-            span.end();
-          }
-        }),
-        installBudget,
-        "install",
-      );
-    } catch (err) {
-      console.error("install failed or timed out:", err);
-      await cleanupOnFailure();
-      return Response.json({
-        passed: false,
-        error: "dependency install took too long, please try again",
-      });
-    }
+      if (install.exitCode !== 0) {
+        const errOut = await install.stderr();
+        await cleanupOnFailure();
+        return Response.json({
+          passed: false,
+          error: `install failed: ${errOut.trim().split("\n")[0]}`,
+        });
+      }
 
-    if (install.exitCode !== 0) {
-      const errOut = await install.stderr();
-      await cleanupOnFailure();
-      return Response.json({
-        passed: false,
-        error: `install failed: ${errOut.trim().split("\n")[0]}`,
-      });
+      if (agentDrive && codeHash) {
+        await sandbox.writeFiles([
+          { path: ".drive-hash", content: Buffer.from(codeHash) },
+        ]);
+      }
     }
 
     if (remaining() < 15_000) {

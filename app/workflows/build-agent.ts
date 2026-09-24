@@ -298,6 +298,7 @@ export async function buildAgentWorkflow(
   prompt: string,
   visitorId?: string,
   previousCode?: string,
+  id?: string,
 ) {
   "use workflow";
 
@@ -329,7 +330,7 @@ export async function buildAgentWorkflow(
     }
   }
 
-  const result = await testAgent(code, prompt, visitorId);
+  const result = await testAgent(code, prompt, visitorId, id);
 
   return {
     code,
@@ -440,12 +441,13 @@ async function callTestService(
   code: string,
   prompt: string,
   visitorId?: string,
+  id?: string,
 ): Promise<TestResult> {
   try {
     const res = await fetch(`${getBaseUrl()}/api/test-agent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, prompt, visitorId }),
+      body: JSON.stringify({ code, prompt, visitorId, id }),
     });
 
     const data = await res.json().catch(() => null);
@@ -473,10 +475,11 @@ async function testAgent(
   code: string,
   prompt: string,
   visitorId?: string,
+  id?: string,
 ): Promise<TestResult> {
   "use step";
 
-  const first = await callTestService(code, prompt, visitorId);
+  const first = await callTestService(code, prompt, visitorId, id);
 
   if (
     first.passed ||
@@ -487,5 +490,5 @@ async function testAgent(
   }
 
   await sleep(TEST_RETRY_DELAY_MS);
-  return callTestService(code, prompt, visitorId);
+  return callTestService(code, prompt, visitorId, id);
 }

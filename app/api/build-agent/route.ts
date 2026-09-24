@@ -55,6 +55,8 @@ export async function POST(req: Request) {
     return Response.json({ error: "invalid prompt" }, { status: 400 });
   }
 
+  const id = nanoid(8);
+
   let result;
   try {
     result = await tracer.startActiveSpan(
@@ -65,6 +67,7 @@ export async function POST(req: Request) {
             prompt,
             visitorId,
             previousCode,
+            id,
           ]);
           const value = await run.returnValue;
           span.setAttribute("agent.passed", !!value.passed);
@@ -85,8 +88,6 @@ export async function POST(req: Request) {
   if (!result.code || (!result.passed && !result.skipped)) {
     return Response.json(result);
   }
-
-  const id = nanoid(8);
 
   await put(
     `agents/${id}.json`,
