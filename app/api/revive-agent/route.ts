@@ -1,4 +1,4 @@
-import { Sandbox } from "@vercel/sandbox";
+import { Sandbox, Drive } from "@vercel/sandbox";
 import { head, put, del } from "@vercel/blob";
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
@@ -199,6 +199,13 @@ export async function POST(req: Request) {
     });
   }
 
+  const agentDrive = await Drive.getOrCreate({
+    name: `agent-${shareId}`,
+  }).catch((err: unknown) => {
+    console.error("revive-agent: drive get/create failed", err);
+    return null;
+  });
+
   let sandbox: Awaited<ReturnType<typeof Sandbox.create>>;
   try {
     sandbox = await Sandbox.create({
@@ -208,6 +215,7 @@ export async function POST(req: Request) {
       ports: [3000],
       env: sandboxEnv,
       persistent: false,
+      ...(agentDrive ? { mounts: { "/vercel/sandbox": agentDrive } } : {}),
     });
   } catch (err) {
     console.error("revive-agent: sandbox create failed", err);
@@ -225,42 +233,56 @@ export async function POST(req: Request) {
   await markResumed();
   await trackSandbox(visitorId, sandboxName);
 
-  await Promise.all(
-    [...getDirectories(files), "agent/channels"].map((dir) =>
-      sandbox.fs.mkdir(dir, { recursive: true }),
-    ),
-  );
+  const alreadySeeded = agentDrive
+    ? (
+        await sandbox.runCommand({
+          cmd: "test",
+          args: ["-f", "agent/agent.ts", "-a", "-d", "node_modules/eve"],
+        })
+      ).exitCode === 0
+    : false;
 
-  await sandbox.writeFiles([
-    ...files.map((f) => ({
-      path: f.filename,
-      content: Buffer.from(f.content),
-    })),
-    {
-      path: "package.json",
-      content: Buffer.from(
-        JSON.stringify({
-          name: "eve-agent-live",
-          private: true,
-          type: "module",
-          dependencies: { eve: "latest" },
-        }),
+  if (!alreadySeeded) {
+    await Promise.all(
+      [...getDirectories(files), "agent/channels"].map((dir) =>
+        sandbox.fs.mkdir(dir, { recursive: true }),
       ),
-    },
-    { path: "agent/channels/eve.ts", content: Buffer.from(OPEN_CHANNEL_AUTH) },
-  ]);
+    );
 
-  const install = await sandbox.runCommand({
-    cmd: "npm",
-    args: ["install", "--no-audit", "--no-fund"],
-  });
-  if (install.exitCode !== 0) {
-    await sandbox.stop();
-    await untrackSandbox(visitorId, sandboxName);
-    return Response.json({
-      ok: false,
-      error: "couldn't restart this agent, try again",
+    await sandbox.writeFiles([
+      ...files.map((f) => ({
+        path: f.filename,
+        content: Buffer.from(f.content),
+      })),
+      {
+        path: "package.json",
+        content: Buffer.from(
+          JSON.stringify({
+            name: "eve-agent-live",
+            private: true,
+            type: "module",
+            dependencies: { eve: "latest" },
+          }),
+        ),
+      },
+      {
+        path: "agent/channels/eve.ts",
+        content: Buffer.from(OPEN_CHANNEL_AUTH),
+      },
+    ]);
+
+    const install = await sandbox.runCommand({
+      cmd: "npm",
+      args: ["install", "--no-audit", "--no-fund"],
     });
+    if (install.exitCode !== 0) {
+      await sandbox.stop();
+      await untrackSandbox(visitorId, sandboxName);
+      return Response.json({
+        ok: false,
+        error: "couldn't restart this agent, try again",
+      });
+    }
   }
 
   await sandbox.runCommand({
