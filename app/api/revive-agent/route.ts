@@ -1,5 +1,5 @@
 import { Sandbox } from "@vercel/sandbox";
-import { head, put } from "@vercel/blob";
+import { head, put, del } from "@vercel/blob";
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
 import { nanoid } from "nanoid";
@@ -118,6 +118,38 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+
+  try {
+    const lock = await head(`agents/${shareId}-reviving.json`, {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    const lockAge = Date.now() - lock.uploadedAt.getTime();
+    if (lockAge < 45_000) {
+      const existing = await head(`agents/${shareId}-session.json`, {
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      }).catch(() => null);
+      if (existing) {
+        const session = await (
+          await fetch(existing.url, { cache: "no-store" })
+        ).json();
+        return Response.json({
+          ok: true,
+          sandboxName: session.sandboxName,
+          url: session.url,
+        });
+      }
+    }
+  } catch {
+    // no lock present, proceed normally
+  }
+
+  await put(`agents/${shareId}-reviving.json`, "1", {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    cacheControlMaxAge: 0,
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  }).catch(() => {});
 
   let code: string;
   try {
@@ -260,6 +292,10 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("revive-agent: session blob write failed", err);
   }
+
+  await del(`agents/${shareId}-reviving.json`, {
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  }).catch(() => {});
 
   return Response.json({ ok: true, sandboxName, url });
 }

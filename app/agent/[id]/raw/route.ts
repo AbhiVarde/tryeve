@@ -1,4 +1,5 @@
 import { head } from "@vercel/blob";
+import { cookies } from "next/headers";
 import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
 
 type FileBlock = { filename: string; content: string };
@@ -55,12 +56,15 @@ export async function GET(
   const isTranscript = search.get("transcript") === "1";
   const isRepo = search.get("repo") === "1";
   const isVercel = search.get("vercel") === "1";
+  const cookieStore = await cookies();
+  const visitorId = cookieStore.get("tryeve_vid")?.value ?? "anon";
+
   const key = isRepo
     ? `agents/${id}-repo.json`
     : isVercel
       ? `agents/${id}-vercel.json`
       : isTranscript
-        ? `agents/${id}-transcript.json`
+        ? `agents/${id}-transcript-${visitorId}.json`
         : isSession
           ? `agents/${id}-session.json`
           : `agents/${id}.json`;

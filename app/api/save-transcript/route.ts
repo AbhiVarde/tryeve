@@ -1,5 +1,6 @@
 import { put } from "@vercel/blob";
 import { checkRateLimit } from "@vercel/firewall";
+import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
 
@@ -18,19 +19,26 @@ export async function POST(req: Request) {
     );
   }
 
+  const cookieStore = await cookies();
+  const visitorId = cookieStore.get("tryeve_vid")?.value ?? "anon";
+
   const trimmed = messages
     .filter((m) => m && typeof m.text === "string" && m.text.trim())
     .slice(-100)
     .map((m) => ({ id: m.id, role: m.role, text: m.text }));
 
   try {
-    await put(`agents/${shareId}-transcript.json`, JSON.stringify(trimmed), {
-      access: "public",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      cacheControlMaxAge: 0,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
+    await put(
+      `agents/${shareId}-transcript-${visitorId}.json`,
+      JSON.stringify(trimmed),
+      {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        cacheControlMaxAge: 0,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      },
+    );
     return Response.json({ ok: true });
   } catch (err) {
     console.error("save-transcript failed:", err);

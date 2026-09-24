@@ -100,6 +100,7 @@ export function useTranscriptSync(
   shareId: string | undefined,
   agentMessages: { id: string; role: string; parts: { type: string }[] }[],
   status: string,
+  visitorId?: string,
 ) {
   useEffect(() => {
     if (!shareId || status !== "ready" || agentMessages.length === 0) return;
@@ -111,9 +112,9 @@ export function useTranscriptSync(
     fetch("/api/save-transcript", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shareId, messages: payload }),
+      body: JSON.stringify({ shareId, messages: payload, visitorId }),
     }).catch(() => {});
-  }, [shareId, agentMessages, status]);
+  }, [shareId, agentMessages, status, visitorId]);
 }
 
 const THINKING_WORDS = [
