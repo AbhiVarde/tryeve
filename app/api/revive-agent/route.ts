@@ -233,11 +233,20 @@ export async function POST(req: Request) {
   await markResumed();
   await trackSandbox(visitorId, sandboxName);
 
+  const codeHash = agentDrive
+    ? Buffer.from(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code)),
+      ).toString("hex")
+    : null;
+
   const alreadySeeded = agentDrive
     ? (
         await sandbox.runCommand({
-          cmd: "test",
-          args: ["-f", "agent/agent.ts", "-a", "-d", "node_modules/eve"],
+          cmd: "sh",
+          args: [
+            "-c",
+            `test -f agent/agent.ts && test -d node_modules/eve && [ "$(cat .drive-hash 2>/dev/null)" = "${codeHash}" ]`,
+          ],
         })
       ).exitCode === 0
     : false;
@@ -282,6 +291,12 @@ export async function POST(req: Request) {
         ok: false,
         error: "couldn't restart this agent, try again",
       });
+    }
+
+    if (agentDrive && codeHash) {
+      await sandbox.writeFiles([
+        { path: ".drive-hash", content: Buffer.from(codeHash) },
+      ]);
     }
   }
 
