@@ -1,8 +1,6 @@
 # ▲ tryeve
 
-**Agent Runtime for eve.**
-
-tested against a live eve runtime, ready to talk before you ever see it. no install, no terminal.
+**Agent Builder for eve.**
 
 [live demo](https://tryeve.abhivarde.in) · built with ▲ [vercel](https://vercel.com)
 
