@@ -235,7 +235,7 @@ export async function POST(req: Request) {
         return await Sandbox.create({
           name: sandboxName,
           runtime: "node24",
-          timeout: 600_000,
+          timeout: 1_800_000,
           ports: [3000],
           env: sandboxEnv,
           persistent: false,
