@@ -8,6 +8,7 @@ import { buildAgentWorkflow } from "@/app/workflows/build-agent";
 import { checkBotId } from "botid/server";
 import { generationEnabled } from "@/flags";
 import { MAX_INPUT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/constants";
+import { getIdentity, getOrCreateCookieIdentity } from "@/app/lib/identity";
 
 const tracer = trace.getTracer("tryeve");
 export const maxDuration = 300;
@@ -34,17 +35,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const cookieStore = await cookies();
-  let visitorId = cookieStore.get("tryeve_vid")?.value;
-  if (!visitorId) {
-    visitorId = nanoid(16);
-    cookieStore.set("tryeve_vid", visitorId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+  const authHeader = req.headers.get("authorization");
+  const identity = authHeader
+    ? await getIdentity(req)
+    : await getOrCreateCookieIdentity();
+
+  if (!identity) {
+    return Response.json(
+      { error: "invalid or missing api key" },
+      { status: 401 },
+    );
   }
+
+  const visitorId = identity.id;
 
   const body = await req.json().catch(() => null);
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";

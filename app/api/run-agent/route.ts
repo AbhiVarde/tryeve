@@ -3,7 +3,6 @@ import { nanoid } from "nanoid";
 import { trace } from "@opentelemetry/api";
 import { checkRateLimit } from "@vercel/firewall";
 import { head, put } from "@vercel/blob";
-import { cookies } from "next/headers";
 import {
   canCreateSandbox,
   trackSandbox,
@@ -11,6 +10,7 @@ import {
 } from "@/app/lib/sandbox-quota";
 import { markPaused, markResumed } from "@/app/lib/system-status";
 import { getMissingConnectionEnvVars } from "@/app/lib/eve-connections";
+import { getIdentity } from "@/app/lib/identity";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
@@ -130,10 +130,19 @@ export async function POST(req: Request) {
     );
   }
 
-  if (shareId && typeof shareId === "string") {
-    const cookieStore = await cookies();
-    const visitorId = cookieStore.get("tryeve_vid")?.value;
+  const authHeader = req.headers.get("authorization");
+  const identity = await getIdentity(req);
 
+  if (authHeader && !identity) {
+    return Response.json(
+      { ok: false, error: "invalid api key" },
+      { status: 401 },
+    );
+  }
+
+  const visitorId = identity?.id;
+
+  if (shareId && typeof shareId === "string") {
     try {
       const agentBlob = await head(`agents/${shareId}.json`, {
         token: process.env.BLOB_READ_WRITE_TOKEN,
@@ -178,10 +187,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const cookieStore2 = await cookies();
-  const runVisitorId = cookieStore2.get("tryeve_vid")?.value;
-
-  if (!(await canCreateSandbox(runVisitorId))) {
+  if (!(await canCreateSandbox(visitorId))) {
     return Response.json({
       ok: false,
       error:
@@ -261,7 +267,7 @@ export async function POST(req: Request) {
   }
 
   await markResumed();
-  await trackSandbox(runVisitorId, sandboxName);
+  await trackSandbox(visitorId, sandboxName);
 
   const alreadySeeded = agentDrive
     ? (
@@ -321,7 +327,7 @@ export async function POST(req: Request) {
     if (install.exitCode !== 0) {
       const err = await install.stderr();
       await sandbox.stop();
-      await untrackSandbox(runVisitorId, sandboxName);
+      await untrackSandbox(visitorId, sandboxName);
       return Response.json({ ok: false, error: `install failed: ${err}` });
     }
 
@@ -349,7 +355,7 @@ export async function POST(req: Request) {
 
   if (!ready) {
     await sandbox.stop();
-    await untrackSandbox(runVisitorId, sandboxName);
+    await untrackSandbox(visitorId, sandboxName);
     return Response.json({
       ok: false,
       error: "agent sandbox didn't start in time",

@@ -1,7 +1,7 @@
 import { Sandbox } from "@vercel/sandbox";
 import { del, head } from "@vercel/blob";
-import { cookies } from "next/headers";
 import { untrackSandbox } from "@/app/lib/sandbox-quota";
+import { getIdentity } from "@/app/lib/identity";
 
 export const runtime = "nodejs";
 
@@ -15,10 +15,19 @@ export async function POST(req: Request) {
     );
   }
 
-  if (shareId && typeof shareId === "string") {
-    const cookieStore = await cookies();
-    const visitorId = cookieStore.get("tryeve_vid")?.value;
+  const authHeader = req.headers.get("authorization");
+  const identity = await getIdentity(req);
 
+  if (authHeader && !identity) {
+    return Response.json(
+      { ok: false, error: "invalid api key" },
+      { status: 401 },
+    );
+  }
+
+  const visitorId = identity?.id;
+
+  if (shareId && typeof shareId === "string") {
     try {
       const agentBlob = await head(`agents/${shareId}.json`, {
         token: process.env.BLOB_READ_WRITE_TOKEN,
@@ -45,9 +54,7 @@ export async function POST(req: Request) {
     // sandbox already gone, nothing to stop
   }
 
-  const cookieStore3 = await cookies();
-  const stopVisitorId = cookieStore3.get("tryeve_vid")?.value;
-  await untrackSandbox(stopVisitorId, sandboxName);
+  await untrackSandbox(visitorId, sandboxName);
 
   if (shareId && typeof shareId === "string") {
     try {
