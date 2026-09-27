@@ -1,8 +1,8 @@
 import { list, put, del, head } from "@vercel/blob";
 
-const MAX_CONCURRENT_SANDBOXES = 3;
+const MAX_CONCURRENT_SANDBOXES = 25;
 const STALE_MS = 3 * 60 * 1000;
-const FREE_TIER_CAP_SECONDS = 5 * 60 * 60; // 5 cpu hours/month, hobby plan
+const INCLUDED_CPU_SECONDS = 5 * 60 * 60;
 
 function prefix(visitorId: string) {
   return `agents/active/${visitorId}/`;
@@ -119,8 +119,8 @@ export async function getMonthlyUsage(visitorId?: string) {
     return {
       seconds: 0,
       hours: 0,
-      capHours: FREE_TIER_CAP_SECONDS / 3600,
-      percentUsed: 0,
+      includedHours: INCLUDED_CPU_SECONDS / 3600,
+      percentOfIncludedUsed: 0,
     };
   }
 
@@ -140,7 +140,10 @@ export async function getMonthlyUsage(visitorId?: string) {
   return {
     seconds,
     hours: seconds / 3600,
-    capHours: FREE_TIER_CAP_SECONDS / 3600,
-    percentUsed: Math.min(100, (seconds / FREE_TIER_CAP_SECONDS) * 100),
+    includedHours: INCLUDED_CPU_SECONDS / 3600,
+    percentOfIncludedUsed: Math.min(
+      100,
+      (seconds / INCLUDED_CPU_SECONDS) * 100,
+    ),
   };
 }
