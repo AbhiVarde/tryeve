@@ -36,6 +36,30 @@ export async function GET() {
   return Response.json(history);
 }
 
+async function removeFromPublicIndex(ids: string[]) {
+  if (ids.length === 0) return;
+  try {
+    const blob = await head("agents/public/index.json", {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    const res = await fetch(blob.url, { cache: "no-store" });
+    const index: HistoryEntry[] = res.ok ? await res.json() : [];
+    const next = index.filter((e) => !ids.includes(e.id));
+    if (next.length === index.length) return;
+    await put("agents/public/index.json", JSON.stringify(next), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 0,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+  } catch (err) {
+    if (!(err instanceof BlobNotFoundError)) {
+      console.error("public index cleanup failed:", err);
+    }
+  }
+}
+
 async function stopAgentBlobs(id: string) {
   try {
     const sessionBlob = await head(`agents/${id}-session.json`, {
@@ -77,6 +101,7 @@ export async function DELETE(req: Request) {
   if (all) {
     const history = await readHistory(key);
     await Promise.all(history.map((entry) => stopAgentBlobs(entry.id)));
+    await removeFromPublicIndex(history.map((entry) => entry.id));
     await del(key, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(
       () => {},
     );
@@ -97,6 +122,7 @@ export async function DELETE(req: Request) {
 
   try {
     await stopAgentBlobs(id);
+    await removeFromPublicIndex([id]);
     await writeHistory(
       key,
       history.filter((entry) => entry.id !== id),
