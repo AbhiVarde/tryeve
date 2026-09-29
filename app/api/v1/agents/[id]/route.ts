@@ -90,3 +90,44 @@ export async function GET(
 
   return Response.json({ id, status: "running" });
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const identity = await requireApiKey(req);
+  if (!identity) return unauthorized();
+
+  const { id } = await params;
+  const agent = await readAgent(id);
+
+  if (!agent || agent.ownerId !== identity.id) {
+    return Response.json({ error: "not found" }, { status: 404 });
+  }
+
+  try {
+    const internalRes = await fetch(`${new URL(req.url).origin}/api/agents`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: `tryeve_vid=${identity.id}`,
+      },
+      body: JSON.stringify({ id }),
+    });
+
+    if (!internalRes.ok) {
+      return Response.json(
+        { error: "couldn't delete this agent" },
+        { status: 500 },
+      );
+    }
+  } catch (err) {
+    console.error("v1 delete: internal call failed", err);
+    return Response.json(
+      { error: "couldn't delete this agent" },
+      { status: 500 },
+    );
+  }
+
+  return Response.json({ ok: true });
+}
