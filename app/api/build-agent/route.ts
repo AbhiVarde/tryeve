@@ -8,14 +8,22 @@ import { buildAgentWorkflow } from "@/app/workflows/build-agent";
 import { checkBotId } from "botid/server";
 import { generationEnabled } from "@/flags";
 import { MAX_INPUT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/constants";
+import { getApiKeyVisitor } from "@/app/lib/api-key";
 
 const tracer = trace.getTracer("tryeve");
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
-  const botCheck = await checkBotId();
-  if (botCheck.isBot) {
-    return Response.json({ error: "request blocked" }, { status: 403 });
+  const keyVisitor = getApiKeyVisitor(req);
+  if (req.headers.get("authorization") && !keyVisitor) {
+    return Response.json({ error: "invalid api key" }, { status: 401 });
+  }
+
+  if (!keyVisitor) {
+    const botCheck = await checkBotId();
+    if (botCheck.isBot) {
+      return Response.json({ error: "request blocked" }, { status: 403 });
+    }
   }
 
   if (!(await generationEnabled())) {
@@ -34,16 +42,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const cookieStore = await cookies();
-  let visitorId = cookieStore.get("tryeve_vid")?.value;
+  let visitorId: string | undefined = keyVisitor ?? undefined;
   if (!visitorId) {
-    visitorId = nanoid(16);
-    cookieStore.set("tryeve_vid", visitorId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    const cookieStore = await cookies();
+    visitorId = cookieStore.get("tryeve_vid")?.value;
+    if (!visitorId) {
+      visitorId = nanoid(16);
+      cookieStore.set("tryeve_vid", visitorId, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
   }
 
   const body = await req.json().catch(() => null);

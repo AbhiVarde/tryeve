@@ -1,0 +1,30 @@
+{
+  "name": "@abhivarde/tryeve",
+  "version": "0.1.0",
+  "description": "build and test eve agents from your terminal, tested against a live eve runtime",
+  "type": "module",
+  "bin": {
+    "tryeve": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbhiVarde/tryeve.git",
+    "directory": "cli"
+  },
+  "homepage": "https://tryeve.abhivarde.in",
+  "keywords": [
+    "eve",
+    "agent",
+    "vercel",
+    "cli",
+    "tryeve"
+  ]
+}
