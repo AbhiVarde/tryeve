@@ -51,5 +51,10 @@
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "allowScripts": {
+    "@swc/core@1.15.3": true,
+    "cbor-extract@2.2.2": true,
+    "esbuild@0.28.2": true
   }
 }
