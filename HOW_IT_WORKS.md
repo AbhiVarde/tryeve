@@ -18,7 +18,7 @@ a model can write eve files without much trouble. what it can't guarantee is tha
 ↳ a real reply means it passed, a failure is surfaced as-is  
 ↳ on a pass, the sandbox stays alive, so connecting later reuses it instead of booting a second one
 
-steps 3 through 8 run as one durable workflow step.  
+the model call through the live test reply runs as one durable workflow step.  
 ↳ a crash mid generation resumes instead of losing the request
 
 ## preflight with jev
@@ -76,7 +76,7 @@ a tool description that names a real-world consequence, sending, deleting, charg
 
 ## sandbox network policy
 
-generated tool code runs with real credentials injected when a connection is present. the sandbox running that code is restricted outbound to `registry.npmjs.org` plus whichever model-provider host is configured (`ai-gateway.vercel.sh`, `api.anthropic.com`, or `api.openai.com`). this closes the gap where generated code held a real secret and unrestricted network access.
+generated tool code runs inside the sandbox, which is restricted outbound to `registry.npmjs.org` plus whichever model-provider host is configured (`ai-gateway.vercel.sh`, `api.anthropic.com`, or `api.openai.com`). this keeps generated code from reaching anything beyond the package registry and the model provider.
 
 ## why real testing instead of stubs
 

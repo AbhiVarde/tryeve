@@ -6,7 +6,7 @@
 
 ## what it does
 
-you type a description. tryeve generates real eve files, boots them in an isolated sandbox against the actual eve runtime, and only shows you the result once it has confirmed the agent responds. if it passes, you can chat with it live, download it as a working project, deploy it straight to your own GitHub, or share a link that lets anyone else talk to it too.
+you type a description. tryeve generates real eve files, boots them in an isolated sandbox against the actual eve runtime, and only shows you the result once it has confirmed the agent responds. if it passes, you can chat with it live, download it as a working project, publish it to the gallery, deploy it to your own GitHub and then Vercel, or share a link that lets anyone else talk to it too.
 
 reload the page anytime. your agent, your chat, your files, all still there.
 
@@ -53,7 +53,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 11. once a github deploy exists, optionally deploy straight to vercel too
 12. optionally, publish the agent to a public gallery, with an auto-generated preview card
 
-steps 2 through 4 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
+steps 4 through 6 run as one durable workflow step, so a crash mid generation doesn't lose your request. a scheduled cron job separately sweeps any sandbox sessions left behind by a closed tab or crashed browser.
 
 for the full technical breakdown, including real bugs hit building this, see [HOW_IT_WORKS.md](https://github.com/AbhiVarde/tryeve/blob/main/HOW_IT_WORKS.md).
 
@@ -95,6 +95,9 @@ for the full system breakdown, including identity boundaries and network policy,
 | [cron](https://vercel.com/docs/cron-jobs)           | sweeps stale sandbox sessions on a schedule                                                 |
 | [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation, connect, and chat requests                                          |
 | [connect](https://vercel.com/docs/connect)          | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
+| [jev](https://www.typesafe.ai)                      | scores whether a prompt is buildable before generation runs                                 |
+| [next/og](https://nextjs.org/docs/app/api-reference/functions/image-response) | generates gallery preview images on demand from the agent's prompt |
+| [vercel marketplace integration](https://vercel.com/docs/integrations) | OAuth for deploying a generated agent to your own Vercel account |
 | [botid](https://vercel.com/docs/botid)              | blocks bot traffic on generation, invisible to real users                                   |
 | [flags sdk](https://vercel.com/docs/feature-flags)  | flips the model or pauses generation live, no redeploy                                      |
 | [ai elements](https://ai-sdk.dev/elements)          | chat interface, task progress ui, loading states                                            |
@@ -143,7 +146,7 @@ VERCEL_OIDC_TOKEN=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 
-# optional, only needed for GitHub deploy
+# optional, only needed for GitHub and Vercel deploy
 GITHUB_CONNECTOR_UID=github/tryeve
 GITHUB_OAUTH_CLIENT_ID=
 GITHUB_OAUTH_CLIENT_SECRET=
@@ -186,7 +189,10 @@ lib/
 - generated agents are tagged with their creator's identity at generation time
 - anyone with a share link can view a generated agent's files and chat with it live
 - only the original creator can overwrite or stop that agent's session, share-link visitors cannot
-- GitHub deploy only ever touches the deploying visitor's own GitHub account, never the original agent owner's data
+- GitHub and Vercel deploys only ever touch the deploying visitor's own accounts, never the original agent owner's data
+- only the creator can publish or unpublish an agent to the gallery
+- sandbox outbound access is allow-listed to registry.npmjs.org and the active model-provider host
+- connection credentials are never stored, only referenced by environment variable name
 - chat, generation, and connect requests are all rate limited per visitor
 
 ## limits

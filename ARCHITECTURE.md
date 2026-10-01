@@ -42,7 +42,7 @@ Blob storage (agent, session, transcript, history)
 | Layer        | Responsibility                                                                                                                                                                                                                                                                                                               |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Generation   | AI Gateway routes to a primary model with a fallback chain. System prompt encodes eve's file conventions, tool approval rules, and when to add a connection, schedule, or skill.                                                                                                                                             |
-| Preflight    | jev (typesafe ai), called via AI SDK's `evaluate()`, scores whether a prompt is buildable before generation runs. Fails open on error.                                                                                                                                                                                       |
+| Preflight    | jev (typesafe ai), called via AI SDK's `evaluate()`, scores whether a prompt is buildable before generation runs. Fails open on error. Also backs the tool approval decision during generation.                                                                                                                              |
 | Verification | A Vercel Sandbox installs and boots the real eve runtime, then sends a live test message. Nothing is shown to the user until this passes.                                                                                                                                                                                    |
 | Durability   | Generation and testing run as one Workflow SDK step, `"use workflow"` / `"use step"`. A crash resumes instead of losing the request.                                                                                                                                                                                         |
 | Storage      | Blob stores the agent's files, its live session pointer, its chat transcript, and per-visitor history, keyed by a private cookie.                                                                                                                                                                                            |
@@ -64,12 +64,12 @@ Every agent is tagged with its creator's identity at generation time, tracked by
 
 ## Network boundaries
 
-| Boundary                | Enforcement                                                                                                                       |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Bot traffic             | BotID screens the generation endpoint before it reaches the AI Gateway                                                            |
-| Abusive request volume  | Vercel Firewall rate limits generation, connect, and chat per visitor                                                             |
-| Sandbox outbound access | `Sandbox.create()` network policy allow-lists `registry.npmjs.org` plus the active model-provider host only                       |
-| Credential exposure     | Named connection credentials are never stored by tryeve, only referenced by environment variable name, and requested at test time |
+| Boundary                | Enforcement                                                                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bot traffic             | BotID screens the generation endpoint before it reaches the AI Gateway                                                                                         |
+| Abusive request volume  | Vercel Firewall rate limits generation, connect, and chat per visitor                                                                                          |
+| Sandbox outbound access | `Sandbox.create()` network policy allow-lists `registry.npmjs.org` plus the active model-provider host only                                                    |
+| Credential exposure     | Named connection credentials are never stored by tryeve, only referenced by environment variable name. Agents that need one are skipped in testing, not failed |
 
 ## Configuration surface
 
