@@ -83,6 +83,11 @@ export async function GET(
       data.missingConnectionEnv = getMissingConnectionEnvVars(files);
     }
 
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      delete data.ownerId;
+      delete data.ownerHash;
+    }
+
     return Response.json(data);
   } catch {
     return isTranscript
