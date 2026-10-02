@@ -444,9 +444,13 @@ async function callTestService(
   id?: string,
 ): Promise<TestResult> {
   try {
+    const secret = process.env.TRYEVE_INTERNAL_SECRET;
     const res = await fetch(`${getBaseUrl()}/api/test-agent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(secret ? { "x-tryeve-internal": secret } : {}),
+      },
       body: JSON.stringify({ code, prompt, visitorId, id }),
     });
 

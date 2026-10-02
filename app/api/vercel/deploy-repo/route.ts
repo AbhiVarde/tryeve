@@ -1,6 +1,7 @@
 import { checkRateLimit } from "@vercel/firewall";
 import { cookies } from "next/headers";
-import { put, head } from "@vercel/blob";
+import { put } from "@vercel/blob";
+import { checkOwner } from "@/app/lib/owner";
 import { getGithubToken } from "@/app/lib/github-connect";
 import {
   parseFiles,
@@ -65,21 +66,18 @@ export async function POST(req: Request) {
   }
 
   if (shareId && typeof shareId === "string") {
-    try {
-      const agentBlob = await head(`agents/${shareId}.json`, {
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      });
-      const agentData: { ownerId?: string } = await (
-        await fetch(agentBlob.url, { cache: "no-store" })
-      ).json();
-      if (agentData.ownerId && agentData.ownerId !== visitorId) {
-        return Response.json(
-          { ok: false, error: "only the creator can deploy this agent" },
-          { status: 403 },
-        );
-      }
-    } catch {
-      // no agent record found, nothing to check ownership against
+    const owner = await checkOwner(shareId, visitorId);
+    if (owner === "forbidden") {
+      return Response.json(
+        { ok: false, error: "only the creator can deploy this agent" },
+        { status: 403 },
+      );
+    }
+    if (owner === "unavailable") {
+      return Response.json(
+        { ok: false, error: "couldn't verify ownership, try again" },
+        { status: 503 },
+      );
     }
   }
 

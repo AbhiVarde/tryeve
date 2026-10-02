@@ -1,4 +1,5 @@
 import { Sandbox } from "@vercel/sandbox";
+import { isInternalRequest } from "@/app/lib/internal-auth";
 import { nanoid } from "nanoid";
 import { trace } from "@opentelemetry/api";
 import { Drive } from "@vercel/sandbox";
@@ -153,6 +154,13 @@ type EvalReport = {
 };
 
 export async function POST(req: Request) {
+  if (!isInternalRequest(req)) {
+    return Response.json(
+      { passed: false, error: "unauthorized" },
+      { status: 401 },
+    );
+  }
+
   const startedAt = Date.now();
   const remaining = () => DEADLINE_MS - (Date.now() - startedAt);
 

@@ -1,5 +1,6 @@
 import { Sandbox } from "@vercel/sandbox";
-import { del, head } from "@vercel/blob";
+import { del } from "@vercel/blob";
+import { checkOwner } from "@/app/lib/owner";
 import { cookies } from "next/headers";
 import { untrackSandbox } from "@/app/lib/sandbox-quota";
 
@@ -19,22 +20,18 @@ export async function POST(req: Request) {
     const cookieStore = await cookies();
     const visitorId = cookieStore.get("tryeve_vid")?.value;
 
-    try {
-      const agentBlob = await head(`agents/${shareId}.json`, {
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      });
-      const agentData: { ownerId?: string } = await (
-        await fetch(agentBlob.url, { cache: "no-store" })
-      ).json();
-
-      if (agentData.ownerId && agentData.ownerId !== visitorId) {
-        return Response.json(
-          { ok: false, error: "only the creator can stop this agent" },
-          { status: 403 },
-        );
-      }
-    } catch {
-      // no agent record found, nothing to check ownership against
+    const owner = await checkOwner(shareId, visitorId);
+    if (owner === "forbidden") {
+      return Response.json(
+        { ok: false, error: "only the creator can stop this agent" },
+        { status: 403 },
+      );
+    }
+    if (owner === "unavailable") {
+      return Response.json(
+        { ok: false, error: "couldn't verify ownership, try again" },
+        { status: 503 },
+      );
     }
   }
 

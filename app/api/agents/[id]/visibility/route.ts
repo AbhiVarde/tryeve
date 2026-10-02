@@ -1,6 +1,7 @@
 import { head, put } from "@vercel/blob";
 import { cookies } from "next/headers";
 import { checkRateLimit } from "@vercel/firewall";
+import { isOwner } from "@/app/lib/owner";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,7 @@ type AgentRecord = {
   prompt: string;
   code: string;
   ownerId?: string;
+  ownerHash?: string;
   public?: boolean;
 };
 
@@ -88,7 +90,7 @@ export async function POST(
     );
   }
 
-  if (agent.ownerId && agent.ownerId !== visitorId) {
+  if (!isOwner(agent, visitorId)) {
     return Response.json(
       { ok: false, error: "only the creator can change visibility" },
       { status: 403 },

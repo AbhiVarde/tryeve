@@ -9,6 +9,7 @@ import { checkBotId } from "botid/server";
 import { generationEnabled } from "@/flags";
 import { MAX_INPUT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/constants";
 import { getApiKeyVisitor } from "@/app/lib/api-key";
+import { hashOwner } from "@/app/lib/owner";
 
 const tracer = trace.getTracer("tryeve");
 export const maxDuration = 300;
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
     JSON.stringify({
       prompt,
       code: result.code,
-      ownerId: visitorId,
+      ownerHash: hashOwner(visitorId!),
       public: false,
     }),
     {
