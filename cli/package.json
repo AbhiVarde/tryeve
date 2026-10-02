@@ -1,19 +1,21 @@
 {
   "name": "@abhivarde/tryeve",
-  "version": "0.1.0",
-  "description": "build and test eve agents from your terminal, tested against a live eve runtime",
+  "version": "0.2.0",
+  "description": "build an eve agent from a sentence, tested on a live eve runtime, written to your disk",
   "type": "module",
   "bin": {
     "tryeve": "./index.mjs"
   },
   "files": [
-    "index.mjs",
-    "README.md"
+    "index.mjs"
   ],
   "engines": {
     "node": ">=18"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AbhiVarde/tryeve.git",

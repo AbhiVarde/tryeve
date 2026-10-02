@@ -1,21 +1,42 @@
-# tryeve cli
+# tryeve
 
-build and test an eve agent from your terminal. every agent is tested against a live eve runtime before it's written to disk.
+build an eve agent from a sentence. every agent is tested on a live eve runtime before it's written to your disk.
+
+invite-key beta: keys are handed out by hand for now. open an issue at github.com/AbhiVarde/tryeve to ask for one.
+
+## use
 
 ```bash
-export TRYEVE_API_KEY=tv_yourkey
+npx @abhivarde/tryeve login
 npx @abhivarde/tryeve "agent that logs expenses with amount and category"
 ```
 
+or skip login and set `TRYEVE_API_KEY`.
+
+## what you get
+
+a folder with the agent, its tools, an eval, `.env.example`, `.gitignore` and a short readme. then:
+
+```bash
+cd <folder>
+cp .env.example .env    # copy on windows, then fill in the keys
+npm install
+npm run dev
+```
+
+the agent's models run through the vercel ai gateway, so `AI_GATEWAY_API_KEY` is needed to chat with it locally.
+
 ## options
 
-- `--out, -o <dir>` output folder, defaults to a slug of the prompt
-- `--json` machine-readable output
-- `--url <base>` override the API base, or set `TRYEVE_URL`
+- `-o, --out <dir>` output folder, defaults to a name from the prompt
+- `--force` write into a folder that isn't empty
+- `--json` machine-readable output, nothing else on stdout
+- `--url <base>` api base, or set `TRYEVE_URL`
+- `-h, --help`, `-v, --version`
 
 ## exit codes
 
-- `0` built, and written to disk
+- `0` built and written to disk
 - `1` error or failed build
 - `2` prompt too vague, needs clarification
 
