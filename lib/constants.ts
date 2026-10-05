@@ -12,23 +12,24 @@ export const GENERATE_MESSAGES = [
 
 export const STARTER_PROMPTS = [
   {
-    label: "expense tracker",
+    label: "itinerary planner",
     prompt:
-      "an agent that logs an expense when given an amount, category, and date",
+      "an agent that builds a customized daily travel itinerary when given a destination, budget, and trip duration",
   },
   {
-    label: "bill splitter",
+    label: "packing assistant",
     prompt:
-      "an agent that splits a bill between people when given the total, tip percentage, and number of people",
+      "an agent that generates a checklist of clothes and gear based on the destination's current weather forecast and trip activities",
   },
   {
-    label: "weather lookup",
-    prompt: "an agent that looks up the current weather for a city",
+    label: "local food guide",
+    prompt:
+      "an agent that recommends the top five must-try local dishes and highly-rated restaurants in any city",
   },
   {
-    label: "commit writer",
+    label: "flight finder",
     prompt:
-      "an agent that turns a change description into a short conventional commit message, always following a strict format: type, optional scope, and a lowercase summary under 60 characters",
+      "an agent that searches for the cheapest flight deals between two locations given preferred departure dates and maximum layovers",
   },
 ] as const;
 
