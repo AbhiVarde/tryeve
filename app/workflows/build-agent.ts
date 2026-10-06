@@ -19,6 +19,15 @@ const TEST_RETRY_DELAY_MS = 5000;
 const NON_RETRYABLE_TEST_ERROR =
   /too many active|no model credentials|no tool or agent files/i;
 
+let jevUnavailable = false;
+
+function isJevAccessError(err: unknown) {
+  const e = err as { statusCode?: number; message?: string } | null;
+  return (
+    e?.statusCode === 403 || /free tier|restricted/i.test(e?.message ?? "")
+  );
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const file = (name: string, body: string) =>
@@ -349,6 +358,8 @@ async function checkBuildable(
 ): Promise<{ buildable: boolean; reason?: string }> {
   "use step";
 
+  if (jevUnavailable) return { buildable: true };
+
   try {
     const result = await experimental_evaluate({
       model: "typesafe-ai/jev",
@@ -372,7 +383,14 @@ async function checkBuildable(
 
     return { buildable: true };
   } catch (err) {
-    console.error("checkBuildable: jev failed, skipping preflight", err);
+    if (isJevAccessError(err)) {
+      jevUnavailable = true;
+      console.warn(
+        "checkBuildable: jev not available on this plan, skipping preflight",
+      );
+    } else {
+      console.error("checkBuildable: jev failed, skipping preflight", err);
+    }
     return { buildable: true };
   }
 }
