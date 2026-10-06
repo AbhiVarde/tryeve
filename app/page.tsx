@@ -52,6 +52,7 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import { SpeechInput } from "@/components/ai-elements/speech-input";
 import {
   Task,
   TaskContent,
@@ -81,12 +82,12 @@ import { getConnectionEnvVars } from "@/app/lib/eve-connections";
 import { ArrowUpIcon } from "@/components/ui/arrow-up";
 import {
   FEATURE_GROUPS,
-  GENERATE_MESSAGES,
   MAX_INPUT_LENGTH,
   MIN_PROMPT_LENGTH,
   STARTER_PROMPTS,
   VERCEL_PRODUCTS,
 } from "@/lib/constants";
+import { BUILD_STEP_LABELS, type BuildEvent } from "@/lib/build-events";
 
 type FileBlock = { filename: string; content: string };
 type TestState = "testing" | "passed" | "failed" | "skipped" | "clarify" | null;
@@ -107,6 +108,72 @@ type Message = {
 };
 type ChatSession = AgentSession & { agentMessageId: string };
 type HistoryEntry = { id: string; prompt: string; createdAt: string };
+type BuildResult = {
+  id?: string;
+  code?: string;
+  passed?: boolean;
+  skipped?: boolean;
+  needsClarification?: boolean;
+  missingConnectionEnv?: string[] | null;
+  error?: string | null;
+  sandboxName?: string | null;
+  url?: string | null;
+};
+
+function applyBuildEvent(prev: BuildEvent[], event: BuildEvent): BuildEvent[] {
+  const index = prev.findIndex((e) => e.step === event.step);
+  if (index === -1) return [...prev, event];
+  const next = [...prev];
+  next[index] = event;
+  return next;
+}
+
+function parseLine(line: string): unknown {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return null;
+  }
+}
+
+async function readBuildResult(
+  res: Response,
+  onStep: (event: BuildEvent) => void,
+): Promise<BuildResult | null> {
+  const contentType = res.headers.get("content-type") ?? "";
+
+  if (!res.body || !contentType.includes("application/x-ndjson")) {
+    return res.json().catch(() => null);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: BuildResult | null = null;
+
+  const handle = (line: string) => {
+    if (!line.trim()) return;
+    const parsed = parseLine(line) as {
+      type?: string;
+      result?: BuildResult;
+    } | null;
+    if (!parsed) return;
+    if (parsed.type === "step") onStep(parsed as unknown as BuildEvent);
+    else if (parsed.type === "result") result = parsed.result ?? null;
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    lines.forEach(handle);
+  }
+  handle(buffer);
+
+  return result;
+}
 
 function parseFiles(raw: string): FileBlock[] {
   const regex = /```[a-zA-Z]*\n([\s\S]*?)```/g;
@@ -320,6 +387,17 @@ function HomeInner() {
   const [hoveredHistoryId, setHoveredHistoryId] = useState<string | null>(null);
 
   const [refineInput, setRefineInput] = useState("");
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechLang, setSpeechLang] = useState("en-US");
+  const [micKey, setMicKey] = useState(0);
+
+  useEffect(() => {
+    setSpeechSupported(
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window,
+    );
+    setSpeechLang(navigator.language || "en-US");
+  }, []);
+
   const [testStatus, setTestStatus] = useState<Record<string, TestResult>>({});
 
   const [panelFile, setPanelFile] = useState<FileBlock | null>(null);
@@ -343,7 +421,7 @@ function HomeInner() {
   const historyIconRef = useRef<HistoryIconHandle>(null);
   const logoutIconRef = useRef<LogoutIconHandle>(null);
 
-  const [phase, setPhase] = useState<"generating" | "testing" | null>(null);
+  const [buildSteps, setBuildSteps] = useState<BuildEvent[]>([]);
   const [systemPaused, setSystemPaused] = useState(false);
   const [pauseReason, setPauseReason] = useState<string | null>(null);
   const [usage, setUsage] = useState<{
@@ -351,7 +429,6 @@ function HomeInner() {
     capHours: number;
     percentUsed: number;
   } | null>(null);
-  const [genMsgIndex, setGenMsgIndex] = useState(0);
 
   const [chatSession, setChatSession] = useState<ChatSession | null>(null);
   const pendingMessageRef = useRef<string | null>(null);
@@ -1019,13 +1096,7 @@ function HomeInner() {
 
   async function generateAgent(prompt: string, previousCode?: string) {
     setBusy(true);
-    setPhase("generating");
-    setGenMsgIndex(0);
-
-    const genMsgTimer = setInterval(() => {
-      setGenMsgIndex((i) => Math.min(i + 1, GENERATE_MESSAGES.length - 1));
-    }, 4000);
-    const phaseTimer = setTimeout(() => setPhase("testing"), 16000);
+    setBuildSteps([]);
 
     const assistantId = crypto.randomUUID();
 
@@ -1057,7 +1128,9 @@ function HomeInner() {
         body: JSON.stringify({ prompt, previousCode }),
       });
 
-      const result = await res.json().catch(() => null);
+      const result = await readBuildResult(res, (event) =>
+        setBuildSteps((prev) => applyBuildEvent(prev, event)),
+      );
 
       if (
         !res.ok ||
@@ -1091,28 +1164,26 @@ function HomeInner() {
               : result.passed
                 ? "passed"
                 : "failed",
-          error: result.error,
+          error: result.error ?? undefined,
           missingConnectionEnv: result.missingConnectionEnv ?? undefined,
         },
       }));
 
-      if (result.id) {
+      const newId = result.id;
+      if (newId) {
         setHistory((prev) => [
-          { id: result.id, prompt, createdAt: new Date().toISOString() },
+          { id: newId, prompt, createdAt: new Date().toISOString() },
           ...prev,
         ]);
       }
 
       setShowGenerateForm(false);
-      if (result.id) router.replace(`/?a=${result.id}`);
+      if (newId) router.replace(`/?a=${newId}`);
     } catch {
       fail("network error, check your connection and try again");
     } finally {
-      clearInterval(genMsgTimer);
-      clearTimeout(phaseTimer);
       setBusy(false);
-      setPhase(null);
-      setGenMsgIndex(0);
+      setBuildSteps([]);
     }
   }
 
@@ -1124,6 +1195,17 @@ function HomeInner() {
       return next;
     });
     await generateAgent(prompt);
+  }
+
+  function appendTranscript(text: string) {
+    const spoken = text.trim();
+    if (!spoken) return;
+    setInput((prev) =>
+      (prev ? `${prev.trimEnd()} ${spoken}` : spoken).slice(
+        0,
+        MAX_INPUT_LENGTH,
+      ),
+    );
   }
 
   function editPrompt(text: string) {
@@ -1184,6 +1266,7 @@ function HomeInner() {
     }
 
     setInput("");
+    setMicKey((k) => k + 1);
 
     if (chatSession) {
       const alive = await fetch("/api/ping-agent", {
@@ -1490,7 +1573,7 @@ function HomeInner() {
             </div>
           </div>
         )}
-        <div className="relative">
+        <div className="rounded-2xl border border-border/40 bg-black/20 transition-colors focus-within:border-border/80">
           <Textarea
             ref={textareaRef}
             placeholder={
@@ -1512,36 +1595,55 @@ function HomeInner() {
                 e.currentTarget.form?.requestSubmit();
               }
             }}
-            className="min-h-28 resize-none rounded-md border-0 bg-black/20 px-3 py-2.5 pr-14 font-mono text-sm shadow-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-24 resize-none rounded-none border-0 bg-transparent px-4 pt-3.5 pb-2 font-mono text-sm shadow-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent"
           />
-          <span
-            className={`pointer-events-none absolute right-3 bottom-2.5 font-mono text-[11px] tabular-nums transition-colors ${
-              nearLimit ? "text-red-400" : "text-muted-foreground/60"
-            }`}
-          >
-            {input.length}/{MAX_INPUT_LENGTH}
-          </span>
+          <div className="flex items-center justify-between px-2.5 pb-2.5">
+            <div className="flex items-center">
+              {speechSupported && (
+                <SpeechInput
+                  key={micKey}
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  lang={speechLang}
+                  disabled={systemPaused && !chatSession}
+                  onTranscriptionChange={appendTranscript}
+                  className="size-8 cursor-pointer rounded-full bg-transparent! text-muted-foreground transition-colors hover:bg-white/10! hover:text-foreground disabled:opacity-40"
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span
+                className={`pointer-events-none font-mono text-[11px] tabular-nums transition-all ${
+                  input.length === 0
+                    ? "opacity-0"
+                    : nearLimit
+                      ? "text-red-400"
+                      : "text-muted-foreground/60"
+                }`}
+              >
+                {input.length}/{MAX_INPUT_LENGTH}
+              </span>
+              <Button
+                type="submit"
+                size="icon"
+                aria-label={chatSession ? "send" : "generate agent"}
+                disabled={
+                  submitting ||
+                  input.trim().length === 0 ||
+                  (systemPaused && !chatSession)
+                }
+                className="size-8 cursor-pointer rounded-full disabled:opacity-30"
+              >
+                {submitting ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  <ArrowUpIcon className="size-4" />
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
-        <Button
-          type="submit"
-          disabled={
-            submitting ||
-            input.trim().length === 0 ||
-            (systemPaused && !chatSession)
-          }
-          className="w-full cursor-pointer"
-        >
-          {submitting && <Spinner className="size-4" />}
-          <span className="animate-in fade-in duration-300">
-            {chatSession
-              ? status === "streaming"
-                ? "sending..."
-                : "send"
-              : busy
-                ? "generating agent..."
-                : "generate agent"}
-          </span>
-        </Button>
       </form>
     );
 
@@ -1856,43 +1958,47 @@ function HomeInner() {
                   <Task defaultOpen className="font-mono text-sm">
                     <TaskTrigger title="building your agent" />
                     <TaskContent>
-                      <TaskItem>
-                        <span className="flex items-center gap-2">
-                          {phase === "generating" ? (
+                      {buildSteps.length === 0 && (
+                        <TaskItem>
+                          <span className="flex items-center gap-2">
                             <Spinner className="size-3" />
-                          ) : (
-                            <CheckIcon
-                              size={12}
-                              className="text-muted-foreground"
-                            />
-                          )}
-                          {phase === "generating" ? (
-                            <Shimmer duration={1.5}>
-                              {GENERATE_MESSAGES[genMsgIndex]}
-                            </Shimmer>
-                          ) : (
-                            "generating agent files..."
-                          )}
-                        </span>
-                      </TaskItem>
-                      <TaskItem>
-                        <span className="flex items-center gap-2">
-                          {phase === "testing" ? (
-                            <Spinner className="size-3" />
-                          ) : (
-                            <div className="size-2 rounded-full border border-muted-foreground/30" />
-                          )}
-                          {phase === "testing" ? (
-                            <Shimmer duration={1.5}>
-                              running sandbox test...
-                            </Shimmer>
-                          ) : (
-                            <span className="text-muted-foreground/50">
-                              running sandbox test...
-                            </span>
-                          )}
-                        </span>
-                      </TaskItem>
+                            <Shimmer duration={1.5}>starting build...</Shimmer>
+                          </span>
+                        </TaskItem>
+                      )}
+                      {buildSteps.map((s) => (
+                        <TaskItem key={s.step}>
+                          <span className="flex items-center gap-2">
+                            {s.status === "running" ? (
+                              <Spinner className="size-3" />
+                            ) : s.status === "done" ? (
+                              <CheckIcon
+                                size={12}
+                                className="text-emerald-500"
+                              />
+                            ) : (
+                              <div className="size-2 rounded-full bg-rose-400" />
+                            )}
+                            {s.status === "running" ? (
+                              <Shimmer duration={1.5}>
+                                {s.detail
+                                  ? `${BUILD_STEP_LABELS[s.step]}, ${s.detail}`
+                                  : BUILD_STEP_LABELS[s.step]}
+                              </Shimmer>
+                            ) : (
+                              <span
+                                className={
+                                  s.status === "failed"
+                                    ? "text-rose-300"
+                                    : "text-muted-foreground"
+                                }
+                              >
+                                {BUILD_STEP_LABELS[s.step]}
+                              </span>
+                            )}
+                          </span>
+                        </TaskItem>
+                      ))}
                     </TaskContent>
                   </Task>
                 )}

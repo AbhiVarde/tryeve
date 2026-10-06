@@ -3,13 +3,6 @@ export const SPONSORS_URL = "https://github.com/sponsors/AbhiVarde";
 export const MAX_INPUT_LENGTH = 500;
 export const MIN_PROMPT_LENGTH = 12;
 
-export const GENERATE_MESSAGES = [
-  "generating agent files...",
-  "writing instructions...",
-  "shaping tool schemas...",
-  "almost done generating...",
-];
-
 export const STARTER_PROMPTS = [
   {
     label: "itinerary planner",
@@ -43,10 +36,12 @@ export const FEATURE_GROUPS: { label: string; items: string[] }[] = [
       "tools that send, delete, or charge are generated with an approval gate",
       "generated files are checked and repaired before they are tested",
       "tested live in a sandbox against your actual request before you see it",
+      "watch the build happen live, real steps as they run, not a fake timer",
       "generation and testing run as one durable workflow, survives crashes",
       "when the model pool is busy, it retries before giving up",
       "if a build fails, the reason is shown and you can retry with one click",
       "refine an existing agent with a follow-up instead of starting over",
+      "describe or message an agent by voice in chrome and edge",
       "uses real web search when a request needs facts, never invents data",
     ],
   },
@@ -131,7 +126,10 @@ export const VERCEL_PRODUCTS: { name: string; description: string }[] = [
     name: "flags sdk",
     description: "flips the model or pauses generation live, no redeploy",
   },
-  { name: "ai elements", description: "chat ui, progress, and loading states" },
+  {
+    name: "ai elements",
+    description: "chat ui, progress, loading states, and voice input",
+  },
   { name: "streamdown", description: "renders code and markdown cleanly" },
   { name: "shadcn/ui", description: "every ui component" },
   { name: "vercel", description: "hosts and deploys the app" },

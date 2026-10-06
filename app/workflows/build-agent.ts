@@ -1,4 +1,5 @@
-import { FatalError } from "workflow";
+import { FatalError, getWritable } from "workflow";
+import type { BuildEvent } from "@/lib/build-events";
 import { experimental_evaluate } from "ai";
 import { primaryModel } from "@/flags";
 
@@ -29,6 +30,19 @@ function isJevAccessError(err: unknown) {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function emit(event: BuildEvent) {
+  try {
+    const writer = getWritable<BuildEvent>().getWriter();
+    try {
+      await writer.write(event);
+    } finally {
+      writer.releaseLock();
+    }
+  } catch (err) {
+    console.error("emit failed:", err);
+  }
+}
 
 const file = (name: string, body: string) =>
   ["```", `// filename: ${name}`, body.trim(), "```"].join("\n");
@@ -358,6 +372,15 @@ async function checkBuildable(
 ): Promise<{ buildable: boolean; reason?: string }> {
   "use step";
 
+  await emit({ type: "step", step: "preflight", status: "running" });
+  const result = await evaluateBuildable(prompt);
+  await emit({ type: "step", step: "preflight", status: "done" });
+  return result;
+}
+
+async function evaluateBuildable(
+  prompt: string,
+): Promise<{ buildable: boolean; reason?: string }> {
   if (jevUnavailable) return { buildable: true };
 
   try {
@@ -402,6 +425,9 @@ async function generateAgent(
 ): Promise<string> {
   "use step";
 
+  const stepName = repair ? "repair" : "generate";
+  await emit({ type: "step", step: stepName, status: "running" });
+
   const { streamText } = await import("ai");
 
   const primary = await primaryModel();
@@ -411,7 +437,15 @@ async function generateAgent(
   let lastError: unknown = null;
 
   for (let round = 0; round < ROUNDS; round++) {
-    if (round > 0) await sleep(ROUND_DELAY_MS * round);
+    if (round > 0) {
+      await emit({
+        type: "step",
+        step: stepName,
+        status: "running",
+        detail: "models are busy, retrying",
+      });
+      await sleep(ROUND_DELAY_MS * round);
+    }
 
     for (const [i, model] of models.entries()) {
       if (i > 0) await sleep(MODEL_DELAY_MS);
@@ -429,7 +463,10 @@ async function generateAgent(
           text += chunk;
         }
 
-        if (text.trim()) return text;
+        if (text.trim()) {
+          await emit({ type: "step", step: stepName, status: "done" });
+          return text;
+        }
       } catch (err) {
         lastError = err;
         console.error(
@@ -441,6 +478,7 @@ async function generateAgent(
   }
 
   console.error("generateAgent: all rounds exhausted", lastError);
+  await emit({ type: "step", step: stepName, status: "failed" });
   throw new FatalError(
     "the free model pool is busy right now, please try again in a minute",
   );
@@ -499,8 +537,9 @@ async function testAgent(
   visitorId?: string,
   id?: string,
 ): Promise<TestResult> {
-  "use step";
+  ("use step");
 
+  await emit({ type: "step", step: "test", status: "running" });
   const first = await callTestService(code, prompt, visitorId, id);
 
   if (
@@ -508,9 +547,26 @@ async function testAgent(
     first.skipped ||
     NON_RETRYABLE_TEST_ERROR.test(first.error ?? "")
   ) {
+    await emit({
+      type: "step",
+      step: "test",
+      status: first.passed || first.skipped ? "done" : "failed",
+    });
     return first;
   }
 
+  await emit({
+    type: "step",
+    step: "test",
+    status: "running",
+    detail: "first run failed, retrying once",
+  });
   await sleep(TEST_RETRY_DELAY_MS);
-  return callTestService(code, prompt, visitorId, id);
+  const second = await callTestService(code, prompt, visitorId, id);
+  await emit({
+    type: "step",
+    step: "test",
+    status: second.passed || second.skipped ? "done" : "failed",
+  });
+  return second;
 }

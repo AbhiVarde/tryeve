@@ -18,6 +18,8 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - a jev preflight score checks if a prompt is buildable before spending a sandbox, low scores get a clarification instead
 - the model used for generation and a kill-switch can be flipped live from the dashboard, no redeploy
 - every agent is tested against a live eve runtime before you see it
+- describe or message an agent by voice in chrome and edge
+- watch the build progress live, real steps as they happen
 - generation and testing run as one durable step, survives crashes
 - if a build fails, the reason is shown and you can retry with one click
 - inspect every file with syntax highlighting
@@ -45,7 +47,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 3. a jev preflight score checks if the prompt is buildable, a low score returns a clarification instead of spending a sandbox
 4. the ai gateway routes the request to a model (switchable live via flags sdk), which writes real eve files
 5. a vercel sandbox installs eve for real and boots it, no stubs
-6. tryeve sends a live test message and confirms the agent actually responds
+6. tryeve sends a live test message and confirms the agent actually responds, while real progress events stream to the page step by step
 7. if it passes, the sandbox is kept alive rather than thrown away, so connecting afterward is instant
 8. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
 9. it's also added to your own history, tracked by a private cookie, not visible to anyone else
@@ -84,27 +86,27 @@ for the full system breakdown, including identity boundaries and network policy,
 
 ## built with ▲
 
-| product                                             | role                                                                                        |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [next.js](https://nextjs.org)                       | the app itself                                                                              |
-| [ai gateway](https://vercel.com/docs/ai-gateway)    | routes the generation request to a model                                                    |
-| [ai sdk](https://sdk.vercel.ai)                     | streams the model's response                                                                |
-| [sandbox](https://vercel.com/docs/sandbox)          | tests every agent against a real eve runtime, then runs it live so you can talk to it       |
-| [workflow sdk](https://vercel.com/docs/workflow)    | runs generate and test as one durable step                                                  |
-| [blob](https://vercel.com/docs/storage/vercel-blob) | stores each agent, its live session, chat transcript, and per-visitor history               |
-| [cron](https://vercel.com/docs/cron-jobs)           | sweeps stale sandbox sessions on a schedule                                                 |
-| [firewall](https://vercel.com/docs/vercel-firewall) | rate limits generation, connect, and chat requests                                          |
-| [connect](https://vercel.com/docs/connect)          | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
-| [jev](https://www.typesafe.ai)                      | scores whether a prompt is buildable before generation runs                                 |
-| [next/og](https://nextjs.org/docs/app/api-reference/functions/image-response) | generates gallery preview images on demand from the agent's prompt |
-| [vercel marketplace integration](https://vercel.com/docs/integrations) | OAuth for deploying a generated agent to your own Vercel account |
-| [botid](https://vercel.com/docs/botid)              | blocks bot traffic on generation, invisible to real users                                   |
-| [flags sdk](https://vercel.com/docs/feature-flags)  | flips the model or pauses generation live, no redeploy                                      |
-| [ai elements](https://ai-sdk.dev/elements)          | chat interface, task progress ui, loading states                                            |
-| [streamdown](https://streamdown.ai)                 | renders code and markdown cleanly                                                           |
-| [shadcn/ui](https://ui.shadcn.com)                  | every ui component                                                                          |
-| [vercel](https://vercel.com)                        | hosts and deploys the app                                                                   |
-| [analytics](https://vercel.com/docs/analytics)      | tracks real usage without slowing anything down                                             |
+| product                                                                       | role                                                                                        |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [next.js](https://nextjs.org)                                                 | the app itself                                                                              |
+| [ai gateway](https://vercel.com/docs/ai-gateway)                              | routes the generation request to a model                                                    |
+| [ai sdk](https://sdk.vercel.ai)                                               | streams the model's response                                                                |
+| [sandbox](https://vercel.com/docs/sandbox)                                    | tests every agent against a real eve runtime, then runs it live so you can talk to it       |
+| [workflow sdk](https://vercel.com/docs/workflow)                              | runs generate and test as one durable step                                                  |
+| [blob](https://vercel.com/docs/storage/vercel-blob)                           | stores each agent, its live session, chat transcript, and per-visitor history               |
+| [cron](https://vercel.com/docs/cron-jobs)                                     | sweeps stale sandbox sessions on a schedule                                                 |
+| [firewall](https://vercel.com/docs/vercel-firewall)                           | rate limits generation, connect, and chat requests                                          |
+| [connect](https://vercel.com/docs/connect)                                    | issues short-lived, user-scoped GitHub tokens to deploy generated agents, no stored secrets |
+| [jev](https://www.typesafe.ai)                                                | scores whether a prompt is buildable before generation runs                                 |
+| [next/og](https://nextjs.org/docs/app/api-reference/functions/image-response) | generates gallery preview images on demand from the agent's prompt                          |
+| [vercel marketplace integration](https://vercel.com/docs/integrations)        | OAuth for deploying a generated agent to your own Vercel account                            |
+| [botid](https://vercel.com/docs/botid)                                        | blocks bot traffic on generation, invisible to real users                                   |
+| [flags sdk](https://vercel.com/docs/feature-flags)                            | flips the model or pauses generation live, no redeploy                                      |
+| [ai elements](https://ai-sdk.dev/elements)                                    | chat interface, task progress ui, loading states                                            |
+| [streamdown](https://streamdown.ai)                                           | renders code and markdown cleanly                                                           |
+| [shadcn/ui](https://ui.shadcn.com)                                            | every ui component                                                                          |
+| [vercel](https://vercel.com)                                                  | hosts and deploys the app                                                                   |
+| [analytics](https://vercel.com/docs/analytics)                                | tracks real usage without slowing anything down                                             |
 
 icons animated by [lucide-animated](https://lucide-animated.com).
 
