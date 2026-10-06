@@ -281,8 +281,8 @@ function validateAgent(raw: string): string[] {
       );
     }
     if (
-      /t\.calledTool\([^)]*count\s*:\s*0/.test(evalBody) ||
-      /t\.notCalledTool\(/.test(evalBody)
+      /\bt\.calledTool\([^)]*count\s*:\s*0/.test(evalBody) ||
+      /\bt\.notCalledTool\(/.test(evalBody)
     ) {
       problems.push(
         "evals/core.eval.ts must scope its negative tool assertion to the turn returned by the second t.send",
@@ -290,7 +290,7 @@ function validateAgent(raw: string): string[] {
     }
     const hasTurnScopedNegativeCheck = toolNames.some((tool) =>
       new RegExp(
-        `\b[A-Za-z_$][\w$]*\.notCalledTool\(\s*["']${tool}["']\s*\)`,
+        String.raw`\b[A-Za-z_$][\w$]*\.notCalledTool\(\s*["']${tool}["']\s*\)`,
       ).test(evalBody),
     );
     if (!hasTurnScopedNegativeCheck) {
@@ -537,7 +537,7 @@ async function testAgent(
   visitorId?: string,
   id?: string,
 ): Promise<TestResult> {
-  ("use step");
+  "use step";
 
   await emit({ type: "step", step: "test", status: "running" });
   const first = await callTestService(code, prompt, visitorId, id);
