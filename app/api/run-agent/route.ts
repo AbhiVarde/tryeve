@@ -237,6 +237,14 @@ export async function POST(req: Request) {
           env: sandboxEnv,
           persistent: false,
           ...(agentDrive ? { mounts: { "/vercel/sandbox": agentDrive } } : {}),
+          networkPolicy: {
+            allow: [
+              "registry.npmjs.org",
+              ...(sandboxEnv.AI_GATEWAY_API_KEY || sandboxEnv.VERCEL_OIDC_TOKEN
+                ? ["ai-gateway.vercel.sh"]
+                : []),
+            ],
+          },
         });
       } finally {
         span.end();
@@ -361,6 +369,8 @@ export async function POST(req: Request) {
         {
           access: "public",
           addRandomSuffix: false,
+          allowOverwrite: true,
+          cacheControlMaxAge: 0,
           token: process.env.BLOB_READ_WRITE_TOKEN,
         },
       );

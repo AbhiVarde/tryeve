@@ -2,6 +2,7 @@ import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import { checkRateLimit } from "@vercel/firewall";
 import { trace } from "@opentelemetry/api";
 import { MAX_INPUT_LENGTH } from "@/lib/constants";
+import { isSafeAgentUrl } from "@/app/lib/safe-url";
 
 const tracer = trace.getTracer("tryeve");
 export const runtime = "nodejs";
@@ -13,26 +14,6 @@ const DASH_RE = /[\u2014\u2013]/g;
 
 function clean(text: string) {
   return text.replace(DASH_RE, ", ").replace(/[ \t]{2,}/g, " ");
-}
-
-function isSafeAgentUrl(raw: string) {
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "https:") return false;
-    const h = u.hostname;
-    return !(
-      h === "localhost" ||
-      h === "[::1]" ||
-      h.endsWith(".local") ||
-      h.endsWith(".internal") ||
-      /^(0|10|127)\./.test(h) ||
-      /^192\.168\./.test(h) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
-      /^169\.254\./.test(h)
-    );
-  } catch {
-    return false;
-  }
 }
 
 function getBaseUrl() {

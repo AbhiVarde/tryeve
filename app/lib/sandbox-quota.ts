@@ -83,6 +83,21 @@ export async function untrackSandbox(
   }).catch((err) => console.error("untrackSandbox failed:", err));
 }
 
+export async function isSandboxTracked(
+  visitorId: string | undefined,
+  sandboxName: string,
+) {
+  if (!visitorId) return false;
+  try {
+    await head(key(visitorId, sandboxName), {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function recordUsage(visitorId: string, additionalSeconds: number) {
   try {
     let current = 0;

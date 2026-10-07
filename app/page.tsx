@@ -475,9 +475,11 @@ function HomeInner() {
     !!selectedFile || showFeatures || showBuiltWith || showHistory;
 
   const chatSessionRef = useRef<ChatSession | null>(null);
+  const activeShareIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     chatSessionRef.current = chatSession;
-  }, [chatSession]);
+    activeShareIdRef.current = activeShareId;
+  }, [chatSession, activeShareId]);
 
   useEffect(() => {
     function stopActiveSandbox() {
@@ -485,9 +487,15 @@ function HomeInner() {
       if (!session) return;
       navigator.sendBeacon(
         "/api/stop-agent",
-        new Blob([JSON.stringify({ sandboxName: session.sandboxName })], {
-          type: "application/json",
-        }),
+        new Blob(
+          [
+            JSON.stringify({
+              sandboxName: session.sandboxName,
+              shareId: activeShareIdRef.current,
+            }),
+          ],
+          { type: "application/json" },
+        ),
       );
     }
 
@@ -515,7 +523,10 @@ function HomeInner() {
         fetch("/api/stop-agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sandboxName: chatSession.sandboxName }),
+          body: JSON.stringify({
+            sandboxName: chatSession.sandboxName,
+            shareId: activeShareIdRef.current,
+          }),
         });
         setChatSession(null);
         toast.info("disconnected after 5 minutes of inactivity");

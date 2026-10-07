@@ -125,19 +125,34 @@ export async function POST(req: Request) {
     });
     const lockAge = Date.now() - lock.uploadedAt.getTime();
     if (lockAge < 45_000) {
-      const existing = await head(`agents/${shareId}-session.json`, {
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      }).catch(() => null);
-      if (existing) {
-        const session = await (
-          await fetch(existing.url, { cache: "no-store" })
-        ).json();
-        return Response.json({
-          ok: true,
-          sandboxName: session.sandboxName,
-          url: session.url,
-        });
+      const deadline = Date.now() + 40_000;
+      while (Date.now() < deadline) {
+        try {
+          const existing = await head(`agents/${shareId}-session.json`, {
+            token: process.env.BLOB_READ_WRITE_TOKEN,
+          });
+          const session = await (
+            await fetch(existing.url, { cache: "no-store" })
+          ).json();
+          const alive = await fetch(session.url)
+            .then((r) => r.status < 500)
+            .catch(() => false);
+          if (alive) {
+            return Response.json({
+              ok: true,
+              sandboxName: session.sandboxName,
+              url: session.url,
+            });
+          }
+        } catch {
+          // session not written yet
+        }
+        await new Promise((r) => setTimeout(r, 2000));
       }
+      return Response.json({
+        ok: false,
+        error: "this agent is still waking up, try again in a moment",
+      });
     }
   } catch {
     // no lock present, proceed normally
@@ -216,6 +231,14 @@ export async function POST(req: Request) {
       env: sandboxEnv,
       persistent: false,
       ...(agentDrive ? { mounts: { "/vercel/sandbox": agentDrive } } : {}),
+      networkPolicy: {
+        allow: [
+          "registry.npmjs.org",
+          ...(sandboxEnv.AI_GATEWAY_API_KEY || sandboxEnv.VERCEL_OIDC_TOKEN
+            ? ["ai-gateway.vercel.sh"]
+            : []),
+        ],
+      },
     });
   } catch (err) {
     console.error("revive-agent: sandbox create failed", err);
@@ -323,6 +346,7 @@ export async function POST(req: Request) {
         access: "public",
         addRandomSuffix: false,
         allowOverwrite: true,
+        cacheControlMaxAge: 0,
         token: process.env.BLOB_READ_WRITE_TOKEN,
       },
     );
