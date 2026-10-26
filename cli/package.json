@@ -1,7 +1,7 @@
 {
   "name": "@abhivarde/tryeve",
-  "version": "0.2.0",
-  "description": "build an eve agent from a sentence, tested on a live eve runtime, written to your disk",
+  "version": "0.5.0",
+  "description": "build an eve agent from a sentence, tested on a live eve runtime, written to your disk and deployed from your terminal",
   "type": "module",
   "bin": {
     "tryeve": "./index.mjs"
@@ -27,6 +27,8 @@
     "agent",
     "vercel",
     "cli",
-    "tryeve"
+    "tryeve",
+    "ai-agents",
+    "scaffold"
   ]
 }

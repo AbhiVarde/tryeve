@@ -11,6 +11,7 @@ import { MAX_INPUT_LENGTH, MIN_PROMPT_LENGTH } from "@/lib/constants";
 import { getApiKeyVisitor } from "@/app/lib/api-key";
 import { hashOwner } from "@/app/lib/owner";
 import { toBuildEvent } from "@/lib/build-events";
+import { takeDailySlot } from "@/app/lib/key-usage";
 
 const tracer = trace.getTracer("tryeve");
 export const maxDuration = 300;
@@ -20,7 +21,7 @@ const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export async function POST(req: Request) {
-  const keyVisitor = getApiKeyVisitor(req);
+  const keyVisitor = await getApiKeyVisitor(req);
   if (req.headers.get("authorization") && !keyVisitor) {
     return Response.json({ error: "invalid api key" }, { status: 401 });
   }
@@ -70,6 +71,18 @@ export async function POST(req: Request) {
 
   if (prompt.length < MIN_PROMPT_LENGTH || prompt.length > MAX_INPUT_LENGTH) {
     return Response.json({ error: "invalid prompt" }, { status: 400 });
+  }
+
+  if (keyVisitor) {
+    const dailyLimit = Number(process.env.TRYEVE_DAILY_LIMIT ?? 10);
+    if (!(await takeDailySlot(keyVisitor, dailyLimit))) {
+      return Response.json(
+        {
+          error: `daily limit of ${dailyLimit} builds reached, it resets at midnight UTC`,
+        },
+        { status: 429 },
+      );
+    }
   }
 
   const id = nanoid(8);
