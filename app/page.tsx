@@ -1716,7 +1716,7 @@ function HomeInner() {
                 </h1>
                 <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
                   tested against a live eve runtime, then deployed to your own
-                  github and vercel.
+                  github and vercel. use it here or from your terminal.
                 </p>
               </div>
               {usage && usage.percentUsed >= 50 && (
@@ -1732,6 +1732,27 @@ function HomeInner() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          'npx @abhivarde/tryeve "agent that logs expenses"',
+                        );
+                        toast.success("command copied", {
+                          description: "run it in any terminal",
+                        });
+                      }}
+                      className="mx-auto flex max-w-full cursor-pointer items-center gap-2 rounded-full border border-border/30 bg-black/20 px-3.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
+                      aria-label="copy cli command"
+                    >
+                      <span className="text-muted-foreground/60">$</span>
+                      <span className="truncate">
+                        npx @abhivarde/tryeve "describe an agent"
+                      </span>
+                      <span className="shrink-0 text-muted-foreground/50">
+                        copy
+                      </span>
+                    </button>
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       <span className="font-mono text-[11px] text-muted-foreground/60">
                         try:

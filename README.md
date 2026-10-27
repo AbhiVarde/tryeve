@@ -2,17 +2,90 @@
 
 **Agent Builder for eve.**
 
-[live demo](https://tryeve.abhivarde.in) · built with ▲ [vercel](https://vercel.com)
+[live demo](https://tryeve.abhivarde.in) · [cli](https://www.npmjs.com/package/@abhivarde/tryeve) · built with ▲ [vercel](https://vercel.com)
 
 ## what it does
 
 you type a description. tryeve generates real eve files, boots them in an isolated sandbox against the actual eve runtime, and only shows you the result once it has confirmed the agent responds. if it passes, you can chat with it live, download it as a working project, publish it to the gallery, deploy it to your own GitHub and then Vercel, or share a link that lets anyone else talk to it too.
 
+use it in the browser or from your terminal. same live eve test either way.
+
 reload the page anytime. your agent, your chat, your files, all still there.
+
+## use it from your terminal
+
+```bash
+npx @abhivarde/tryeve "agent that logs expenses with amount and category"
+```
+
+the first run asks you to sign in with github once: a short code, one click in the browser, and a key is saved to `~/.config/tryeve/config.json`. tryeve reads only your public profile, and your github token is never stored.
+
+```
+  tryeve 0.5.0
+
+  ✓ prompt looks buildable             5s
+  ✓ agent written                      4s
+  ✓ live eve test finished             57s
+
+  ✓ passed a live eve test · 2m 06s
+```
+
+then you get a file tree, a share link, and the exact commands to run it. the agent is written to a folder with its tools, an eval, `.env.example`, `.gitignore` and a short readme.
+
+```bash
+cd <folder>
+cp .env.example .env    # copy on windows, then add your AI_GATEWAY_API_KEY
+npm install
+npm run dev             # chat with your agent in the terminal
+```
+
+ship it from inside the agent folder:
+
+```bash
+npx @abhivarde/tryeve deploy github    # new private repo, add --public for public
+npx @abhivarde/tryeve deploy vercel    # deploy with your vercel account
+```
+
+`deploy github` needs [git](https://git-scm.com) and the [github cli](https://cli.github.com) signed in with `gh auth login`. `deploy vercel` runs `npx vercel` and walks you through sign-in. add `AI_GATEWAY_API_KEY` in your vercel project so the agent can answer.
+
+use it from a coding agent:
+
+```bash
+echo "agent that triages support emails" | npx @abhivarde/tryeve - --json
+```
+
+`--json` prints one object on stdout: `ok`, `id`, `share`, `tested`, `env`, `dir`, `files`. progress and errors never touch stdout.
+
+### cli options
+
+- `-o, --out <dir>` output folder, defaults to a name from the prompt
+- `--force` write into a folder that isn't empty
+- `--open` open the web page for the agent when the build finishes
+- `--public` make the github repo public, default is private
+- `--json` machine-readable output, nothing else on stdout
+- `--url <base>` api base, or set `TRYEVE_URL`
+- `-h, --help`, `-v, --version`
+
+### cli commands
+
+- `deploy github` push the agent in the current folder to a new github repo
+- `deploy vercel` deploy the agent in the current folder to vercel
+- `login` save your key, or `login --key` if you already have one
+- `logout` remove it
+
+### cli exit codes
+
+- `0` built and written to disk
+- `1` error or failed build
+- `2` prompt too vague, needs clarification
+
+agents that connect to a real service can't be tested here, since tryeve never holds your credentials. they're written to disk marked "not tested", with the variables they need listed. the cli writes only under `agent/` and `evals/`, plus the project files it creates itself. anything else in a response is skipped.
 
 ## features
 
 - describe an agent in plain english
+- build from the browser or from your terminal with `npx @abhivarde/tryeve`
+- pipe it into a coding agent with `--json`
 - generates real, working eve files
 - generation requests are screened by botid before they reach the ai gateway, bots never touch a sandbox
 - a jev preflight score checks if a prompt is buildable before spending a sandbox, low scores get a clarification instead
@@ -26,6 +99,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 - export the full agent as a zip
 - deploy any generated agent straight to your own GitHub, no OAuth app to set up yourself
 - once deployed to github, deploy straight to vercel too
+- ship from the cli too, `deploy github` and `deploy vercel` run inside the agent folder
 - publish an agent to a public gallery, with an auto-generated preview card
 - share a live link to any agent you build, anyone with the link can chat with it directly
 - connect to your agent right after it's built, no install needed
@@ -42,12 +116,12 @@ reload the page anytime. your agent, your chat, your files, all still there.
 
 ## how it works
 
-1. you describe an agent
+1. you describe an agent, in the browser or through the cli
 2. a botid check runs first, bot traffic is rejected before it costs anything
 3. a jev preflight score checks if the prompt is buildable, a low score returns a clarification instead of spending a sandbox
 4. the ai gateway routes the request to a model (switchable live via flags sdk), which writes real eve files
 5. a vercel sandbox installs eve for real and boots it, no stubs
-6. tryeve sends a live test message and confirms the agent actually responds, while real progress events stream to the page step by step
+6. tryeve sends a live test message and confirms the agent actually responds, while real progress events stream to the page or terminal step by step
 7. if it passes, the sandbox is kept alive rather than thrown away, so connecting afterward is instant
 8. the agent, its live session, and its chat transcript are stored in blob, so a share link or a page reload brings it all back, including past messages
 9. it's also added to your own history, tracked by a private cookie, not visible to anyone else
@@ -63,7 +137,7 @@ for the full technical breakdown, including real bugs hit building this, see [HO
 
 ```mermaid
 flowchart TD
-  Prompt[user prompt] -->|botid check| Bot{bot traffic?}
+  Prompt[user prompt, web or cli] -->|botid check| Bot{bot traffic?}
   Bot -->|blocked| Reject[403]
   Bot -->|passed| Preflight[jev preflight via ai gateway]
   Preflight -->|low score| Clarify[clarification, no sandbox spent]
@@ -76,6 +150,7 @@ flowchart TD
   Test -->|pass| Store[(blob: agent, session, transcript, history)]
   Store --> Chat[chat, reuses live sandbox]
   Store --> Download[download as zip]
+  Store --> Disk[cli writes files to your disk]
   Store --> Gallery[publish to gallery]
   Store --> GithubDeploy[deploy to github, connect + classic oauth]
   GithubDeploy --> VercelDeploy[deploy to vercel, vercel oauth]
@@ -196,6 +271,8 @@ lib/
 - sandbox outbound access is allow-listed to registry.npmjs.org and the active model-provider host
 - connection credentials are never stored, only referenced by environment variable name
 - chat, generation, and connect requests are all rate limited per visitor
+- the cli signs in with github device flow, reads only your public profile, and never stores your github token
+- cli deploys run on your machine with your own git, gh, and vercel sessions, tryeve never sees those credentials
 
 ## limits
 
@@ -206,6 +283,12 @@ sandboxes run on the [hobby plan](https://vercel.com/docs/plans/hobby) by defaul
 - concurrent sandboxes are capped per visitor to keep usage fair
 - generation, connect, and chat requests are all rate limited per ip
 - sandboxes are created with `persistent: false`, so stopping one never writes to Snapshot Storage, only compute hours apply
+
+cli beta limits:
+
+- one key per github account, accounts must be 7 days old
+- 10 builds a day
+- signing in on another machine replaces the first key
 
 these are generous enough for regular use. earlier builds of this project did not set `persistent: false`, which caused Snapshot Storage (a separate Hobby allowance) to fill up from routine testing alone. that's fixed as of the current version, heavy usage now only affects the compute hour allowance, not storage.
 

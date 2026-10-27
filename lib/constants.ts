@@ -50,6 +50,9 @@ export const FEATURE_GROUPS: { label: string; items: string[] }[] = [
     items: [
       "inspect every file with syntax highlighting",
       "export the full agent as a zip",
+      "build from your terminal with npx @abhivarde/tryeve, one github sign-in, same live eve test, files written to your disk",
+      "ship from the cli too: deploy github and deploy vercel run inside the agent folder",
+      "pipe it into a coding agent with --json, one machine-readable object on stdout",
       "deploy any agent straight to your own GitHub, one-time authorization",
       "deploy that same agent to your own vercel account too, live in seconds",
     ],
