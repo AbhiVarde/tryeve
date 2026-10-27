@@ -391,6 +391,8 @@ function HomeInner() {
   const [speechLang, setSpeechLang] = useState("en-US");
   const [micKey, setMicKey] = useState(0);
 
+  const [cliCopied, setCliCopied] = useState(false);
+
   useEffect(() => {
     setSpeechSupported(
       "SpeechRecognition" in window || "webkitSpeechRecognition" in window,
@@ -1345,6 +1347,16 @@ function HomeInner() {
     await generateAgent(trimmed);
   }
 
+  function copyCli() {
+    navigator.clipboard
+      .writeText('npx @abhivarde/tryeve "agent that logs expenses"')
+      .then(() => {
+        setCliCopied(true);
+        setTimeout(() => setCliCopied(false), 1800);
+      })
+      .catch(() => {});
+  }
+
   function submitRefine() {
     const trimmed = refineInput.trim();
     if (!trimmed || !latestAssistantMessage || busy) return;
@@ -1703,7 +1715,7 @@ function HomeInner() {
       >
         {restoring || messages.length === 0 ? (
           <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-14 sm:px-6 sm:py-20">
-            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-2 sm:gap-4 text-center">
+            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-3 text-center sm:gap-4">
               <Badge
                 variant="outline"
                 className="rounded-full px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
@@ -1720,37 +1732,37 @@ function HomeInner() {
                 </p>
               </div>
               {usage && usage.percentUsed >= 50 && (
-                <p className="mb-2 font-mono text-[11px] text-muted-foreground/60">
+                <p className="font-mono text-[11px] text-muted-foreground/60">
                   {usage.hours.toFixed(1)}/{usage.capHours} sandbox hours used
                   this month
                 </p>
               )}
-              <div className="mt-2 w-full">
+              <div className="mt-3 w-full sm:mt-4">
                 {restoring ? (
                   <div className="font-mono text-sm text-muted-foreground">
                     <Shimmer duration={1.5}>loading your agent...</Shimmer>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-4">
                     <button
                       type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(
-                          'npx @abhivarde/tryeve "agent that logs expenses"',
-                        );
-                        toast.success("command copied", {
-                          description: "run it in any terminal",
-                        });
-                      }}
-                      className="mx-auto flex max-w-full cursor-pointer items-center gap-2 rounded-full border border-border/30 bg-black/20 px-3.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
+                      onClick={copyCli}
                       aria-label="copy cli command"
+                      className="mx-auto flex max-w-full cursor-pointer items-center gap-2.5 rounded-full border border-border/30 bg-black/20 py-1.5 pl-3.5 pr-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
                     >
-                      <span className="text-muted-foreground/60">$</span>
+                      <span className="text-muted-foreground/50">$</span>
                       <span className="truncate">
-                        npx @abhivarde/tryeve "describe an agent"
+                        npx @abhivarde/tryeve "agent that logs expenses"
                       </span>
-                      <span className="shrink-0 text-muted-foreground/50">
-                        copy
+                      <span className="h-3 w-px shrink-0 bg-border/40" />
+                      <span
+                        className={`w-10 shrink-0 text-left transition-colors ${
+                          cliCopied
+                            ? "text-emerald-500"
+                            : "text-muted-foreground/60"
+                        }`}
+                      >
+                        {cliCopied ? "copied" : "copy"}
                       </span>
                     </button>
                     <div className="flex flex-wrap items-center justify-center gap-2">
