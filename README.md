@@ -15,7 +15,7 @@ reload the page anytime. your agent, your chat, your files, all still there.
 ## use it from your terminal
 
 ```bash
-npx @abhivarde/tryeve "agent that logs expenses with amount and category"
+npx @abhivarde/tryeve "agent that roasts my startup idea with amount and category"
 ```
 
 the first run asks you to sign in with github once: a short code, one click in the browser, and a key is saved to `~/.config/tryeve/config.json`. tryeve reads only your public profile, and your github token is never stored.

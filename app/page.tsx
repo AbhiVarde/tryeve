@@ -1349,7 +1349,7 @@ function HomeInner() {
 
   function copyCli() {
     navigator.clipboard
-      .writeText('npx @abhivarde/tryeve "agent that logs expenses"')
+      .writeText('npx @abhivarde/tryeve "agent that roasts my startup idea"')
       .then(() => {
         setCliCopied(true);
         setTimeout(() => setCliCopied(false), 1800);
@@ -1752,7 +1752,8 @@ function HomeInner() {
                     >
                       <span className="text-muted-foreground/50">$</span>
                       <span className="truncate">
-                        npx @abhivarde/tryeve "agent that logs expenses"
+                        npx @abhivarde/tryeve "agent that roasts my startup
+                        idea"
                       </span>
                       <span className="h-3 w-px shrink-0 bg-border/40" />
                       <span
