@@ -84,11 +84,11 @@ export function InstallCard() {
       <div
         role="group"
         aria-label="install method"
-        className="relative grid w-fit grid-cols-2 rounded-full bg-white/5 p-px"
+        className="relative grid w-fit grid-cols-2 rounded-md bg-white/5 p-px"
       >
         <span
           aria-hidden="true"
-          className="absolute inset-y-px left-px w-[calc(50%-1px)] rounded-full bg-white/10 transition-transform duration-200 ease-out motion-reduce:transition-none"
+          className="absolute inset-y-px left-px w-[calc(50%-1px)] rounded-md bg-white/5 transition-transform duration-200 ease-out motion-reduce:transition-none"
           style={{ transform: `translateX(${index * 100}%)` }}
         />
         {TABS.map((t, i) => (
@@ -101,7 +101,7 @@ export function InstallCard() {
               setCopied(false);
             }}
             className={cn(
-              "relative z-10 h-5 w-11 cursor-pointer touch-manipulation rounded-full text-center text-[10px] leading-none outline-none transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-border",
+              "relative z-10 h-5 w-11 cursor-pointer touch-manipulation rounded-md text-center text-[10px] leading-none outline-none transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-border",
               index === i
                 ? "text-foreground"
                 : "text-muted-foreground/60 hover:text-foreground",
@@ -116,7 +116,7 @@ export function InstallCard() {
         type="button"
         onClick={copy}
         aria-label={`copy ${active.label} command`}
-        className="group mt-1.5 flex w-full cursor-pointer touch-manipulation items-center gap-2 rounded-lg bg-white/3 px-2.5 py-1.5 text-left outline-none transition-colors hover:bg-white/6 active:bg-white/8 focus-visible:ring-1 focus-visible:ring-border"
+        className="group mt-1.5 flex w-full cursor-pointer touch-manipulation items-center gap-2 rounded-lg bg-white/2 px-2.5 py-1.5 text-left outline-none transition-colors hover:bg-white/3 active:bg-white/3 focus-visible:ring-0 focus-visible:ring-border"
       >
         <span aria-hidden="true" className="text-muted-foreground/40">
           $
