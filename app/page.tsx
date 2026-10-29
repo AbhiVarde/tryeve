@@ -80,6 +80,7 @@ import { ClockIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { getConnectionEnvVars } from "@/app/lib/eve-connections";
 import { ArrowUpIcon } from "@/components/ui/arrow-up";
+import { InstallCard } from "@/components/install-card";
 import {
   FEATURE_GROUPS,
   MAX_INPUT_LENGTH,
@@ -390,8 +391,6 @@ function HomeInner() {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [speechLang, setSpeechLang] = useState("en-US");
   const [micKey, setMicKey] = useState(0);
-
-  const [cliCopied, setCliCopied] = useState(false);
 
   useEffect(() => {
     setSpeechSupported(
@@ -1347,16 +1346,6 @@ function HomeInner() {
     await generateAgent(trimmed);
   }
 
-  function copyCli() {
-    navigator.clipboard
-      .writeText('npx @abhivarde/tryeve "agent that roasts my startup idea"')
-      .then(() => {
-        setCliCopied(true);
-        setTimeout(() => setCliCopied(false), 1800);
-      })
-      .catch(() => {});
-  }
-
   function submitRefine() {
     const trimmed = refineInput.trim();
     if (!trimmed || !latestAssistantMessage || busy) return;
@@ -1618,7 +1607,7 @@ function HomeInner() {
                 e.currentTarget.form?.requestSubmit();
               }
             }}
-            className="min-h-24 resize-none rounded-none border-0 bg-transparent px-4 pt-3.5 pb-2 font-mono text-sm shadow-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent"
+            className="min-h-20 resize-none rounded-none border-0 bg-transparent px-4 pt-3.5 pb-2 font-mono text-sm shadow-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent"
           />
           <div className="flex items-center justify-between px-2.5 pb-2.5">
             <div className="flex items-center">
@@ -1714,15 +1703,15 @@ function HomeInner() {
         }`}
       >
         {restoring || messages.length === 0 ? (
-          <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-14 sm:px-6 sm:py-20">
-            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-3 text-center sm:gap-4">
+          <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-10 sm:px-6 sm:py-14">
+            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-2.5 text-center sm:gap-3">
               <Badge
                 variant="outline"
                 className="rounded-full px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
               >
                 Agent Builder
               </Badge>
-              <div className="flex flex-col gap-2.5 sm:gap-3">
+              <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                   describe an agent. get a working one.
                 </h1>
@@ -1732,41 +1721,19 @@ function HomeInner() {
                 </p>
               </div>
               {usage && usage.percentUsed >= 50 && (
-                <p className="font-mono text-[11px] text-muted-foreground/60">
+                <p className="absolute inset-x-0 -bottom-7 font-mono text-[11px] text-muted-foreground/60">
                   {usage.hours.toFixed(1)}/{usage.capHours} sandbox hours used
                   this month
                 </p>
               )}
-              <div className="mt-3 w-full sm:mt-4">
-                {restoring ? (
+              <div className="mt-1 w-full sm:mt-2">
+                {restoring && searchParams.get("a") ? (
                   <div className="font-mono text-sm text-muted-foreground">
                     <Shimmer duration={1.5}>loading your agent...</Shimmer>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-4">
-                    <button
-                      type="button"
-                      onClick={copyCli}
-                      aria-label="copy cli command"
-                      className="mx-auto flex max-w-full cursor-pointer items-center gap-2.5 rounded-full border border-border/30 bg-black/20 py-1.5 pl-3.5 pr-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
-                    >
-                      <span className="text-muted-foreground/50">$</span>
-                      <span className="truncate">
-                        npx @abhivarde/tryeve "agent that roasts my startup
-                        idea"
-                      </span>
-                      <span className="h-3 w-px shrink-0 bg-border/40" />
-                      <span
-                        className={`w-10 shrink-0 text-left transition-colors ${
-                          cliCopied
-                            ? "text-emerald-500"
-                            : "text-muted-foreground/60"
-                        }`}
-                      >
-                        {cliCopied ? "copied" : "copy"}
-                      </span>
-                    </button>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-center gap-1.5">
                       <span className="font-mono text-[11px] text-muted-foreground/60">
                         try:
                       </span>
@@ -1782,6 +1749,7 @@ function HomeInner() {
                       ))}
                     </div>
                     {inputBar}
+                    <InstallCard />
                   </div>
                 )}
               </div>
