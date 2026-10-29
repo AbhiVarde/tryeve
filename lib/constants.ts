@@ -7,137 +7,129 @@ export const STARTER_PROMPTS = [
   {
     label: "itinerary planner",
     prompt:
-      "an agent that builds a customized daily travel itinerary when given a destination, budget, and trip duration",
+      "an agent that builds a daily travel itinerary from a destination, budget, and trip length",
   },
   {
     label: "packing assistant",
     prompt:
-      "an agent that generates a checklist of clothes and gear based on the destination's current weather forecast and trip activities",
+      "an agent that lists clothes and gear based on the destination's weather forecast and trip activities",
   },
   {
     label: "local food guide",
     prompt:
-      "an agent that recommends the top five must-try local dishes and highly-rated restaurants in any city",
+      "an agent that recommends five must-try dishes and well-rated restaurants in any city",
   },
   {
     label: "flight finder",
     prompt:
-      "an agent that searches for the cheapest flight deals between two locations given preferred departure dates and maximum layovers",
+      "an agent that finds the cheapest flights between two places for given dates and a maximum number of layovers",
   },
 ] as const;
 
 export const FEATURE_GROUPS: { label: string; items: string[] }[] = [
   {
-    label: "build & test",
+    label: "build and test",
     items: [
       "describe an agent in plain english",
-      "generates real eve files: instructions, typed tools, skills, subagents, mcp connections, schedules, and an eval",
+      "writes real eve files: instructions, typed tools, skills, subagents, mcp connections, schedules and an eval",
       "connects to real services over mcp when you name one, like linear or notion",
-      "tools that send, delete, or charge are generated with an approval gate",
-      "generated files are checked and repaired before they are tested",
-      "tested live in a sandbox against your actual request before you see it",
-      "watch the build happen live, real steps as they run, not a fake timer",
-      "generation and testing run as one durable workflow, survives crashes",
-      "when the model pool is busy, it retries before giving up",
-      "if a build fails, the reason is shown and you can retry with one click",
-      "refine an existing agent with a follow-up instead of starting over",
+      "tools that send, delete or charge get an approval gate",
+      "uses web search for live facts, never invents data",
+      "files are validated and repaired before testing",
+      "every agent is tested live in a sandbox before you see it",
+      "real build steps stream as they run",
+      "generation and testing run as one durable workflow",
+      "retries when the model pool is busy, one click to retry a failed build",
+      "refine an existing agent with a follow-up",
       "describe or message an agent by voice in chrome and edge",
-      "uses real web search when a request needs facts, never invents data",
     ],
   },
   {
-    label: "deploy & own it",
+    label: "cli",
+    items: [
+      "build from your terminal with npx @abhivarde/tryeve",
+      "one github sign-in, same live eve test, files written to your disk",
+      "deploy to github or vercel from inside the agent folder",
+      "--json prints one machine-readable object for coding agents",
+      "ships an agent skill so coding agents know how to use it",
+    ],
+  },
+  {
+    label: "deploy and own it",
     items: [
       "inspect every file with syntax highlighting",
       "export the full agent as a zip",
-      "build from your terminal with npx @abhivarde/tryeve, one github sign-in, same live eve test, files written to your disk",
-      "ship from the cli too: deploy github and deploy vercel run inside the agent folder",
-      "pipe it into a coding agent with --json, one machine-readable object on stdout",
-      "deploy any agent straight to your own GitHub, one-time authorization",
-      "deploy that same agent to your own vercel account too, live in seconds",
+      "deploy to your own github with a one-time authorization",
+      "deploy that repo to your own vercel account",
     ],
   },
   {
-    label: "chat & share",
+    label: "chat and share",
     items: [
-      "connect to your agent right after it's built, no install needed",
-      "chat with it live, with markdown-formatted replies",
-      "share a live link, anyone with it can chat with your agent directly",
-      "your chat history is saved, reopening an agent restores the real conversation",
-      "publish an agent to the public gallery with one toggle",
-      "browse and open any agent others have published",
+      "chat with your agent right after it's built, no install",
+      "replies render as markdown",
+      "share a live link, anyone with it can chat",
+      "reopening an agent restores the real conversation",
+      "publish to the public gallery with one toggle",
+      "browse and open agents others have published",
     ],
   },
   {
-    label: "reliability & privacy",
+    label: "reliability and privacy",
     items: [
-      "generated code runs sandboxed, network access locked to only what it needs",
-      "tool failures and rate limits are handled gracefully, never crash the chat",
-      "reload the page anytime, your agent and chat pick up right where you left off",
-      "switching tabs never disconnects your agent, only real exits do",
-      "dead share links reconnect automatically, no dead ends",
-      "warned before disconnect, never cut off without notice",
-      "idle or closed sandboxes shut down automatically, nothing left running",
-      "only you can overwrite or stop your own agent, others can still chat with it",
-      "concurrent sandboxes are capped per visitor to keep usage fair for everyone",
-      "your history is private, delete any entry or clear it all",
+      "generated code runs sandboxed with locked-down network access",
+      "tool failures and rate limits never crash the chat",
+      "reload anytime, your agent and chat stay put",
+      "switching tabs never disconnects, only real exits do",
+      "dead share links reconnect automatically",
+      "you are warned before a disconnect",
+      "idle sandboxes shut down on their own",
+      "only the creator can overwrite or stop an agent",
+      "concurrent sandboxes are capped per visitor",
+      "history is private, delete one entry or all of it",
     ],
   },
 ];
 
 export const VERCEL_PRODUCTS: { name: string; description: string }[] = [
-  {
-    name: "eve",
-    description: "the agent framework every generated agent runs on",
-  },
-  { name: "next.js", description: "the app itself" },
+  { name: "eve", description: "the framework every generated agent runs on" },
+  { name: "next.js", description: "the app" },
   { name: "ai gateway", description: "routes generation to a model" },
-  { name: "ai sdk", description: "streams the model's response" },
+  { name: "ai sdk", description: "streams model output" },
   {
     name: "sandbox",
-    description:
-      "tests and runs each agent live, network-locked to only what it needs",
+    description: "tests and runs each agent, network access locked down",
   },
   {
     name: "workflow sdk",
-    description: "runs generate + test as one durable workflow",
+    description: "runs generate and test as one durable workflow",
   },
-  { name: "blob", description: "stores agents, sessions, and chat history" },
+  { name: "blob", description: "stores agents, sessions and chat history" },
   { name: "cron", description: "sweeps stale sandbox sessions" },
-  {
-    name: "observability",
-    description: "traces the sandbox pipeline for failures",
-  },
+  { name: "observability", description: "traces the sandbox pipeline" },
   {
     name: "firewall",
-    description: "rate limits generation, connect, and chat",
+    description: "rate limits generation, connect and chat",
   },
   {
     name: "connect",
-    description: "issues scoped GitHub tokens to push generated files",
+    description: "issues scoped github tokens to push generated files",
   },
   {
     name: "vercel oauth",
-    description:
-      "deploys agents straight to a user's own vercel account, no token of mine involved",
+    description: "deploys to your own vercel account, no shared token",
   },
-  {
-    name: "botid",
-    description: "blocks bot traffic on generation, invisible to real users",
-  },
+  { name: "botid", description: "blocks bot traffic on generation" },
   {
     name: "flags sdk",
-    description: "flips the model or pauses generation live, no redeploy",
+    description: "switches the model or pauses generation, no redeploy",
   },
   {
     name: "ai elements",
-    description: "chat ui, progress, loading states, and voice input",
+    description: "chat ui, progress, loading states and voice input",
   },
-  { name: "streamdown", description: "renders code and markdown cleanly" },
+  { name: "streamdown", description: "renders code and markdown" },
   { name: "shadcn/ui", description: "every ui component" },
   { name: "vercel", description: "hosts and deploys the app" },
-  {
-    name: "analytics",
-    description: "tracks usage without slowing things down",
-  },
+  { name: "analytics", description: "usage tracking, no slowdown" },
 ];
